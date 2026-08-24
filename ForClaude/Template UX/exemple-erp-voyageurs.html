@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>ERP-Voyageurs — Exemple GPMM</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gpmm.css" />
+</head>
+<body>
+  <!-- Bibliothèque d'icônes SVG locale — voir icons.svg pour la liste complète (35 icônes, nomenclature #i-xxx) -->
+  <svg class="svg-sprite" aria-hidden="true">
+    <defs>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10M9 20v-6h6v6"/></symbol>
+      <symbol id="i-ship" viewBox="0 0 24 24"><path d="M4 17h16l-2 3H6l-2-3zM6 17l1-7h10l1 7M9 10V6h6v4M12 6V3"/></symbol>
+      <symbol id="i-tools" viewBox="0 0 24 24"><path d="M14 6l4-4 4 4-4 4M13 7L4 16l4 4 9-9M3 21l3-1-2-2-1 3z"/></symbol>
+      <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5h10v16M14 9h6v12M8 9h2M8 13h2M8 17h2M17 13h1M17 17h1"/></symbol>
+      <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-4 2-6 6-6s6 2 6 6M16 7a3 3 0 0 1 3 3M17 14c3 .3 4 2.3 4 5"/></symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-3z"/><path d="M9 12l2 2 4-4"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/><path d="M3 9h18"/></symbol>
+      <symbol id="i-fire" viewBox="0 0 24 24"><path d="M13 3s1 4-2 6c-2 1.5-3 3.5-3 5.5A4.5 4.5 0 0 0 12.5 19c2.5 0 4.5-2 4.5-4.5 0-2-1-3.5-2.5-5 .1 2-1 3-2 3.5.5-3-1-5-1-5S9 10 9 13"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.8-1.8l.9-1.9-2.2-2.2-1.9.9A7 7 0 0 0 11.5 4L10.5 2h-3L6.8 4a7 7 0 0 0-1.8.8l-1.9-.9L.9 6.1 1.8 8a7 7 0 0 0-.8 1.8L-1 10.5v3l2 .7a7 7 0 0 0 .8 1.8l-.9 1.9 2.2 2.2 1.9-.9a7 7 0 0 0 1.8.8l.7 2h3l.7-2a7 7 0 0 0 1.8-.8l1.9.9 2.2-2.2-.9-1.9a7 7 0 0 0 .8-1.8z" transform="translate(2 0) scale(.85)"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M18.4 5.6l-.7.7M6.3 17.7l-.7.7"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 6 2 8H4c0-2 2-2 2-8M10 20h4"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+      <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 20V4M6 10l6-6 6 6"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 4v16M6 14l6 6 6-6"/></symbol>
+      <symbol id="i-selector" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+      <symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol>
+      <symbol id="i-info-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12v4M12 8h.01"/></symbol>
+      <symbol id="i-circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></symbol>
+      <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16 4l4 4L8 20H4v-4z"/><path d="M13.5 6.5l4 4"/></symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></symbol>
+      <symbol id="i-grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol>
+      <symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app-shell" id="appShell">
+    <header class="app-header">
+      <div class="brand-block">
+        <img src="logo-gpmm.png" alt="Marseille Fos" class="brand-logo" />
+        <span class="brand-separator" aria-hidden="true"></span>
+        <span class="app-name">ERP-Voyageurs</span>
+      </div>
+
+      <div class="header-tabs-shell" id="headerTabsShell">
+        <button type="button" class="tabs-scroll-btn tabs-scroll-btn--left" id="tabsScrollLeft" aria-label="Afficher les onglets précédents" hidden>
+          <svg class="ti"><use href="#i-chevron-left"></use></svg>
+        </button>
+        <!-- Chaque onglet [data-main-tab="xxx"] affiche le panneau [data-main-panel="xxx"] correspondant
+             (comportement générique fourni par app.js). Les onglets Base documentaire, Sécurité incendie
+             et Administration n'ont volontairement pas de panneau dans cet exemple : ils illustrent la
+             largeur de la barre de navigation, à compléter selon les besoins réels de l'application. -->
+        <nav class="header-tabs gp-tabs" id="headerTabs" aria-label="Modules ERP" tabindex="0">
+          <button class="gp-tab" aria-selected="true" data-main-tab="accueil">Accueil</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="escales">Escales</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="maintenance">Maintenance</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="installations">Installations</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="rh">RH</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="base-documentaire">Base documentaire</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="securite-incendie">Sécurité incendie</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="administration">Administration</button>
+        </nav>
+        <button type="button" class="tabs-scroll-btn tabs-scroll-btn--right" id="tabsScrollRight" aria-label="Afficher les onglets suivants" hidden>
+          <svg class="ti"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="content-area" aria-label="Contenu principal">
+
+      <!-- ============================= ACCUEIL ============================= -->
+      <div data-main-panel="accueil">
+        <div class="page-heading">
+          <div>
+            <div class="breadcrumbs"><span>ERP-Voyageurs</span><span>/</span><strong>Accueil</strong></div>
+            <h1>Tableau de bord</h1>
+            <p>Exemple d'application bâtie sur le template GPMM — démontre le shell, les composants et leurs comportements.</p>
+          </div>
+          <div class="page-actions">
+            <button class="gp-btn gp-btn--secondary"><svg class="ti"><use href="#i-download"></use></svg>Exporter</button>
+            <button class="gp-btn gp-btn--primary" data-open-modal="modalNouvelleEscale"><svg class="ti"><use href="#i-plus"></use></svg>Nouvelle escale</button>
+          </div>
+        </div>
+
+        <section class="metrics-grid" aria-label="Indicateurs">
+          <article class="metric-card"><span class="metric-label">Escales aujourd'hui</span><strong class="metric-value">12</strong><span class="metric-meta success">+2 vs prévision</span></article>
+          <article class="metric-card"><span class="metric-label">Interventions ouvertes</span><strong class="metric-value">18</strong><span class="metric-meta warning">4 prioritaires</span></article>
+          <article class="metric-card"><span class="metric-label">Installations suivies</span><strong class="metric-value">146</strong><span class="metric-meta">98 % à jour</span></article>
+          <article class="metric-card"><span class="metric-label">Agents planifiés</span><strong class="metric-value">37</strong><span class="metric-meta success">Couverture conforme</span></article>
+        </section>
+
+        <section class="demo-grid">
+          <article class="gp-panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">Escale</span><h2>Préparation opérationnelle</h2></div>
+              <span class="gp-badge gp-badge--success">Prête</span>
+            </div>
+            <div class="form-grid">
+              <label class="gp-field"><span class="gp-label">Navire</span><input class="gp-input" value="Méditerranée" /></label>
+              <label class="gp-field"><span class="gp-label">Poste</span><input class="gp-input" value="Cap Janet — Poste 35" /></label>
+              <div class="gp-field">
+                <span class="gp-label">Date</span>
+                <div class="gp-dp" data-dp>
+                  <div class="gp-dp__input" data-dp-trigger>
+                    <span class="gp-dp__ico"><svg class="ti"><use href="#i-calendar"></use></svg></span>
+                    <input type="text" placeholder="JJ/MM/AAAA" maxlength="10" value="16/08/2026" data-dp-input aria-label="Date" autocomplete="off">
+                  </div>
+                  <div class="gp-dp__panel" data-dp-panel>
+                    <div class="gp-dp__direct" data-dp-direct>
+                      <div class="gp-dp__dpart" data-dp-dd>--</div>
+                      <span class="gp-dp__dsep">/</span>
+                      <div class="gp-dp__dpart" data-dp-mm>--</div>
+                      <span class="gp-dp__dsep">/</span>
+                      <div class="gp-dp__dpart" style="flex:2;" data-dp-yy>----</div>
+                    </div>
+                    <p class="gp-dp__hint" data-dp-hint hidden>Saisie en cours — JJ/MM/AAAA</p>
+                    <div class="gp-dp__nav">
+                      <button class="gp-dp__nav-btn" data-dp-prev aria-label="Mois précédent"><svg class="ti"><use href="#i-chevron-left"></use></svg></button>
+                      <div class="gp-dp__nav-sels">
+                        <button class="gp-dp__nav-sel" data-dp-msel></button>
+                        <button class="gp-dp__nav-sel" data-dp-ysel></button>
+                      </div>
+                      <button class="gp-dp__nav-btn" data-dp-next aria-label="Mois suivant"><svg class="ti"><use href="#i-chevron-right"></use></svg></button>
+                    </div>
+                    <div class="gp-dp__body"><div class="gp-dp__grid" data-dp-grid></div></div>
+                    <div class="gp-dp__foot">
+                      <button class="gp-btn gp-btn--ghost gp-btn--sm" data-dp-today>Aujourd'hui</button>
+                      <button class="gp-btn gp-btn--primary gp-btn--sm" data-dp-ok>OK</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <label class="gp-field"><span class="gp-label">Référence</span><input class="gp-input" value="ESC-2026-0816-012" readonly /></label>
+            </div>
+          </article>
+
+          <article class="gp-panel compact-panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">Filtres</span><h2>Vue courante</h2></div>
+            </div>
+            <div class="gp-chipset">
+              <button class="gp-chip is-on">Aujourd'hui</button>
+              <button class="gp-chip">Croisière</button>
+              <button class="gp-chip">Ferry</button>
+              <button class="gp-chip">À surveiller</button>
+            </div>
+            <div class="search-row gp-inputgroup"><svg class="ti"><use href="#i-search"></use></svg><input placeholder="Rechercher une escale, un poste…" /></div>
+          </article>
+        </section>
+
+        <!-- Tableau triable, redimensionnable et à sélection multiple : voir data-table / data-sort / data-col
+             sur les en-têtes et data-rowcheck sur chaque ligne (comportement fourni par app.js, sans code
+             supplémentaire à écrire). -->
+        <section class="gp-panel table-panel">
+          <div class="panel-header">
+            <div><span class="eyebrow">Exploitation</span><h2>Escales à venir</h2></div>
+            <button class="gp-btn gp-btn--ghost">Voir tout</button>
+          </div>
+          <div class="gp-table-wrap gp-scroll" data-table>
+            <table class="gp-table">
+              <thead>
+                <tr>
+                  <th style="width:20px;"><input class="gp-check" type="checkbox" data-selall aria-label="Tout sélectionner"></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><span class="gp-th__grip" draggable="true" aria-label="Déplacer la colonne" role="button"><svg class="ti"><use href="#i-grip-vertical"></use></svg></span><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:150px;"><span class="gp-th"><span class="gp-th__grip" draggable="true" aria-label="Déplacer la colonne" role="button"><svg class="ti"><use href="#i-grip-vertical"></use></svg></span><span class="gp-th__sort" data-sort><span>Navire</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><span class="gp-th__grip" draggable="true" aria-label="Déplacer la colonne" role="button"><svg class="ti"><use href="#i-grip-vertical"></use></svg></span><span class="gp-th__sort" data-sort><span>Type</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:130px;"><span class="gp-th"><span class="gp-th__grip" draggable="true" aria-label="Déplacer la colonne" role="button"><svg class="ti"><use href="#i-grip-vertical"></use></svg></span><span class="gp-th__sort" data-sort><span>Poste</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:90px;"><span class="gp-th"><span class="gp-th__grip" draggable="true" aria-label="Déplacer la colonne" role="button"><svg class="ti"><use href="#i-grip-vertical"></use></svg></span><span class="gp-th__sort" data-sort><span>Heure</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th>Statut</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td class="mono">ESC-012</td><td>Méditerranée</td><td>Ferry</td><td>Cap Janet 35</td><td class="mono">17:30</td><td><span class="gp-badge gp-badge--success">Prête</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#i-pencil"></use></svg></button><button aria-label="Synchroniser vers le cloud"><svg class="ti"><use href="#i-cloud"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#i-download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#i-trash"></use></svg></button></div></td></tr>
+                <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td class="mono">ESC-013</td><td>Europa</td><td>Croisière</td><td>Joliette 163</td><td class="mono">18:15</td><td><span class="gp-badge gp-badge--warning">À vérifier</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#i-pencil"></use></svg></button><button aria-label="Synchroniser vers le cloud"><svg class="ti"><use href="#i-cloud"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#i-download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#i-trash"></use></svg></button></div></td></tr>
+                <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td class="mono">ESC-014</td><td>Corsica</td><td>Ferry</td><td>Cap Janet 34</td><td class="mono">19:00</td><td><span class="gp-badge gp-badge--info">Planifiée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#i-pencil"></use></svg></button><button aria-label="Synchroniser vers le cloud"><svg class="ti"><use href="#i-cloud"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#i-download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#i-trash"></use></svg></button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Boutons (toutes variantes) et notifications (4 types) -->
+        <section class="gp-panel" style="margin-top:14px;">
+          <div class="panel-header">
+            <div><span class="eyebrow">Actions</span><h2>Boutons & notifications</h2></div>
+          </div>
+          <div class="stack" style="gap:14px;">
+            <div class="row">
+              <button class="gp-btn gp-btn--primary">Valider</button>
+              <button class="gp-btn gp-btn--secondary">Annuler</button>
+              <button class="gp-btn gp-btn--ghost">Détails</button>
+              <button class="gp-btn gp-btn--danger">Supprimer</button>
+              <button class="gp-btn gp-btn--neutral">Neutre</button>
+              <button class="gp-btn gp-btn--primary" disabled>Désactivé</button>
+            </div>
+            <div class="row">
+              <button class="gp-btn gp-btn--primary gp-btn--sm">Small</button>
+              <button class="gp-btn gp-btn--primary">Medium</button>
+              <button class="gp-btn gp-btn--primary gp-btn--lg">Large</button>
+              <button class="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Ajouter"><svg class="ti"><use href="#i-plus"></use></svg></button>
+            </div>
+            <div class="row">
+              <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="info" data-toast-title="Rapport généré" data-toast-text="L'export des escales est prêt.">Toast info</button>
+              <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="success" data-toast-title="Modifications enregistrées" data-toast-text="La fiche escale a été mise à jour.">Toast succès</button>
+              <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="warning" data-toast-title="Astreinte non couverte" data-toast-text="Aucun agent affecté ce week-end.">Toast alerte</button>
+              <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="danger" data-toast-title="Échec de la synchronisation" data-toast-text="Impossible de joindre le serveur." data-toast-auto="false">Toast erreur</button>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============================= ESCALES ============================= -->
+      <div data-main-panel="escales" hidden>
+        <div class="page-heading">
+          <div>
+            <div class="breadcrumbs"><span>ERP-Voyageurs</span><span>/</span><strong>Escales</strong></div>
+            <h1>Préparation d'escale</h1>
+            <p>Sélection d'installation, plage de dates et confirmation d'annulation.</p>
+          </div>
+          <div class="page-actions">
+            <button class="gp-btn gp-btn--danger" data-open-modal="modalAnnulerEscale"><svg class="ti"><use href="#i-x"></use></svg>Annuler l'escale</button>
+          </div>
+        </div>
+
+        <div class="demo-grid">
+          <article class="gp-panel">
+            <div class="panel-header"><div><span class="eyebrow">Installation</span><h2>Choix du poste</h2></div></div>
+            <div class="stack" style="gap:16px;">
+              <div class="gp-field" style="max-width:340px;">
+                <label class="gp-label">Poste d'accostage</label>
+                <div class="gp-combobox" id="cbEscalePoste">
+                  <div class="gp-inputgroup" data-cb-trigger><span data-cb-value style="flex:1;color:var(--gp-text-muted)">Choisir un poste…</span><svg class="ti chevron"><use href="#i-chevron-down"></use></svg></div>
+                  <div class="gp-menu">
+                    <div class="gp-opt" data-cb-opt>Cap Janet</div>
+                    <div class="gp-opt" data-cb-opt>Quai de la Joliette</div>
+                    <div class="gp-opt" data-cb-opt>Mourepiane</div>
+                    <div class="gp-opt" data-cb-opt>Fos — Darse 1</div>
+                  </div>
+                </div>
+              </div>
+              <label class="gp-choice" style="justify-content:space-between;max-width:340px;">
+                <span>Marquer comme urgente</span>
+                <span class="gp-switch"><input type="checkbox"><span class="track"></span></span>
+              </label>
+            </div>
+          </article>
+
+          <article class="gp-panel compact-panel">
+            <div class="panel-header"><div><span class="eyebrow">Bassins</span><h2>Sélection rapide</h2></div></div>
+            <div class="gp-listbox" data-single-listbox>
+              <div class="gp-optgroup">Bassins Est</div>
+              <div class="gp-opt">Cap Janet</div>
+              <div class="gp-opt is-selected">Quai de la Joliette <svg class="ti js-check"><use href="#i-check"></use></svg></div>
+              <div class="gp-opt">Mourepiane</div>
+              <div class="gp-opt is-disabled">Môle Léon Gourret — hors service</div>
+              <div class="gp-optgroup" style="border-top:1px solid var(--gp-surface-sunken)">Bassins Ouest</div>
+              <div class="gp-opt">Fos — Darse 1</div>
+            </div>
+          </article>
+        </div>
+
+        <section class="gp-panel" style="margin-top:14px;">
+          <div class="panel-header"><div><span class="eyebrow">Filtre</span><h2>Plage de dates des escales</h2></div></div>
+          <div class="demo-grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr);">
+            <div>
+              <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 10px;">Curseur + saisie (tonnage min/max)</p>
+              <div class="gp-range" data-range>
+                <div class="gp-range__track"><div class="gp-range__fill"></div></div>
+                <input type="range" min="0" max="10000" step="100" value="1500">
+                <input type="range" min="0" max="10000" step="100" value="6000">
+              </div>
+              <div class="gp-rangefields">
+                <div class="gp-field"><label class="gp-label">Min (t)</label><input class="gp-input" data-range-field value="1500"></div>
+                <span class="sep">–</span>
+                <div class="gp-field"><label class="gp-label">Max (t)</label><input class="gp-input" data-range-field value="6000"></div>
+              </div>
+            </div>
+            <div>
+              <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 10px;">Plage de dates</p>
+              <div class="gp-chipset" style="margin-bottom:14px;">
+                <button class="gp-chip" data-preset>7 jours</button>
+                <button class="gp-chip" data-preset>30 jours</button>
+                <button class="gp-chip" data-preset>Ce mois</button>
+                <button class="gp-chip is-on" data-preset>Personnalisé</button>
+              </div>
+              <div class="gp-rangefields" style="margin-top:0;">
+                <div class="gp-field"><label class="gp-label">Du</label>
+                  <div class="gp-inputgroup"><input value="01/08/2026"><svg class="ti" style="font-size:15px;"><use href="#i-calendar"></use></svg></div></div>
+                <div class="gp-field"><label class="gp-label">Au</label>
+                  <div class="gp-inputgroup"><input value="16/08/2026"><svg class="ti" style="font-size:15px;"><use href="#i-calendar"></use></svg></div></div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============================= MAINTENANCE ============================= -->
+      <div data-main-panel="maintenance" hidden>
+        <div class="page-heading">
+          <div>
+            <div class="breadcrumbs"><span>ERP-Voyageurs</span><span>/</span><strong>Maintenance</strong></div>
+            <h1>Interventions</h1>
+            <p>Planification, filtres d'équipe et vues de suivi.</p>
+          </div>
+        </div>
+
+        <div>
+          <div class="gp-tabs" role="tablist">
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="mnt1">Vue d'ensemble</button>
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="mnt2">Interventions <span class="gp-badge">18</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="mnt3">Équipes</button>
+            <button class="gp-tab" role="tab" disabled>Archives</button>
+          </div>
+          <div class="gp-tabpanel" data-panel="mnt1" hidden>
+            <p style="margin:0 0 14px;">Bascule de vue (jour / semaine / mois) via le sélecteur segmenté :</p>
+            <div class="gp-seg">
+              <button class="gp-seg__item">Jour</button>
+              <button class="gp-seg__item is-active">Semaine</button>
+              <button class="gp-seg__item">Mois</button>
+            </div>
+          </div>
+          <div class="gp-tabpanel" data-panel="mnt2">
+            <div class="demo-grid" style="margin-bottom:0;">
+              <article class="gp-panel compact-panel">
+                <div class="panel-header"><div><span class="eyebrow">Quantité</span><h2>Agents requis sur site</h2></div></div>
+                <div class="row" style="gap:24px;">
+                  <div>
+                    <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 8px;">Chevrons — desktop</p>
+                    <div class="gp-spin" data-spin>
+                      <input class="gp-spin__input" type="number" value="3" min="0" max="20" step="1" aria-label="Agents requis">
+                      <span class="gp-spin__steps">
+                        <button class="gp-spin__step" data-inc aria-label="Augmenter"><span class="gp-chev gp-chev--up"></span></button>
+                        <button class="gp-spin__step" data-dec aria-label="Diminuer"><span class="gp-chev gp-chev--down"></span></button>
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 8px;">− valeur + — tactile</p>
+                    <div class="gp-spin--touch" data-spin>
+                      <button class="gp-spin__tbtn gp-spin__tbtn--minus" data-dec aria-label="Diminuer"><span class="gp-pm"></span></button>
+                      <input class="gp-spin__input" type="number" value="3" min="0" max="20" step="1" aria-label="Agents requis">
+                      <button class="gp-spin__tbtn gp-spin__tbtn--plus" data-inc aria-label="Augmenter"><span class="gp-pm gp-pm--plus"></span></button>
+                    </div>
+                  </div>
+                </div>
+              </article>
+              <article class="gp-panel compact-panel">
+                <div class="panel-header"><div><span class="eyebrow">Priorité</span><h2>Nouvelle intervention</h2></div></div>
+                <div class="stack" style="gap:14px;">
+                  <label class="gp-choice"><input class="gp-radio" type="radio" name="mntPrio">Basse</label>
+                  <label class="gp-choice"><input class="gp-radio" type="radio" name="mntPrio" checked>Normale</label>
+                  <label class="gp-choice"><input class="gp-radio" type="radio" name="mntPrio">Haute</label>
+                </div>
+              </article>
+            </div>
+          </div>
+          <div class="gp-tabpanel" data-panel="mnt3" hidden>
+            <div class="demo-grid" style="margin-bottom:0;">
+              <div class="gp-slicer" data-slicer>
+                <div class="gp-slicer__hd"><span class="gp-slicer__title">Équipe · liste à cocher</span><button class="gp-slicer__clear" data-clear>Effacer</button></div>
+                <div class="gp-inputgroup" style="margin-bottom:8px;"><svg class="ti"><use href="#i-search"></use></svg><input placeholder="Rechercher"></div>
+                <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox" checked>Électriciens</label>
+                <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox" checked>Mécaniciens</label>
+                <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox">Hydraulique</label>
+                <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox">Astreinte</label>
+                <div class="gp-slicer__foot" data-count>2 sélectionnées</div>
+              </div>
+              <div>
+                <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 10px;">Dropdown compact</p>
+                <div class="gp-combobox" data-dd>
+                  <div class="gp-inputgroup" data-dd-trigger style="cursor:pointer;"><span style="flex:1;">2 sélectionnées</span><svg class="ti chevron"><use href="#i-chevron-down"></use></svg></div>
+                  <div class="gp-menu">
+                    <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Électriciens</span></label>
+                    <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Mécaniciens</span></label>
+                    <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Hydraulique</span></label>
+                  </div>
+                </div>
+                <p class="spec-label" style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:20px 0 10px;">Tuiles avec compteurs · postes à couvrir</p>
+                <div class="stack" style="gap:7px;">
+                  <div class="gp-tile is-on" data-tile>Quai de la Joliette <span class="gp-tile__count">12</span></div>
+                  <div class="gp-tile" data-tile>Cap Janet <span class="gp-tile__count">7</span></div>
+                  <div class="gp-tile" data-tile>Fos — Darse 1 <span class="gp-tile__count">4</span></div>
+                  <div class="gp-tile is-disabled">Mourepiane <span class="gp-tile__count">0</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============================= INSTALLATIONS ============================= -->
+      <div data-main-panel="installations" hidden>
+        <div class="page-heading">
+          <div>
+            <div class="breadcrumbs"><span>ERP-Voyageurs</span><span>/</span><strong>Installations</strong></div>
+            <h1>Fiche installation</h1>
+            <p>Champs en lecture seule, désactivés et en erreur ; info-bulles et alerte contextuelle.</p>
+          </div>
+        </div>
+
+        <div class="demo-grid">
+          <article class="gp-panel">
+            <div class="panel-header">
+              <div><span class="eyebrow">Poste 35</span><h2>Cap Janet</h2></div>
+              <span class="gp-badge gp-badge--success">Conforme</span>
+            </div>
+            <div class="form-grid">
+              <label class="gp-field"><span class="gp-label">Nom de l'installation</span><input class="gp-input" placeholder="Saisir un intitulé…"></label>
+              <div class="gp-field">
+                <label class="gp-label">Dernier contrôle <span class="req" style="color:var(--gp-danger);">*</span></label>
+                <input class="gp-input is-error" value="32/13/2026">
+                <span class="gp-errmsg" style="font-size:12px;color:var(--gp-danger-text);display:flex;align-items:center;gap:4px;"><svg class="ti"><use href="#i-alert-circle"></use></svg>Date invalide</span>
+              </div>
+              <div class="gp-field">
+                <label class="gp-label">Matricule agent</label>
+                <div class="gp-inputgroup"><input value="AG-04821" readonly><svg class="ti" style="font-size:15px;"><use href="#i-lock"></use></svg></div>
+                <span class="gp-help" style="font-size:12px;color:var(--gp-text-secondary);">Lecture seule</span>
+              </div>
+              <div class="gp-field">
+                <label class="gp-label">Référence</label>
+                <input class="gp-input" value="Non modifiable" disabled>
+                <span class="gp-help" style="font-size:12px;color:var(--gp-text-secondary);">Désactivé</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="gp-panel compact-panel">
+            <div class="panel-header"><div><span class="eyebrow">Équipements</span><h2>Sélection multiple</h2></div></div>
+            <div class="gp-listbox">
+              <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Éclairage de sécurité</span></label>
+              <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Bornes électriques</span></label>
+              <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Passerelle mobile</span></label>
+              <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Défibrillateur</span></label>
+            </div>
+          </article>
+        </div>
+
+        <section class="gp-panel" style="margin-top:14px;">
+          <div class="panel-header"><div><span class="eyebrow">Aide contextuelle</span><h2>Info-bulles & alerte</h2></div></div>
+          <div class="row" style="gap:40px;">
+            <span class="gp-tip" data-tip="Exporter en PDF" tabindex="0">
+              <button class="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Exporter"><svg class="ti"><use href="#i-download"></use></svg></button>
+            </span>
+            <span class="gp-tip" data-tip="Dernière synchro il y a 5 min" tabindex="0">
+              <svg class="ti" style="font-size:20px;color:var(--gp-text-secondary)"><use href="#i-info-circle"></use></svg>
+            </span>
+            <div class="gp-popover" style="max-width:250px;">
+              <div class="gp-popover__hd">
+                <p class="gp-popover__title">Tension nominale</p>
+                <svg class="ti" style="color:var(--gp-text-muted);cursor:pointer"><use href="#i-x"></use></svg>
+              </div>
+              <p class="gp-popover__text">Valeur de référence du réseau (230 V). Un écart de ±10 % déclenche une alerte.</p>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============================= RH ============================= -->
+      <div data-main-panel="rh" hidden>
+        <div class="page-heading">
+          <div>
+            <div class="breadcrumbs"><span>ERP-Voyageurs</span><span>/</span><strong>RH</strong></div>
+            <h1>Habilitations & astreintes</h1>
+            <p>Filtres par équipe et habilitations requises pour un agent.</p>
+          </div>
+        </div>
+
+        <div class="demo-grid">
+          <article class="gp-panel compact-panel">
+            <div class="panel-header"><div><span class="eyebrow">Filtre</span><h2>Statut d'astreinte</h2></div></div>
+            <div class="gp-chipset">
+              <button class="gp-chip" data-chip>Tout</button>
+              <button class="gp-chip is-on" data-chip>En cours <svg class="ti"><use href="#i-x"></use></svg></button>
+              <button class="gp-chip" data-chip>Planifiée <svg class="ti"><use href="#i-x"></use></svg></button>
+              <button class="gp-chip is-on" data-chip>En retard <svg class="ti"><use href="#i-x"></use></svg></button>
+              <button class="gp-chip" data-chip>Terminée <svg class="ti"><use href="#i-x"></use></svg></button>
+            </div>
+          </article>
+          <article class="gp-panel compact-panel">
+            <div class="panel-header"><div><span class="eyebrow">Disponibilité</span><h2>Notifications agent</h2></div></div>
+            <div class="stack" style="max-width:360px;">
+              <label class="gp-choice" style="justify-content:space-between;">
+                <span>Astreinte week-end</span>
+                <span class="gp-switch"><input type="checkbox" checked><span class="track"></span></span>
+              </label>
+              <hr style="border:none;border-top:1px solid var(--gp-border);margin:0;">
+              <label class="gp-choice" style="justify-content:space-between;">
+                <span>Notifications e-mail</span>
+                <span class="gp-switch"><input type="checkbox"><span class="track"></span></span>
+              </label>
+            </div>
+          </article>
+        </div>
+
+        <section class="gp-panel" style="margin-top:14px;">
+          <div class="panel-header"><div><span class="eyebrow">Habilitations</span><h2>Requises pour cet agent</h2></div></div>
+          <div class="stack" style="gap:10px;max-width:420px;">
+            <label class="gp-choice"><input class="gp-check" type="checkbox" data-master="hab" id="masterHab">Habilitations requises</label>
+            <label class="gp-choice" style="margin-left:18px;"><input class="gp-check" type="checkbox" data-group="hab" checked>Travail en hauteur</label>
+            <label class="gp-choice" style="margin-left:18px;"><input class="gp-check" type="checkbox" data-group="hab" checked>Habilitation électrique B2V</label>
+            <label class="gp-choice" style="margin-left:18px;"><input class="gp-check" type="checkbox" data-group="hab">Espaces confinés</label>
+          </div>
+        </section>
+      </div>
+
+      </section>
+
+      <aside class="app-sidebar" id="appSidebar" aria-label="Navigation principale latérale">
+        <nav class="sidebar-nav gp-scroll">
+          <a href="#" class="sidebar-item is-active" data-label="Accueil"><svg class="ti"><use href="#i-home"></use></svg><span class="sidebar-label">Accueil</span></a>
+
+          <div class="menu-group is-open">
+            <button class="sidebar-item menu-trigger" aria-expanded="true"><svg class="ti"><use href="#i-ship"></use></svg><span class="sidebar-label">Exploitation</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu">
+              <a href="#">Prévisions d'escales</a><a href="#">Préparation</a><a href="#">Suivi d'escale</a>
+            </div>
+          </div>
+
+          <div class="menu-group">
+            <button class="sidebar-item menu-trigger" aria-expanded="false"><svg class="ti"><use href="#i-tools"></use></svg><span class="sidebar-label">Maintenance</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu"><a href="#">Interventions</a><a href="#">Préventif</a><a href="#">Contrôles</a></div>
+          </div>
+
+          <div class="menu-group">
+            <button class="sidebar-item menu-trigger" aria-expanded="false"><svg class="ti"><use href="#i-building"></use></svg><span class="sidebar-label">Installations</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu"><a href="#">Terminaux</a><a href="#">Équipements</a><a href="#">Documents</a></div>
+          </div>
+
+          <div class="menu-group">
+            <button class="sidebar-item menu-trigger" aria-expanded="false"><svg class="ti"><use href="#i-users"></use></svg><span class="sidebar-label">Ressources humaines</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu"><a href="#">Planning</a><a href="#">Habilitations</a><a href="#">Formations</a></div>
+          </div>
+
+          <div class="menu-group">
+            <button class="sidebar-item menu-trigger" aria-expanded="false"><svg class="ti"><use href="#i-shield"></use></svg><span class="sidebar-label">Conformité</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu"><a href="#">ERP</a><a href="#">ISPS</a><a href="#">Audits</a></div>
+          </div>
+        </nav>
+
+        <div class="sidebar-footer">
+          <button type="button" class="sidebar-footer-action" title="Paramètres"><svg class="ti"><use href="#i-settings"></use></svg><span class="sidebar-label">Paramètres</span></button>
+          <span class="sidebar-footer-separator" aria-hidden="true"></span>
+          <button type="button" class="sidebar-footer-action theme-toggle" id="themeToggle" title="Changer de thème" aria-pressed="false"><svg class="ti"><use id="themeIconUse" href="#i-moon"></use></svg><span class="sidebar-label" id="themeLabel">Sombre</span></button>
+        </div>
+      </aside>
+
+      <button type="button" class="sidebar-rail-toggle" id="sidebarRailToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Escamoter la navigation">
+        <svg class="ti"><use id="sidebarRailIconUse" href="#i-chevron-left"></use></svg>
+      </button>
+    </main>
+
+    <footer class="status-bar" role="status">
+      <div class="status-left"><span class="status-dot"></span><span>ERP-Voyageurs</span><span class="status-sep">•</span><span>Environnement Production</span></div>
+      <div class="status-right"><span>Connecté</span><span class="status-sep">•</span><span class="mono">v1.0.0</span><span class="status-sep">•</span><span>Utilisateur</span></div>
+    </footer>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  </div>
+
+  <!-- Région des toasts : générée automatiquement par app.js si absente. -->
+  <div class="gp-toast-region" id="toastRegion" aria-live="polite"></div>
+
+  <!-- Modale de démonstration : ouverte via [data-open-modal="modalNouvelleEscale"] sur le bouton "Nouvelle escale" -->
+  <div class="gp-overlay" id="modalNouvelleEscale" data-close-overlay>
+    <div class="gp-modal" role="dialog" aria-modal="true" aria-labelledby="mneTitle">
+      <div class="gp-modal__hd">
+        <h3 class="gp-modal__title" id="mneTitle">Nouvelle escale</h3>
+        <button class="gp-modal__close" data-close aria-label="Fermer"><svg class="ti"><use href="#i-x"></use></svg></button>
+      </div>
+      <div class="gp-modal__bd gp-scroll">
+        <div class="gp-field"><label class="gp-label">Navire</label><input class="gp-input" placeholder="Nom du navire…"></div>
+        <div class="gp-field"><label class="gp-label">Poste</label><input class="gp-input" placeholder="Poste d'accostage…"></div>
+        <div class="gp-field">
+          <label class="gp-label">Date</label>
+          <div class="gp-dp" data-dp>
+            <div class="gp-dp__input" data-dp-trigger>
+              <span class="gp-dp__ico"><svg class="ti"><use href="#i-calendar"></use></svg></span>
+              <input type="text" placeholder="JJ/MM/AAAA" maxlength="10" data-dp-input aria-label="Date" autocomplete="off">
+            </div>
+            <div class="gp-dp__panel" data-dp-panel>
+              <div class="gp-dp__direct" data-dp-direct>
+                <div class="gp-dp__dpart" data-dp-dd>--</div>
+                <span class="gp-dp__dsep">/</span>
+                <div class="gp-dp__dpart" data-dp-mm>--</div>
+                <span class="gp-dp__dsep">/</span>
+                <div class="gp-dp__dpart" style="flex:2;" data-dp-yy>----</div>
+              </div>
+              <p class="gp-dp__hint" data-dp-hint hidden>Saisie en cours — JJ/MM/AAAA</p>
+              <div class="gp-dp__nav">
+                <button class="gp-dp__nav-btn" data-dp-prev aria-label="Mois précédent"><svg class="ti"><use href="#i-chevron-left"></use></svg></button>
+                <div class="gp-dp__nav-sels">
+                  <button class="gp-dp__nav-sel" data-dp-msel></button>
+                  <button class="gp-dp__nav-sel" data-dp-ysel></button>
+                </div>
+                <button class="gp-dp__nav-btn" data-dp-next aria-label="Mois suivant"><svg class="ti"><use href="#i-chevron-right"></use></svg></button>
+              </div>
+              <div class="gp-dp__body"><div class="gp-dp__grid" data-dp-grid></div></div>
+              <div class="gp-dp__foot">
+                <button class="gp-btn gp-btn--ghost gp-btn--sm" data-dp-today>Aujourd'hui</button>
+                <button class="gp-btn gp-btn--primary gp-btn--sm" data-dp-ok>OK</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="gp-modal__ft">
+        <button class="gp-btn gp-btn--secondary" data-close>Annuler</button>
+        <button class="gp-btn gp-btn--primary" data-close>Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modale de confirmation destructive : ouverte via [data-open-modal="modalAnnulerEscale"] -->
+  <div class="gp-overlay" id="modalAnnulerEscale">
+    <div class="gp-modal" role="alertdialog" aria-modal="true" aria-labelledby="maeTitle" style="max-width:400px;">
+      <div class="gp-modal__bd" style="flex-direction:row;">
+        <span class="gp-confirm-icon"><svg class="ti"><use href="#i-alert-triangle"></use></svg></span>
+        <div>
+          <h3 class="gp-modal__title" id="maeTitle" style="margin-bottom:6px;">Annuler l'escale ?</h3>
+          <p style="font-size:13px;color:var(--gp-text-secondary);margin:0;line-height:1.5;">Cette action est définitive. Le poste redevient disponible immédiatement.</p>
+        </div>
+      </div>
+      <div class="gp-modal__ft">
+        <button class="gp-btn gp-btn--neutral" data-close autofocus>Retour</button>
+        <button class="gp-btn gp-btn--danger" data-close>Annuler l'escale</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

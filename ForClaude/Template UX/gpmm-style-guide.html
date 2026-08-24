@@ -1,0 +1,1368 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Style Guide — Applications métier GPMM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* =====================================================================
+   GPMM — Tokens (feuille de style générique des applications métier)
+   ===================================================================== */
+:root{
+  --gp-sans:'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --gp-mono:'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Couleurs de marque */
+  --gp-primary:#005299; --gp-primary-hover:#013F76; --gp-primary-active:#012E56;
+  --gp-primary-weak:#EAF1F8; --gp-on-primary:#ffffff; --gp-steel:#5F8CB4;
+
+  /* Neutres ardoise */
+  --gp-page:#EEF1F5; --gp-surface:#ffffff; --gp-surface-2:#F8FAFC; --gp-surface-sunken:#F1F4F8;
+  --gp-border:#D8E0E8; --gp-border-strong:#CBD5E1;
+  --gp-text:#1E293B; --gp-text-secondary:#475569; --gp-text-muted:#94A3B8; --gp-text-disabled:#A3AEBC;
+
+  /* Sémantiques */
+  --gp-success:#2E7D46; --gp-success-bg:#EAF4EC; --gp-success-text:#256437;
+  --gp-warning:#B7791F; --gp-warning-bg:#FBF1DE; --gp-warning-text:#8A5A12;
+  --gp-danger:#D32F2F; --gp-danger-hover:#B02525; --gp-danger-bg:#FBEAEA; --gp-danger-text:#7A1E1E; --gp-on-danger:#ffffff;
+  --gp-info:#0069AD; --gp-info-bg:#E6F1FB; --gp-info-text:#0C447C;
+
+  /* États désactivés */
+  --gp-disabled-bg:#B9C6D4; --gp-disabled-on:#F0F4F8;
+  --gp-disabled-surface:#F1F5F9; --gp-disabled-border:#E2E8F0; --gp-disabled-fg:#A3AEBC;
+
+  /* Élévation, focus, forme */
+  --gp-focus:rgba(0,82,153,.28);
+  --gp-radius:6px; --gp-radius-lg:12px;
+  --gp-control-h:38px;
+  --gp-shadow-float:0 8px 24px rgba(15,42,66,.14), 0 2px 6px rgba(15,42,66,.08);
+  --gp-shadow-modal:0 24px 60px rgba(11,24,38,.38), 0 8px 20px rgba(11,24,38,.22);
+  --gp-overlay:rgba(15,42,66,.45);
+  --gp-tooltip-bg:#1E293B; --gp-tooltip-text:#ffffff; --gp-tooltip-border:transparent;
+  --gp-switch-knob:#ffffff;
+  --gp-sb-track:#EAEEF3; --gp-sb-thumb:#CBD5E1; --gp-sb-thumb-h:#A9B7C6;
+  --gp-sb-track-w:#E1E7ED; --gp-sb-thumb-w:#94A3B8; --gp-sb-thumb-wh:#6B7A8C;
+  --gp-step-fg:#7A8595; --gp-step-hover:#E4EAF1; --gp-tstep-bg:#F5F8FB; --gp-tstep-hover:#DDE9F5;
+  --gp-table-hbg:#E7EDF3; --gp-table-zebra:#F8FAFC;
+}
+[data-theme="dark"]{
+  --gp-primary:#4C9BDE; --gp-primary-hover:#6FB0E6; --gp-primary-active:#87BEEA;
+  --gp-primary-weak:#10314C; --gp-on-primary:#06192B; --gp-steel:#6FA0C8;
+
+  --gp-page:#0B1826; --gp-surface:#12233A; --gp-surface-2:#0F1E2E; --gp-surface-sunken:#132539;
+  --gp-border:#24374B; --gp-border-strong:#33465A;
+  --gp-text:#E6EEF5; --gp-text-secondary:#C4D2DF; --gp-text-muted:#8CA3B6; --gp-text-disabled:#5A6E80;
+
+  --gp-success:#4CAF6E; --gp-success-bg:#14261B; --gp-success-text:#7FCB97;
+  --gp-warning:#E0A54A; --gp-warning-bg:#2A2113; --gp-warning-text:#E9C486;
+  --gp-danger:#EF5350; --gp-danger-hover:#F26B6B; --gp-danger-bg:#2A1618; --gp-danger-text:#F3B4B4; --gp-on-danger:#2A0A0A;
+  --gp-info:#3B9BD9; --gp-info-bg:#10314C; --gp-info-text:#8FC1EC;
+
+  --gp-disabled-bg:#2A4055; --gp-disabled-on:#5B7186;
+  --gp-disabled-surface:#17232F; --gp-disabled-border:#2A3B4B; --gp-disabled-fg:#5A6E80;
+
+  --gp-focus:rgba(140,180,220,.30);
+  /* Élévation sombre = surface claire + liseré + halo léger (hybride) */
+  --gp-shadow-float:0 10px 28px rgba(0,0,0,.45), 0 0 14px rgba(120,170,220,.10);
+  --gp-shadow-modal:0 20px 50px rgba(0,0,0,.55), 0 0 22px rgba(120,170,220,.14), inset 0 1px 0 rgba(255,255,255,.06);
+  --gp-overlay:rgba(2,6,11,.72);
+  --gp-tooltip-bg:#2E4358; --gp-tooltip-text:#E6EEF5; --gp-tooltip-border:#3E546B;
+  --gp-switch-knob:#E6EEF5;
+  --gp-sb-track:#182B40; --gp-sb-thumb:#3A4E63; --gp-sb-thumb-h:#516781;
+  --gp-sb-track-w:#17293A; --gp-sb-thumb-w:#54697F; --gp-sb-thumb-wh:#6E869B;
+  --gp-step-fg:#8CA3B6; --gp-step-hover:#1E3853; --gp-tstep-bg:#132A40; --gp-tstep-hover:#1E4364;
+  --gp-table-hbg:#132A40; --gp-table-zebra:#0F1E2E;
+}
+
+*{box-sizing:border-box;}
+svg.ti{width:1em;height:1em;display:inline-block;vertical-align:-.125em;flex:none;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+svg.gp-th__grip{fill:currentColor;stroke:none;}
+body{margin:0;font-family:var(--gp-sans);background:var(--gp-page);color:var(--gp-text);
+  -webkit-font-smoothing:antialiased;transition:background .2s,color .2s;}
+
+/* ========================= BOUTONS ========================= */
+.gp-btn{font-family:var(--gp-sans);font-weight:500;font-size:14px;line-height:1;height:var(--gp-control-h);
+  padding:0 15px;border-radius:var(--gp-radius);border:1px solid transparent;display:inline-flex;
+  align-items:center;justify-content:center;gap:6px;cursor:pointer;white-space:nowrap;
+  transition:background .12s,border-color .12s,box-shadow .12s;}
+.gp-btn:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-btn--primary{background:var(--gp-primary);color:var(--gp-on-primary);}
+.gp-btn--primary:hover{background:var(--gp-primary-hover);}
+.gp-btn--primary:active{background:var(--gp-primary-active);}
+.gp-btn--secondary{background:var(--gp-surface);color:var(--gp-primary);border-color:var(--gp-primary);}
+.gp-btn--secondary:hover{background:var(--gp-primary-weak);}
+.gp-btn--ghost{background:transparent;color:var(--gp-primary);}
+.gp-btn--ghost:hover{background:var(--gp-surface-sunken);}
+.gp-btn--danger{background:var(--gp-danger);color:var(--gp-on-danger);}
+.gp-btn--danger:hover{background:var(--gp-danger-hover);}
+.gp-btn--neutral{background:var(--gp-surface);color:var(--gp-text-secondary);border-color:var(--gp-border-strong);}
+.gp-btn--neutral:hover{background:var(--gp-surface-sunken);}
+.gp-btn--sm{height:30px;font-size:13px;padding:0 12px;}
+.gp-btn--lg{height:44px;font-size:15px;padding:0 20px;}
+.gp-btn--icon{width:var(--gp-control-h);padding:0;}
+.gp-btn--icon.gp-btn--sm{width:30px;} .gp-btn--icon.gp-btn--lg{width:44px;}
+.gp-btn i{font-size:1.15em;}
+.gp-btn--primary:disabled,.gp-btn--danger:disabled{background:var(--gp-disabled-bg);color:var(--gp-disabled-on);cursor:not-allowed;}
+.gp-btn--secondary:disabled,.gp-btn--ghost:disabled,.gp-btn--neutral:disabled{
+  background:transparent;color:var(--gp-disabled-fg);border-color:var(--gp-disabled-border);cursor:not-allowed;}
+
+/* ========================= INTERRUPTEUR ========================= */
+.gp-switch{position:relative;display:inline-block;width:40px;height:22px;flex:none;vertical-align:middle;}
+.gp-switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;}
+.gp-switch .track{position:absolute;inset:0;border-radius:999px;background:var(--gp-border-strong);transition:background .15s;}
+.gp-switch .track::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:var(--gp-switch-knob);box-shadow:0 1px 2px rgba(0,0,0,.22);transition:left .15s,background .15s;}
+.gp-switch input:checked + .track{background:var(--gp-primary);}
+.gp-switch input:checked + .track::after{left:calc(100% - 20px);background:var(--gp-on-primary);}
+.gp-switch input:focus-visible + .track{box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-switch input:disabled + .track{background:var(--gp-disabled-surface);}
+.gp-switch input:disabled + .track::after{box-shadow:none;background:var(--gp-disabled-on);}
+
+/* ========================= CHECKBOX / RADIO ========================= */
+.gp-check,.gp-radio{appearance:none;-webkit-appearance:none;width:18px;height:18px;flex:none;margin:0;cursor:pointer;
+  border:1.5px solid var(--gp-text-muted);background:var(--gp-surface);display:inline-grid;place-content:center;
+  transition:background .12s,border-color .12s,box-shadow .12s;vertical-align:middle;}
+.gp-check{border-radius:4px;} .gp-radio{border-radius:50%;}
+.gp-check:checked,.gp-check:indeterminate{background:var(--gp-primary);border-color:var(--gp-primary);}
+.gp-check:checked::after{content:"";width:5px;height:9px;margin-top:-2px;border:solid var(--gp-on-primary);
+  border-width:0 2px 2px 0;transform:rotate(45deg);}
+.gp-check:indeterminate::after{content:"";width:9px;height:2px;background:var(--gp-on-primary);border-radius:1px;}
+.gp-radio:checked{border-color:var(--gp-primary);}
+.gp-radio:checked::after{content:"";width:8px;height:8px;border-radius:50%;background:var(--gp-primary);}
+.gp-check:focus-visible,.gp-radio:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-check:disabled,.gp-radio:disabled{border-color:var(--gp-disabled-border);background:var(--gp-disabled-surface);cursor:not-allowed;}
+.gp-check:disabled:checked{background:var(--gp-disabled-bg);border-color:var(--gp-disabled-bg);}
+.gp-check:disabled:checked::after{border-color:var(--gp-disabled-on);}
+.gp-radio:disabled:checked{border-color:var(--gp-disabled-bg);}
+.gp-radio:disabled:checked::after{background:var(--gp-disabled-bg);}
+.gp-choice{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer;}
+
+/* ========================= CHAMPS DE SAISIE ========================= */
+.gp-field{display:flex;flex-direction:column;gap:6px;}
+.gp-label{font-size:13px;font-weight:500;color:var(--gp-text-secondary);}
+.gp-label .req{color:var(--gp-danger);}
+.gp-input,.gp-textarea,.gp-inputgroup{font-family:var(--gp-sans);font-size:14px;color:var(--gp-text);
+  background:var(--gp-surface);border:1px solid var(--gp-border-strong);border-radius:var(--gp-radius);
+  height:var(--gp-control-h);width:100%;}
+.gp-input{padding:0 12px;}
+.gp-input::placeholder,.gp-inputgroup input::placeholder{color:var(--gp-text-muted);}
+.gp-textarea{height:auto;min-height:76px;padding:9px 12px;line-height:1.5;resize:vertical;}
+.gp-input:focus,.gp-textarea:focus{outline:none;border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-inputgroup{display:flex;align-items:center;gap:8px;padding:0 12px;}
+.gp-inputgroup:focus-within{border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-inputgroup input{flex:1;border:none;background:none;outline:none;font:inherit;color:inherit;height:100%;min-width:0;}
+.gp-inputgroup i{color:var(--gp-text-secondary);font-size:17px;}
+.gp-inputgroup .gp-suffix{font-family:var(--gp-mono);color:var(--gp-text-secondary);}
+.gp-input.is-error,.gp-inputgroup.is-error{border-color:var(--gp-danger);}
+.gp-input.is-error:focus{box-shadow:0 0 0 3px color-mix(in srgb,var(--gp-danger) 22%,transparent);}
+.gp-input:disabled,.gp-inputgroup.is-disabled{background:var(--gp-disabled-surface);border-color:var(--gp-disabled-border);color:var(--gp-text-disabled);}
+.gp-input[readonly]{background:var(--gp-surface-2);}
+.gp-help{font-size:12px;color:var(--gp-text-secondary);}
+.gp-errmsg{font-size:12px;color:var(--gp-danger-text);display:flex;align-items:center;gap:4px;}
+
+/* ========================= LISTBOX ========================= */
+.gp-listbox{background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:var(--gp-radius);overflow:hidden;}
+.gp-optgroup{font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:500;
+  color:var(--gp-text-muted);padding:9px 12px 4px;}
+.gp-optgroup + .gp-opt{margin-top:0;}
+.gp-opt{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:9px 12px;font-size:14px;
+  color:var(--gp-text);cursor:pointer;}
+.gp-opt:hover{background:var(--gp-surface-sunken);}
+.gp-opt.is-selected{background:var(--gp-primary-weak);color:var(--gp-primary);font-weight:500;
+  border-left:3px solid var(--gp-primary);padding-left:9px;}
+.gp-opt.is-focus{box-shadow:inset 0 0 0 2px var(--gp-primary);}
+.gp-opt.is-disabled{color:var(--gp-text-disabled);cursor:not-allowed;}
+.gp-opt.is-disabled:hover{background:none;}
+.gp-opt .gp-left{display:flex;align-items:center;gap:10px;}
+
+/* ========================= COMBOBOX ========================= */
+.gp-combobox{position:relative;max-width:340px;}
+.gp-combobox .gp-inputgroup{cursor:pointer;}
+.gp-combobox .chevron{transition:transform .15s;color:var(--gp-text-secondary);}
+.gp-combobox.is-open .chevron{transform:rotate(180deg);}
+.gp-menu{position:absolute;left:0;right:0;margin-top:4px;background:var(--gp-surface);
+  border:1px solid var(--gp-border);border-radius:var(--gp-radius);box-shadow:var(--gp-shadow-float);
+  overflow:hidden;z-index:20;display:none;}
+.gp-combobox.is-open .gp-menu{display:block;}
+
+/* ========================= TOASTS ========================= */
+.gp-toast-region{position:fixed;top:16px;right:16px;display:flex;flex-direction:column;gap:10px;z-index:60;max-width:min(400px,calc(100vw - 32px));}
+.gp-toast{display:flex;align-items:flex-start;gap:11px;padding:12px 12px 12px 14px;border-radius:8px;
+  background:var(--gp-surface);border:1px solid var(--gp-border);border-left:4px solid var(--_c);
+  box-shadow:var(--gp-shadow-float);position:relative;overflow:hidden;}
+.gp-toast--info{--_c:var(--gp-info);} .gp-toast--success{--_c:var(--gp-success);}
+.gp-toast--warning{--_c:var(--gp-warning);} .gp-toast--danger{--_c:var(--gp-danger);}
+.gp-toast__icon{color:var(--_c);font-size:19px;line-height:1.2;flex:none;}
+.gp-toast__title{font-size:14px;font-weight:500;margin:0 0 2px;color:var(--gp-text);}
+.gp-toast__text{font-size:13px;margin:0;color:var(--gp-text-secondary);line-height:1.45;}
+.gp-toast__action{font-size:13px;font-weight:500;color:var(--_c);margin-top:7px;display:inline-block;
+  background:none;border:none;padding:0;cursor:pointer;font-family:inherit;}
+.gp-toast__close{color:var(--gp-text-muted);font-size:16px;cursor:pointer;background:none;border:none;flex:none;margin-left:4px;padding:0;}
+.gp-toast__bar{position:absolute;left:0;bottom:0;height:3px;background:var(--_c);}
+@media (max-width:640px){.gp-toast-region{top:12px;left:12px;right:12px;max-width:none;}}
+
+/* ========================= MODALE ========================= */
+.gp-overlay{position:fixed;inset:0;background:var(--gp-overlay);display:none;align-items:center;justify-content:center;
+  padding:22px;z-index:80;}
+.gp-overlay.is-open{display:flex;}
+.gp-modal{background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:12px;overflow:hidden;
+  width:100%;max-width:440px;max-height:calc(100vh - 44px);display:flex;flex-direction:column;box-shadow:var(--gp-shadow-modal);}
+.gp-modal__hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--gp-border);flex:none;}
+.gp-modal__title{font-size:16px;font-weight:500;margin:0;}
+.gp-modal__close{background:none;border:none;color:var(--gp-text-muted);font-size:18px;cursor:pointer;padding:0;}
+.gp-modal__bd{padding:18px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;}
+.gp-modal__ft{display:flex;justify-content:flex-end;gap:10px;padding:14px 18px;border-top:1px solid var(--gp-border);flex:none;}
+.gp-confirm-icon{width:40px;height:40px;border-radius:50%;background:var(--gp-danger-bg);color:var(--gp-danger);
+  display:flex;align-items:center;justify-content:center;flex:none;font-size:20px;}
+@media (max-width:640px){
+  .gp-overlay{padding:0;align-items:stretch;justify-content:stretch;}
+  .gp-modal{max-width:none;max-height:none;border-radius:0;}
+  .gp-modal__bd{flex:1;}
+  .gp-modal__ft > .gp-btn{flex:1;}
+}
+
+/* ========================= TABS ========================= */
+.gp-tabs{display:flex;border-bottom:1px solid var(--gp-border);overflow-x:auto;scrollbar-width:none;}
+.gp-tabs::-webkit-scrollbar{display:none;}
+.gp-tab{font-family:inherit;font-size:14px;color:var(--gp-text-secondary);background:none;border:none;
+  border-bottom:2px solid transparent;margin-bottom:-1px;padding:10px 16px;cursor:pointer;white-space:nowrap;
+  display:flex;align-items:center;gap:8px;}
+.gp-tab:hover{color:var(--gp-text);border-bottom-color:var(--gp-border-strong);}
+.gp-tab[aria-selected="true"]{color:var(--gp-primary);font-weight:500;border-bottom-color:var(--gp-primary);}
+.gp-tab:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gp-focus);border-radius:4px;}
+.gp-tab:disabled{color:var(--gp-text-disabled);cursor:not-allowed;}
+.gp-tabpanel{padding:16px;background:var(--gp-surface);border:1px solid var(--gp-border);border-top:none;
+  border-radius:0 0 8px 8px;font-size:14px;color:var(--gp-text-secondary);}
+.gp-tabpanel[hidden]{display:none;}
+.gp-seg{display:inline-flex;background:var(--gp-surface-sunken);border-radius:8px;padding:3px;}
+.gp-seg__item{font-family:inherit;font-size:13px;color:var(--gp-text-secondary);background:none;border:none;
+  padding:6px 15px;border-radius:6px;cursor:pointer;}
+.gp-seg__item.is-active{background:var(--gp-surface);color:var(--gp-primary);font-weight:500;box-shadow:0 1px 2px rgba(0,0,0,.1);}
+
+/* ========================= BADGE ========================= */
+.gp-badge{font-size:11px;font-weight:500;padding:1px 7px;border-radius:9px;background:var(--gp-info-bg);color:var(--gp-info-text);}
+
+/* ========================= SLICERS ========================= */
+.gp-chipset{display:flex;flex-wrap:wrap;gap:7px;}
+.gp-chip{font-family:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--gp-border-strong);
+  background:var(--gp-surface);color:var(--gp-text-secondary);cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+.gp-chip:hover{background:var(--gp-surface-sunken);}
+.gp-chip.is-on{background:var(--gp-primary);border-color:var(--gp-primary);color:var(--gp-on-primary);}
+.gp-chip:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-chip svg{display:none;}
+.gp-chip.is-on svg{display:inline-flex;}
+.gp-slicer{background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:var(--gp-radius-lg);padding:14px;}
+.gp-slicer__hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.gp-slicer__title{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);}
+.gp-slicer__clear{font-size:11px;color:var(--gp-primary);cursor:pointer;background:none;border:none;font-family:inherit;padding:0;}
+.gp-slicer__foot{font-size:11px;color:var(--gp-text-secondary);border-top:1px solid var(--gp-surface-sunken);padding-top:7px;margin-top:6px;}
+.gp-tile{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--gp-border);border-radius:8px;
+  padding:9px 11px;font-size:13px;color:var(--gp-text);cursor:pointer;}
+.gp-tile:hover{background:var(--gp-surface-sunken);}
+.gp-tile.is-on{border-color:var(--gp-primary);background:var(--gp-primary-weak);color:var(--gp-primary);font-weight:500;}
+.gp-tile.is-on:hover{background:var(--gp-primary-weak);}
+.gp-tile.is-disabled{color:var(--gp-text-disabled);cursor:not-allowed;}
+.gp-tile__count{font-size:11px;font-weight:500;padding:1px 7px;border-radius:9px;background:var(--gp-surface-sunken);color:var(--gp-text-secondary);}
+.gp-tile.is-on .gp-tile__count{background:color-mix(in srgb,var(--gp-primary) 18%,transparent);color:var(--gp-primary);}
+/* Slicer de plage */
+.gp-range{position:relative;padding-top:26px;}
+.gp-range__track{position:relative;height:5px;border-radius:3px;background:var(--gp-border-strong);margin:0 9px;}
+.gp-range__fill{position:absolute;top:0;height:100%;border-radius:3px;background:var(--gp-primary);}
+.gp-range input[type=range]{position:absolute;left:9px;right:9px;width:auto;top:26px;height:5px;margin:0;
+  background:none;pointer-events:none;-webkit-appearance:none;appearance:none;}
+.gp-range input[type=range]::-webkit-slider-runnable-track{background:transparent;border:none;height:5px;}
+.gp-range input[type=range]::-moz-range-track{background:transparent;border:none;height:5px;}
+.gp-range input[type=range]::-moz-range-progress{background:transparent;}
+.gp-range input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;pointer-events:auto;width:18px;height:18px;margin-top:-6.5px;
+  border-radius:50%;background:var(--gp-surface);border:2px solid var(--gp-primary);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
+.gp-range input[type=range]::-moz-range-thumb{pointer-events:auto;width:18px;height:18px;border-radius:50%;
+  background:var(--gp-surface);border:2px solid var(--gp-primary);box-shadow:0 1px 3px rgba(0,0,0,.25);cursor:pointer;}
+.gp-range input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-range__bub{position:absolute;top:-24px;transform:translateX(-50%);font-family:var(--gp-mono);font-size:12px;font-weight:500;color:var(--gp-primary);white-space:nowrap;}
+.gp-range__ends{display:flex;justify-content:space-between;font-family:var(--gp-mono);font-size:11px;color:var(--gp-text-muted);margin-top:14px;padding:0 9px;}
+.gp-rangefields{display:flex;gap:10px;align-items:flex-end;margin-top:16px;}
+.gp-rangefields .gp-field{flex:1;}
+.gp-rangefields .sep{color:var(--gp-text-muted);padding-bottom:9px;}
+
+/* ========================= CALENDRIER (DATEPICKER) ========================= */
+.gp-dp{position:relative;max-width:280px;}
+.gp-dp__input{display:flex;align-items:center;height:var(--gp-control-h);border:1px solid var(--gp-border-strong);
+  border-radius:var(--gp-radius);background:var(--gp-surface);padding:0 12px;gap:8px;cursor:pointer;box-sizing:border-box;width:100%;}
+.gp-dp__input:focus-within{border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-dp__input input{flex:1;border:none;background:transparent;outline:none;font-family:var(--gp-mono);font-size:14px;
+  color:var(--gp-text);cursor:pointer;width:100%;min-width:0;}
+.gp-dp__input input::placeholder{font-family:var(--gp-sans);color:var(--gp-text-muted);}
+.gp-dp__ico{flex:none;color:var(--gp-text-secondary);}
+.gp-dp__ico svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;display:block;}
+.gp-dp__panel{position:absolute;left:0;top:calc(100% + 4px);z-index:30;
+  background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:var(--gp-radius);
+  box-shadow:var(--gp-shadow-float);overflow:hidden;display:none;min-width:256px;}
+[data-theme="dark"] .gp-dp__panel{box-shadow:var(--gp-shadow-float),0 0 22px rgba(120,170,220,.12);}
+.gp-dp__panel.is-open{display:block;}
+/* saisie directe */
+.gp-dp__direct{display:none;padding:8px 10px;border-bottom:1px solid var(--gp-border);gap:4px;align-items:center;}
+.gp-dp__direct.is-visible{display:flex;}
+.gp-dp__dpart{flex:1;border:1px solid var(--gp-border-strong);border-radius:var(--gp-radius);height:32px;
+  display:flex;align-items:center;padding:0 8px;font-size:13px;font-family:var(--gp-mono);color:var(--gp-text);
+  background:var(--gp-surface);}
+.gp-dp__dpart.is-focus{border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-dp__dsep{color:var(--gp-text-muted);font-size:13px;}
+.gp-dp__hint{font-size:11px;color:var(--gp-text-muted);padding:0 10px 6px;border-bottom:1px solid var(--gp-border);}
+/* navigation */
+.gp-dp__nav{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  background:var(--gp-surface-2);border-bottom:1px solid var(--gp-border);}
+.gp-dp__nav-btn{width:28px;height:28px;border-radius:var(--gp-radius);border:1px solid var(--gp-border);
+  background:var(--gp-surface);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.gp-dp__nav-btn svg{width:14px;height:14px;fill:none;stroke:var(--gp-text-secondary);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;}
+.gp-dp__nav-btn:hover{background:var(--gp-surface-sunken);}
+.gp-dp__nav-sels{display:flex;gap:6px;}
+.gp-dp__nav-sel{font-size:13px;font-weight:500;color:var(--gp-on-primary);background:var(--gp-primary);
+  border:none;border-radius:var(--gp-radius);padding:4px 10px;cursor:pointer;font-family:inherit;}
+[data-theme="dark"] .gp-dp__nav-sel{color:#E6EEF5;background:#1E3A55;border:1px solid #3B6080;}
+.gp-dp__nav-sel:hover{background:var(--gp-primary-hover);}
+[data-theme="dark"] .gp-dp__nav-sel:hover{background:#264D6E;}
+/* grille */
+.gp-dp__body{padding:6px 10px 10px;background:var(--gp-surface);}
+.gp-dp__grid{display:grid;grid-template-columns:repeat(5,1fr) repeat(2,1fr);}
+.gp-dp__dow{font-size:11px;font-weight:500;text-align:center;padding:5px 2px;color:var(--gp-text-muted);}
+.gp-dp__dow.we{color:var(--gp-primary);background:var(--gp-primary-weak);border-radius:0;font-weight:600;}
+.gp-dp__day{font-size:13px;text-align:center;padding:7px 2px;cursor:pointer;color:var(--gp-text);position:relative;border-radius:var(--gp-radius);}
+.gp-dp__day.we{border-radius:0;background:var(--gp-primary-weak);}
+[data-theme="dark"] .gp-dp__day.we{background:#132E48;}
+[data-theme="dark"] .gp-dp__dow.we{background:#132E48;color:#8FC1EC;}
+.gp-dp__day:hover:not(.we){background:var(--gp-surface-sunken);}
+.gp-dp__day.we:hover{background:var(--gp-primary-weak);filter:brightness(.95);}
+.gp-dp__day.other{color:var(--gp-text-disabled);}
+.gp-dp__day.other.we{background:color-mix(in srgb,var(--gp-primary-weak) 50%,transparent);}
+[data-theme="dark"] .gp-dp__day.other.we{background:#0F2336;}
+.gp-dp__day.today::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);
+  width:4px;height:4px;border-radius:50%;background:var(--gp-primary);}
+.gp-dp__day.sel{background:var(--gp-primary) !important;color:var(--gp-on-primary) !important;border-radius:var(--gp-radius) !important;}
+.gp-dp__day.sel::after{display:none;}
+/* pied */
+.gp-dp__foot{display:flex;justify-content:space-between;align-items:center;
+  padding:8px 12px;border-top:1px solid var(--gp-border);background:var(--gp-surface);}
+
+/* ========================= BARRES DE DÉFILEMENT ========================= */
+html{scrollbar-width:auto;scrollbar-color:var(--gp-sb-thumb) var(--gp-sb-track);}
+html::-webkit-scrollbar{width:12px;height:12px;}
+html::-webkit-scrollbar-track{background:var(--gp-sb-track);}
+html::-webkit-scrollbar-thumb{background:var(--gp-sb-thumb);border-radius:6px;border:3px solid var(--gp-sb-track);}
+html::-webkit-scrollbar-thumb:hover{background:var(--gp-sb-thumb-h);}
+.gp-scroll{scrollbar-width:auto;scrollbar-color:var(--gp-sb-thumb) var(--gp-sb-track);}
+.gp-scroll::-webkit-scrollbar{width:12px;height:12px;}
+.gp-scroll::-webkit-scrollbar-track{background:var(--gp-sb-track);border-radius:6px;}
+.gp-scroll::-webkit-scrollbar-thumb{background:var(--gp-sb-thumb);border-radius:6px;border:3px solid var(--gp-sb-track);}
+.gp-scroll::-webkit-scrollbar-thumb:hover{background:var(--gp-sb-thumb-h);}
+.gp-scroll::-webkit-scrollbar-corner{background:var(--gp-sb-track);}
+.gp-scroll--wide{scrollbar-width:auto;scrollbar-color:var(--gp-sb-thumb-w) var(--gp-sb-track-w);}
+.gp-scroll--wide::-webkit-scrollbar{width:14px;height:14px;}
+.gp-scroll--wide::-webkit-scrollbar-track{background:var(--gp-sb-track-w);border-radius:7px;}
+.gp-scroll--wide::-webkit-scrollbar-thumb{background:var(--gp-sb-thumb-w);border-radius:7px;border:3px solid var(--gp-sb-track-w);}
+.gp-scroll--wide::-webkit-scrollbar-thumb:hover{background:var(--gp-sb-thumb-wh);}
+.gp-scroll--wide::-webkit-scrollbar-corner{background:var(--gp-sb-track-w);}
+
+/* ========================= SPIN BUTTON ========================= */
+.gp-spin{display:inline-flex;align-items:stretch;gap:6px;}
+.gp-spin__input{height:var(--gp-control-h);width:78px;border:1px solid var(--gp-border-strong);border-radius:var(--gp-radius);
+  background:var(--gp-surface);padding:0 12px;box-sizing:border-box;font-family:var(--gp-mono);font-size:14px;color:var(--gp-text);}
+.gp-spin__input::-webkit-outer-spin-button,.gp-spin__input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.gp-spin__input[type=number]{-moz-appearance:textfield;appearance:textfield;}
+.gp-spin__input:focus{outline:none;border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-spin__steps{width:28px;height:var(--gp-control-h);border:1px solid var(--gp-border-strong);border-radius:var(--gp-radius);
+  background:var(--gp-surface);display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;}
+.gp-spin__step{-webkit-appearance:none;appearance:none;flex:1;min-height:0;background:transparent;border:none;outline:none;
+  cursor:pointer;padding:0;color:var(--gp-step-fg);display:flex;align-items:center;justify-content:center;transition:background .1s,color .1s;}
+.gp-spin__step:first-child{border-bottom:1px solid var(--gp-border);}
+.gp-spin__step:hover{background:var(--gp-step-hover);color:var(--gp-primary);}
+.gp-spin__step:focus-visible{color:var(--gp-primary);}
+.gp-spin__step:disabled{color:var(--gp-disabled-fg);cursor:not-allowed;background:transparent;}
+.gp-chev{width:7px;height:7px;border-style:solid;border-color:currentColor;border-width:1.5px 1.5px 0 0;}
+.gp-chev--up{transform:rotate(-45deg);}
+.gp-chev--down{transform:rotate(135deg);}
+/* Variante tactile — − valeur + */
+.gp-spin--touch{display:inline-flex;align-items:stretch;height:44px;width:150px;border:1px solid var(--gp-border-strong);
+  border-radius:var(--gp-radius);background:var(--gp-surface);overflow:hidden;}
+.gp-spin--touch:focus-within{border-color:var(--gp-primary);box-shadow:0 0 0 3px var(--gp-focus);}
+.gp-spin--touch .gp-spin__input{flex:1;width:auto;height:100%;border:none;border-radius:0;text-align:center;box-shadow:none;}
+.gp-spin--touch .gp-spin__input:focus{box-shadow:none;}
+.gp-spin__tbtn{-webkit-appearance:none;appearance:none;width:44px;border:none;background:var(--gp-tstep-bg);color:var(--gp-primary);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;transition:background .1s;}
+.gp-spin__tbtn:hover{background:var(--gp-tstep-hover);}
+.gp-spin__tbtn--minus{border-right:1px solid var(--gp-border);}
+.gp-spin__tbtn--plus{border-left:1px solid var(--gp-border);}
+.gp-spin__tbtn:disabled{color:var(--gp-disabled-fg);cursor:not-allowed;}
+.gp-pm{position:relative;width:13px;height:13px;}
+.gp-pm::before{content:"";position:absolute;top:50%;left:0;right:0;height:1.6px;background:currentColor;transform:translateY(-50%);}
+.gp-pm--plus::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1.6px;background:currentColor;transform:translateX(-50%);}
+
+/* ========================= TABLEAU ========================= */
+.gp-table-wrap{border:1px solid var(--gp-border);border-radius:8px;overflow:auto;max-height:360px;}
+table.gp-table{border-collapse:separate;border-spacing:0;width:100%;min-width:680px;font-size:13px;}
+.gp-table th,.gp-table td{padding:9px 12px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--gp-border);}
+.gp-table thead th{position:sticky;top:0;z-index:2;background:var(--gp-table-hbg);color:var(--gp-text-secondary);font-weight:500;font-size:12px;}
+.gp-table tbody td{color:var(--gp-text);}
+.gp-table tbody tr:nth-child(even) td{background:var(--gp-table-zebra);}
+.gp-table tbody tr:hover td{background:var(--gp-surface-sunken);}
+.gp-table tbody tr.is-sel td{background:var(--gp-primary-weak);}
+.gp-table tbody tr.is-sel td:first-child{box-shadow:inset 3px 0 0 var(--gp-primary);}
+.gp-table .mono{font-family:var(--gp-mono);}
+.gp-th{display:flex;align-items:center;gap:6px;padding-right:8px;}
+.gp-th__grip{cursor:grab;color:var(--gp-text-muted);font-size:15px;}
+.gp-th__grip:active{cursor:grabbing;}
+.gp-th__sort{display:inline-flex;align-items:center;gap:4px;cursor:pointer;user-select:none;}
+.gp-th__ind{font-size:14px;color:var(--gp-text-muted);}
+.gp-th__pri{font-size:10px;font-weight:600;background:var(--gp-primary-weak);color:var(--gp-primary);border-radius:8px;padding:0 5px;line-height:15px;}
+.gp-th__rz{position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;}
+.gp-th__rz:hover{box-shadow:inset -2px 0 0 var(--gp-border-strong);}
+.gp-table th.drag-over{background:var(--gp-primary-weak);}
+.gp-rowacts{display:flex;gap:12px;}
+.gp-rowacts button{-webkit-appearance:none;appearance:none;background:none;border:none;padding:0;cursor:pointer;color:var(--gp-text-secondary);font-size:17px;display:flex;}
+.gp-rowacts button:hover{color:var(--gp-primary);}
+.gp-rowacts button.del{color:var(--gp-danger);}
+.gp-badge--info{background:var(--gp-info-bg);color:var(--gp-info-text);}
+.gp-badge--success{background:var(--gp-success-bg);color:var(--gp-success-text);}
+.gp-badge--warning{background:var(--gp-warning-bg);color:var(--gp-warning-text);}
+.gp-badge--danger{background:var(--gp-danger-bg);color:var(--gp-danger-text);}
+
+/* ========================= TOOLTIP ========================= */
+.gp-tip{position:relative;display:inline-flex;}
+.gp-tip::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 9px);left:50%;transform:translateX(-50%);
+  background:var(--gp-tooltip-bg);color:var(--gp-tooltip-text);border:1px solid var(--gp-tooltip-border);
+  font-size:12px;line-height:1.4;padding:6px 10px;border-radius:6px;white-space:nowrap;box-shadow:var(--gp-shadow-float);
+  opacity:0;pointer-events:none;transition:opacity .12s;z-index:70;}
+.gp-tip::before{content:"";position:absolute;bottom:calc(100% + 5px);left:50%;transform:translateX(-50%) rotate(45deg);
+  width:8px;height:8px;background:var(--gp-tooltip-bg);border-right:1px solid var(--gp-tooltip-border);
+  border-bottom:1px solid var(--gp-tooltip-border);opacity:0;transition:opacity .12s;z-index:71;}
+.gp-tip:hover::after,.gp-tip:hover::before,
+.gp-tip:focus-within::after,.gp-tip:focus-within::before{opacity:1;}
+
+/* ========================= POPOVER (variante tactile) ========================= */
+.gp-popover{background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:8px;
+  box-shadow:var(--gp-shadow-float);padding:12px 13px;max-width:250px;}
+.gp-popover__hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+.gp-popover__title{font-size:13px;font-weight:500;margin:0 0 4px;}
+.gp-popover__text{font-size:12px;color:var(--gp-text-secondary);margin:0;line-height:1.5;}
+
+/* ========================= TOUCH ========================= */
+@media (pointer:coarse){
+  :root{--gp-control-h:44px;}
+  .gp-switch{width:52px;height:30px;}
+  .gp-switch .track::after{width:26px;height:26px;}
+  .gp-switch input:checked + .track::after{left:calc(100% - 28px);}
+  .gp-check,.gp-radio{width:22px;height:22px;}
+}
+
+/* ========================= DOCUMENTATION (page) ========================= */
+.doc-header{position:sticky;top:0;z-index:90;background:var(--gp-surface);border-bottom:1px solid var(--gp-border);
+  padding:13px 24px;display:flex;align-items:center;justify-content:space-between;}
+.doc-brand{display:flex;align-items:center;gap:12px;}
+.doc-mark{font-weight:500;font-size:16px;color:var(--gp-primary);letter-spacing:.01em;}
+.doc-mark span{color:var(--gp-danger);}
+.doc-sub{font-size:13px;color:var(--gp-text-secondary);}
+.doc-main{max-width:940px;margin:0 auto;padding:28px 24px 96px;}
+.doc-section{margin-bottom:44px;scroll-margin-top:72px;}
+.doc-h{font-size:18px;font-weight:500;margin:0 0 3px;}
+.doc-desc{font-size:14px;color:var(--gp-text-secondary);margin:0 0 16px;max-width:70ch;line-height:1.55;}
+.specimen{background:var(--gp-surface);border:1px solid var(--gp-border);border-radius:12px;padding:22px;}
+.row{display:flex;flex-wrap:wrap;gap:16px;align-items:center;}
+.stack{display:flex;flex-direction:column;gap:14px;}
+.spec-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--gp-text-muted);margin:0 0 10px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;}
+.divider{height:1px;background:var(--gp-border);border:none;margin:22px 0;}
+/* nuancier */
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px;}
+.swatch{border:1px solid var(--gp-border);border-radius:8px;overflow:hidden;}
+.swatch .chip{height:52px;}
+.swatch .meta{padding:7px 9px;font-size:12px;}
+.swatch .meta b{font-weight:500;display:block;color:var(--gp-text);}
+.swatch .meta code{font-family:var(--gp-mono);color:var(--gp-text-secondary);font-size:11px;}
+.type-sample{font-size:15px;color:var(--gp-text);line-height:1.6;}
+.type-sample .mono{font-family:var(--gp-mono);}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><symbol id="x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol><symbol id="check" viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></symbol><symbol id="minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol><symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol><symbol id="chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol><symbol id="arrow-up" viewBox="0 0 24 24"><path d="M12 20V4M6 10l6-6 6 6"/></symbol><symbol id="arrow-down" viewBox="0 0 24 24"><path d="M12 4v16M6 14l6 6 6-6"/></symbol><symbol id="selector" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></symbol><symbol id="search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></symbol><symbol id="calendar" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></symbol><symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol><symbol id="alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></symbol><symbol id="info-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 12v4M12 8h.01"/></symbol><symbol id="circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 12l2 2 4-4"/></symbol><symbol id="alert-triangle" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol><symbol id="eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol><symbol id="pencil" viewBox="0 0 24 24"><path d="M16 4l4 4L8 20H4v-4z"/><path d="M13.5 6.5l4 4"/></symbol><symbol id="download" viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></symbol><symbol id="trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13"/></symbol><symbol id="grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol><symbol id="moon" viewBox="0 0 24 24"><path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10z"/></symbol><symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M18.4 5.6l-.7.7M6.3 17.7l-.7.7"/></symbol></defs></svg>
+<header class="doc-header">
+  <div class="doc-brand">
+    <span class="doc-mark">Marseille <span>Fos</span></span>
+    <span class="doc-sub">Style guide — applications métier</span>
+  </div>
+  <button class="gp-btn gp-btn--neutral gp-btn--sm" id="themeBtn" aria-label="Basculer le thème">
+    <svg class="ti"><use href="#moon"></use></svg><span id="themeLbl">Sombre</span>
+  </button>
+</header>
+
+<main class="doc-main">
+
+  <!-- FONDATION : COULEURS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Palette — Ardoise</h2>
+    <p class="doc-desc">Bleu institutionnel en primaire, gris teintés bleu-ardoise pour les surfaces et bordures,
+      rouge réservé à l'erreur. Chaque token s'adapte automatiquement au thème clair et sombre.</p>
+    <div class="specimen">
+      <p class="spec-label">Marque</p>
+      <div class="swatches" style="margin-bottom:18px;">
+        <div class="swatch"><div class="chip" style="background:var(--gp-primary)"></div><div class="meta"><b>Primaire</b><code>--gp-primary</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-primary-hover)"></div><div class="meta"><b>Primaire survol</b><code>--gp-primary-hover</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-steel)"></div><div class="meta"><b>Acier</b><code>--gp-steel</code></div></div>
+      </div>
+      <p class="spec-label">Sémantiques</p>
+      <div class="swatches" style="margin-bottom:18px;">
+        <div class="swatch"><div class="chip" style="background:var(--gp-success)"></div><div class="meta"><b>Succès</b><code>--gp-success</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-warning)"></div><div class="meta"><b>Alerte</b><code>--gp-warning</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-danger)"></div><div class="meta"><b>Erreur</b><code>--gp-danger</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-info)"></div><div class="meta"><b>Info</b><code>--gp-info</code></div></div>
+      </div>
+      <p class="spec-label">Neutres & surfaces</p>
+      <div class="swatches">
+        <div class="swatch"><div class="chip" style="background:var(--gp-page)"></div><div class="meta"><b>Page</b><code>--gp-page</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-surface)"></div><div class="meta"><b>Surface</b><code>--gp-surface</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-border)"></div><div class="meta"><b>Bordure</b><code>--gp-border</code></div></div>
+        <div class="swatch"><div class="chip" style="background:var(--gp-text)"></div><div class="meta"><b>Texte</b><code>--gp-text</code></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FONDATION : TYPO -->
+  <section class="doc-section">
+    <h2 class="doc-h">Typographie</h2>
+    <p class="doc-desc">IBM Plex Sans pour l'interface, IBM Plex Mono pour les chiffres et données tabulaires
+      (alignement des valeurs). Deux graisses : 400 régulier, 500 pour l'emphase.</p>
+    <div class="specimen">
+      <div class="type-sample">
+        <div style="font-size:24px;font-weight:500;">Contrôle des installations passagers</div>
+        <div style="font-size:16px;">Plex Sans — corps de texte, formulaires et libellés. Lisible en densité moyenne.</div>
+        <div class="mono" style="margin-top:8px;">Plex Mono — 230 V · 43°N · AG-04821 · 12,5 m</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BOUTONS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Boutons</h2>
+    <p class="doc-desc">Une seule action forte par écran (primaire). Secondaire pour le repli, ghost pour le tertiaire,
+      danger pour le destructif. Survolez et tabulez pour voir les états.</p>
+    <div class="specimen stack">
+      <div class="row">
+        <button class="gp-btn gp-btn--primary">Valider</button>
+        <button class="gp-btn gp-btn--secondary">Annuler</button>
+        <button class="gp-btn gp-btn--ghost">Détails</button>
+        <button class="gp-btn gp-btn--danger">Supprimer</button>
+        <button class="gp-btn gp-btn--primary" disabled>Désactivé</button>
+      </div>
+      <div class="row">
+        <button class="gp-btn gp-btn--primary gp-btn--sm">Small</button>
+        <button class="gp-btn gp-btn--primary">Medium</button>
+        <button class="gp-btn gp-btn--primary gp-btn--lg">Large</button>
+      </div>
+      <div class="row">
+        <button class="gp-btn gp-btn--primary"><svg class="ti"><use href="#check"></use></svg>Enregistrer</button>
+        <button class="gp-btn gp-btn--secondary"><svg class="ti"><use href="#download"></use></svg>Exporter</button>
+        <button class="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Ajouter"><svg class="ti"><use href="#plus"></use></svg></button>
+        <button class="gp-btn gp-btn--ghost gp-btn--icon" aria-label="Supprimer" style="color:var(--gp-danger)"><svg class="ti"><use href="#trash"></use></svg></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- INTERRUPTEUR -->
+  <section class="doc-section">
+    <h2 class="doc-h">Interrupteur</h2>
+    <p class="doc-desc">Réglage on/off appliqué immédiatement. Le libellé décrit l'état activé, jamais une action.</p>
+    <div class="specimen">
+      <div class="stack" style="max-width:420px;">
+        <label class="gp-choice" style="justify-content:space-between;">
+          <span>Mode maintenance</span>
+          <span class="gp-switch"><input type="checkbox" checked><span class="track"></span></span>
+        </label>
+        <hr class="divider" style="margin:0;">
+        <label class="gp-choice" style="justify-content:space-between;">
+          <span>Notifications e-mail</span>
+          <span class="gp-switch"><input type="checkbox"><span class="track"></span></span>
+        </label>
+        <hr class="divider" style="margin:0;">
+        <label class="gp-choice" style="justify-content:space-between;color:var(--gp-text-disabled);">
+          <span>Option verrouillée</span>
+          <span class="gp-switch"><input type="checkbox" checked disabled><span class="track"></span></span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHECKBOX / RADIO -->
+  <section class="doc-section">
+    <h2 class="doc-h">Cases à cocher & boutons radio</h2>
+    <p class="doc-desc">Jumeaux visuels. Carré = choix multiples indépendants ; rond = choix exclusif dans un groupe.</p>
+    <div class="specimen grid">
+      <div>
+        <p class="spec-label">Radio — choix exclusif</p>
+        <div class="stack" style="gap:10px;">
+          <label class="gp-choice"><input class="gp-radio" type="radio" name="prio">Basse</label>
+          <label class="gp-choice"><input class="gp-radio" type="radio" name="prio" checked>Normale</label>
+          <label class="gp-choice"><input class="gp-radio" type="radio" name="prio">Haute</label>
+        </div>
+      </div>
+      <div>
+        <p class="spec-label">Checkbox — choix multiples</p>
+        <div class="stack" style="gap:10px;">
+          <label class="gp-choice"><input class="gp-check" type="checkbox" id="master">Habilitations requises</label>
+          <label class="gp-choice" style="margin-left:18px;"><input class="gp-check gp-sub" type="checkbox" checked>Travail en hauteur</label>
+          <label class="gp-choice" style="margin-left:18px;"><input class="gp-check gp-sub" type="checkbox" checked>Habilitation électrique B2V</label>
+          <label class="gp-choice" style="margin-left:18px;"><input class="gp-check gp-sub" type="checkbox">Espaces confinés</label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHAMPS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Champs de saisie</h2>
+    <p class="doc-desc">Label toujours visible au-dessus du champ. Le message d'erreur remplace le texte d'aide.
+      Désactivé (grisé, sans valeur) ≠ lecture seule (donnée réelle non éditable).</p>
+    <div class="specimen grid">
+      <div class="gp-field">
+        <label class="gp-label">Nom de l'intervention</label>
+        <input class="gp-input" placeholder="Saisir un intitulé…">
+        <span class="gp-help">Texte d'aide</span>
+      </div>
+      <div class="gp-field">
+        <label class="gp-label">Date <span class="req">*</span></label>
+        <input class="gp-input is-error" value="32/13/2026">
+        <span class="gp-errmsg"><svg class="ti"><use href="#alert-circle"></use></svg>Date invalide</span>
+      </div>
+      <div class="gp-field">
+        <label class="gp-label">Matricule agent</label>
+        <div class="gp-inputgroup"><input value="AG-04821" readonly><svg class="ti" style="font-size:15px;"><use href="#lock"></use></svg></div>
+        <span class="gp-help">Lecture seule</span>
+      </div>
+      <div class="gp-field">
+        <label class="gp-label">Rechercher</label>
+        <div class="gp-inputgroup"><svg class="ti"><use href="#search"></use></svg><input placeholder="Agent, poste, référence…"></div>
+      </div>
+      <div class="gp-field">
+        <label class="gp-label">Tension mesurée</label>
+        <div class="gp-inputgroup"><input value="230"><span class="gp-suffix">V</span></div>
+      </div>
+      <div class="gp-field">
+        <label class="gp-label">Référence</label>
+        <input class="gp-input" value="Non modifiable" disabled>
+        <span class="gp-help">Désactivé</span>
+      </div>
+      <div class="gp-field" style="grid-column:1/-1;max-width:440px;">
+        <label class="gp-label">Compte rendu</label>
+        <textarea class="gp-textarea">Remplacement du bloc d'éclairage de sécurité, test de décharge conforme.</textarea>
+      </div>
+    </div>
+  </section>
+
+  <!-- SPIN BUTTON -->
+  <section class="doc-section">
+    <h2 class="doc-h">Spin button</h2>
+    <p class="doc-desc">Champ numérique avec incrément/décrément. Forme desktop : textbox + bloc de chevrons séparé à côté
+      (survol contrasté, flèches ↑↓ au clavier). Forme tactile : − valeur + à cibles larges. La valeur est en Plex Mono,
+      les bornes min/max désactivent le bouton concerné.</p>
+    <div class="specimen grid">
+      <div>
+        <p class="spec-label">Chevrons — desktop</p>
+        <div class="gp-spin" data-spin>
+          <input class="gp-spin__input" type="number" value="12" min="0" max="99" step="1" aria-label="Quantité">
+          <span class="gp-spin__steps">
+            <button class="gp-spin__step" data-inc aria-label="Augmenter"><span class="gp-chev gp-chev--up"></span></button>
+            <button class="gp-spin__step" data-dec aria-label="Diminuer"><span class="gp-chev gp-chev--down"></span></button>
+          </span>
+        </div>
+      </div>
+      <div>
+        <p class="spec-label">− valeur + — tactile</p>
+        <div class="gp-spin--touch" data-spin>
+          <button class="gp-spin__tbtn gp-spin__tbtn--minus" data-dec aria-label="Diminuer"><span class="gp-pm"></span></button>
+          <input class="gp-spin__input" type="number" value="12" min="0" max="99" step="1" aria-label="Quantité">
+          <button class="gp-spin__tbtn gp-spin__tbtn--plus" data-inc aria-label="Augmenter"><span class="gp-pm gp-pm--plus"></span></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LISTBOX -->
+  <section class="doc-section">
+    <h2 class="doc-h">Listbox</h2>
+    <p class="doc-desc">Liste toujours visible. Sélection simple (ligne surlignée + liseré + coche) ou multiple (cases à cocher).
+      Le curseur clavier (encadré) est distinct de la sélection.</p>
+    <div class="specimen grid">
+      <div>
+        <p class="spec-label">Sélection simple</p>
+        <div class="gp-listbox" data-single-listbox>
+          <div class="gp-optgroup">Bassins Est</div>
+          <div class="gp-opt">Cap Janet</div>
+          <div class="gp-opt is-selected">Quai de la Joliette <svg class="ti js-check"><use href="#check"></use></svg></div>
+          <div class="gp-opt">Mourepiane</div>
+          <div class="gp-opt is-disabled">Môle Léon Gourret — hors service</div>
+          <div class="gp-optgroup" style="border-top:1px solid var(--gp-surface-sunken)">Bassins Ouest</div>
+          <div class="gp-opt">Fos — Darse 1</div>
+        </div>
+      </div>
+      <div>
+        <p class="spec-label">Sélection multiple</p>
+        <div class="gp-listbox">
+          <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Électriciens</span></label>
+          <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Mécaniciens</span></label>
+          <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Hydraulique</span></label>
+          <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Astreinte</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMBOBOX -->
+  <section class="doc-section">
+    <h2 class="doc-h">Combobox</h2>
+    <p class="doc-desc">Champ + liste filtrable. Cliquez pour ouvrir. Sur mobile, elle ouvre une feuille (bottom-sheet).
+      Pour une liste courte toujours pertinente, préférez la listbox.</p>
+    <div class="specimen">
+      <div class="gp-combobox" id="cb1">
+        <div class="gp-inputgroup" data-cb-trigger><span data-cb-value style="flex:1;color:var(--gp-text-muted)">Installation…</span><svg class="ti chevron"><use href="#chevron-down"></use></svg></div>
+        <div class="gp-menu">
+          <div class="gp-opt" data-cb-opt>Cap Janet</div>
+          <div class="gp-opt" data-cb-opt>Quai de la Joliette</div>
+          <div class="gp-opt" data-cb-opt>Mourepiane</div>
+          <div class="gp-opt" data-cb-opt>Fos — Darse 1</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CALENDRIER -->
+  <section class="doc-section">
+    <h2 class="doc-h">Calendrier (date picker)</h2>
+    <p class="doc-desc">Saisie d'une date seule. S'ouvre en dropdown sous le champ. Mode grille par défaut (mois et année
+      cliquables pour navigation rapide) ; bascule automatiquement en saisie directe JJ/MM/AAAA dès que l'utilisateur tape.
+      Colonnes samedi et dimanche en bande continue sans arrondi. Fonctionne en clair et sombre.</p>
+    <div class="specimen">
+      <div class="gp-dp" data-dp>
+        <div class="gp-dp__input" data-dp-trigger>
+          <span class="gp-dp__ico"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></svg></span>
+          <input type="text" placeholder="JJ/MM/AAAA" maxlength="10" data-dp-input aria-label="Date" autocomplete="off">
+        </div>
+        <div class="gp-dp__panel" data-dp-panel>
+          <div class="gp-dp__direct" data-dp-direct>
+            <div class="gp-dp__dpart" data-dp-dd>--</div>
+            <span class="gp-dp__dsep">/</span>
+            <div class="gp-dp__dpart" data-dp-mm>--</div>
+            <span class="gp-dp__dsep">/</span>
+            <div class="gp-dp__dpart" style="flex:2;" data-dp-yy>----</div>
+          </div>
+          <p class="gp-dp__hint" data-dp-hint hidden>Saisie en cours — JJ/MM/AAAA</p>
+          <div class="gp-dp__nav">
+            <button class="gp-dp__nav-btn" data-dp-prev aria-label="Mois précédent"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <div class="gp-dp__nav-sels">
+              <button class="gp-dp__nav-sel" data-dp-msel></button>
+              <button class="gp-dp__nav-sel" data-dp-ysel></button>
+            </div>
+            <button class="gp-dp__nav-btn" data-dp-next aria-label="Mois suivant"><svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></button>
+          </div>
+          <div class="gp-dp__body">
+            <div class="gp-dp__grid" data-dp-grid></div>
+          </div>
+          <div class="gp-dp__foot">
+            <button class="gp-btn gp-btn--ghost gp-btn--sm" data-dp-today>Aujourd'hui</button>
+            <button class="gp-btn gp-btn--primary gp-btn--sm" data-dp-ok>OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLICERS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Slicers (filtres)</h2>
+    <p class="doc-desc">Filtres visuels pour tableaux de bord et vues en liste. Quatre formes selon le nombre de valeurs
+      et la place disponible : chips, liste à cocher, dropdown compact, tuiles avec compteurs.</p>
+    <div class="specimen grid">
+      <div>
+        <p class="spec-label">A · Chips</p>
+        <div class="gp-chipset">
+          <button class="gp-chip" data-chip>Tout</button>
+          <button class="gp-chip is-on" data-chip>En cours <svg class="ti"><use href="#x"></use></svg></button>
+          <button class="gp-chip" data-chip>Planifiée <svg class="ti"><use href="#x"></use></svg></button>
+          <button class="gp-chip is-on" data-chip>En retard <svg class="ti"><use href="#x"></use></svg></button>
+          <button class="gp-chip" data-chip>Terminée <svg class="ti"><use href="#x"></use></svg></button>
+        </div>
+      </div>
+      <div class="gp-slicer" data-slicer>
+        <div class="gp-slicer__hd"><span class="gp-slicer__title">Équipe · liste à cocher</span><button class="gp-slicer__clear" data-clear>Effacer</button></div>
+        <div class="gp-inputgroup" style="margin-bottom:8px;"><svg class="ti"><use href="#search"></use></svg><input placeholder="Rechercher"></div>
+        <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox" checked>Électriciens</label>
+        <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox" checked>Mécaniciens</label>
+        <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox">Hydraulique</label>
+        <label class="gp-choice" style="padding:5px 0;"><input class="gp-check" type="checkbox">Astreinte</label>
+        <div class="gp-slicer__foot" data-count>2 sélectionnées</div>
+      </div>
+      <div>
+        <p class="spec-label">C · Dropdown compact</p>
+        <div class="gp-combobox" data-dd>
+          <div class="gp-inputgroup" data-dd-trigger style="cursor:pointer;"><span style="flex:1;">2 sélectionnées</span><svg class="ti chevron"><use href="#chevron-down"></use></svg></div>
+          <div class="gp-menu">
+            <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Électriciens</span></label>
+            <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox" checked>Mécaniciens</span></label>
+            <label class="gp-opt"><span class="gp-left"><input class="gp-check" type="checkbox">Hydraulique</span></label>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="spec-label">D · Tuiles avec compteurs</p>
+        <div class="stack" style="gap:7px;">
+          <div class="gp-tile is-on" data-tile>Quai de la Joliette <span class="gp-tile__count">12</span></div>
+          <div class="gp-tile" data-tile>Cap Janet <span class="gp-tile__count">7</span></div>
+          <div class="gp-tile" data-tile>Fos — Darse 1 <span class="gp-tile__count">4</span></div>
+          <div class="gp-tile is-disabled">Mourepiane <span class="gp-tile__count">0</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SLICER DE PLAGE -->
+  <section class="doc-section">
+    <h2 class="doc-h">Slicer de plage</h2>
+    <p class="doc-desc">Pour filtrer une valeur continue. Trois variantes : curseur seul (réglage rapide),
+      curseur + saisie (numérique précis), et plage de dates (préréglages + personnalisé).</p>
+    <div class="specimen grid">
+
+      <div>
+        <p class="spec-label">1 · Curseur seul</p>
+        <div class="gp-range" data-range data-bubbles>
+          <div class="gp-range__track"><div class="gp-range__fill"></div><span class="gp-range__bub" data-bub-min></span><span class="gp-range__bub" data-bub-max></span></div>
+          <input type="range" min="0" max="400" value="210">
+          <input type="range" min="0" max="400" value="245">
+          <div class="gp-range__ends"><span>0</span><span>400 V</span></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="spec-label">2 · Curseur + saisie</p>
+        <div class="gp-range" data-range>
+          <div class="gp-range__track"><div class="gp-range__fill"></div></div>
+          <input type="range" min="0" max="10000" step="100" value="1500">
+          <input type="range" min="0" max="10000" step="100" value="6000">
+        </div>
+        <div class="gp-rangefields">
+          <div class="gp-field"><label class="gp-label">Min (€)</label><input class="gp-input" data-range-field value="1500"></div>
+          <span class="sep">–</span>
+          <div class="gp-field"><label class="gp-label">Max (€)</label><input class="gp-input" data-range-field value="6000"></div>
+        </div>
+      </div>
+
+      <div>
+        <p class="spec-label">3 · Plage de dates</p>
+        <div class="gp-chipset" style="margin-bottom:14px;">
+          <button class="gp-chip" data-preset>7 jours</button>
+          <button class="gp-chip" data-preset>30 jours</button>
+          <button class="gp-chip" data-preset>Ce mois</button>
+          <button class="gp-chip is-on" data-preset>Personnalisé</button>
+        </div>
+        <div class="gp-rangefields" style="margin-top:0;">
+          <div class="gp-field"><label class="gp-label">Du</label>
+            <div class="gp-inputgroup"><input value="01/08/2026"><svg class="ti" style="font-size:15px;"><use href="#calendar"></use></svg></div></div>
+          <div class="gp-field"><label class="gp-label">Au</label>
+            <div class="gp-inputgroup"><input value="16/08/2026"><svg class="ti" style="font-size:15px;"><use href="#calendar"></use></svg></div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- TOASTS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Notifications (toasts)</h2>
+    <p class="doc-desc">Quatre types, icône + couleur (jamais la couleur seule). Info et succès disparaissent seuls ;
+      alerte et erreur restent jusqu'à acquittement. Position haut-droite en desktop, pleine largeur en haut sur mobile.</p>
+    <div class="specimen">
+      <div class="row">
+        <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="info">Info</button>
+        <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="success">Succès</button>
+        <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="warning">Alerte</button>
+        <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="danger">Erreur</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODALE -->
+  <section class="doc-section">
+    <h2 class="doc-h">Modalbox</h2>
+    <p class="doc-desc">Couche la plus haute : voile + ombre marquée (clair) ou surface claire + liseré + halo (sombre).
+      Fermeture par Échap, clic sur le voile ou ×. Sur mobile, passe en plein écran.</p>
+    <div class="specimen">
+      <div class="row">
+        <button class="gp-btn gp-btn--primary" id="openForm">Ouvrir un formulaire</button>
+        <button class="gp-btn gp-btn--danger" id="openConfirm">Confirmation destructive</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TABS -->
+  <section class="doc-section">
+    <h2 class="doc-h">Onglets</h2>
+    <p class="doc-desc">Style souligné pour naviguer entre des sections. Le sélecteur segmenté sert à basculer une même vue.</p>
+    <div class="specimen stack">
+      <div>
+        <div class="gp-tabs" role="tablist">
+          <button class="gp-tab" role="tab" aria-selected="false" data-tab="p1">Vue d'ensemble</button>
+          <button class="gp-tab" role="tab" aria-selected="true" data-tab="p2">Interventions <span class="gp-badge">12</span></button>
+          <button class="gp-tab" role="tab" aria-selected="false" data-tab="p3">Équipes</button>
+          <button class="gp-tab" role="tab" disabled>Archives</button>
+        </div>
+        <div class="gp-tabpanel" data-panel="p1" hidden>Contenu — vue d'ensemble</div>
+        <div class="gp-tabpanel" data-panel="p2">Contenu — interventions</div>
+        <div class="gp-tabpanel" data-panel="p3" hidden>Contenu — équipes</div>
+      </div>
+      <div>
+        <p class="spec-label">Segmenté</p>
+        <div class="gp-seg">
+          <button class="gp-seg__item">Jour</button>
+          <button class="gp-seg__item is-active">Semaine</button>
+          <button class="gp-seg__item">Mois</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TOOLTIP / POPOVER -->
+  <section class="doc-section">
+    <h2 class="doc-h">Tooltip & popover</h2>
+    <p class="doc-desc">Le tooltip est une info-bulle brève au survol et au focus (jamais d'information essentielle,
+      invisible au tactile). Au doigt, un popover déclenché par appui prend le relais pour l'info qui compte.</p>
+    <div class="specimen">
+      <div class="row" style="gap:40px;">
+        <span class="gp-tip" data-tip="Exporter en PDF" tabindex="0">
+          <button class="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Exporter"><svg class="ti"><use href="#download"></use></svg></button>
+        </span>
+        <span class="gp-tip" data-tip="Dernière synchro il y a 5 min" tabindex="0">
+          <svg class="ti" style="font-size:20px;color:var(--gp-text-secondary)"><use href="#info-circle"></use></svg>
+        </span>
+        <div class="gp-popover" style="max-width:250px;">
+          <div class="gp-popover__hd">
+            <p class="gp-popover__title">Tension nominale</p>
+            <svg class="ti" style="color:var(--gp-text-muted);cursor:pointer"><use href="#x"></use></svg>
+          </div>
+          <p class="gp-popover__text">Valeur de référence du réseau (230 V). Un écart de ±10 % déclenche une alerte.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+  <!-- TABLEAU -->
+  <section class="doc-section">
+    <h2 class="doc-h">Tableau</h2>
+    <p class="doc-desc">En-tête figé, colonnes triables (tri multi-colonnes avec priorité), redimensionnables (bord droit) et
+      déplaçables (poignée à gauche). Cases à cocher, lignes zébrées, ligne sélectionnée surlignée, colonne d'actions fixe.
+      Défilement horizontal sur petit écran. Clique un titre pour trier, glisse la poignée pour réordonner, tire le bord droit pour élargir.</p>
+    <div class="gp-table-wrap gp-scroll" data-table>
+      <table class="gp-table">
+        <thead>
+          <tr>
+            <th style="width:20px;"><input class="gp-check" type="checkbox" data-selall aria-label="Tout sélectionner"></th>
+            <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Poste</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+            <th data-col data-type="text" style="width:180px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Installation</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+            <th data-col data-type="date" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière intervention</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+            <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#selector"></use></svg><span class="gp-th__pri" hidden></span></span></span><span class="gp-th__rz" data-rz></span></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 1</td><td>Quai de la Joliette</td><td class="mono">12/08/2026</td><td><span class="gp-badge gp-badge--info">En cours</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 2</td><td>Cap Janet</td><td class="mono">05/08/2026</td><td><span class="gp-badge gp-badge--success">Terminée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 3</td><td>Fos — Darse 1</td><td class="mono">28/07/2026</td><td><span class="gp-badge gp-badge--danger">En retard</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 4</td><td>Mourepiane</td><td class="mono">15/08/2026</td><td><span class="gp-badge gp-badge--warning">Planifiée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 5</td><td>Lavéra</td><td class="mono">10/08/2026</td><td><span class="gp-badge gp-badge--info">En cours</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+          <tr><td><input class="gp-check" type="checkbox" data-rowcheck aria-label="Sélectionner la ligne"></td><td>Poste 6</td><td>Caronte</td><td class="mono">02/08/2026</td><td><span class="gp-badge gp-badge--success">Terminée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#eye"></use></svg></button><button aria-label="Modifier"><svg class="ti"><use href="#pencil"></use></svg></button><button aria-label="Télécharger"><svg class="ti"><use href="#download"></use></svg></button><button class="del" aria-label="Supprimer"><svg class="ti"><use href="#trash"></use></svg></button></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BARRES DE DÉFILEMENT -->
+  <section class="doc-section">
+    <h2 class="doc-h">Barres de défilement</h2>
+    <p class="doc-desc">Deux variantes : standard avec rail (classe <code style="font-family:var(--gp-mono)">.gp-scroll</code>, le défaut,
+      appliqué à toute la page) et épaisse (<code style="font-family:var(--gp-mono)">.gp-scroll--wide</code>) pour les tableaux larges
+      ou les postes tactile-souris. Chrome et Edge rendent la version complète ; Firefox applique « fine/normale » + couleurs ;
+      au tactile, l'OS impose sa propre barre transitoire.</p>
+    <div class="specimen grid">
+      <div>
+        <p class="spec-label">Standard · .gp-scroll</p>
+        <div class="gp-scroll" style="height:120px;overflow:auto;border:1px solid var(--gp-border);border-radius:8px;padding:10px;">
+          <div style="width:640px;font-size:13px;line-height:1.95;color:var(--gp-text)">Cap Janet<br>Quai de la Joliette — poste passagers, correspondances navettes et signalétique dédiée<br>Mourepiane<br>Fos — Darse 1<br>Fos — Darse 2<br>Lavéra<br>Caronte<br>Graveleau</div>
+        </div>
+      </div>
+      <div>
+        <p class="spec-label">Épaisse · .gp-scroll--wide</p>
+        <div class="gp-scroll--wide" style="height:120px;overflow:auto;border:1px solid var(--gp-border);border-radius:8px;padding:10px;">
+          <div style="width:640px;font-size:13px;line-height:1.95;color:var(--gp-text)">Cap Janet<br>Quai de la Joliette — poste passagers, correspondances navettes et signalétique dédiée<br>Mourepiane<br>Fos — Darse 1<br>Fos — Darse 2<br>Lavéra<br>Caronte<br>Graveleau</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- Région des toasts -->
+<div class="gp-toast-region" id="toastRegion" aria-live="polite"></div>
+
+<!-- Modale : formulaire -->
+<div class="gp-overlay" id="modalForm" data-close-overlay>
+  <div class="gp-modal" role="dialog" aria-modal="true" aria-labelledby="mfTitle">
+    <div class="gp-modal__hd">
+      <h3 class="gp-modal__title" id="mfTitle">Nouvelle intervention</h3>
+      <button class="gp-modal__close" data-close aria-label="Fermer"><svg class="ti"><use href="#x"></use></svg></button>
+    </div>
+    <div class="gp-modal__bd gp-scroll">
+      <div class="gp-field"><label class="gp-label">Intitulé</label><input class="gp-input" placeholder="Saisir un intitulé…"></div>
+      <div class="gp-field"><label class="gp-label">Installation</label>
+        <div class="gp-inputgroup"><input value="Quai de la Joliette" style="cursor:default" readonly><svg class="ti"><use href="#chevron-down"></use></svg></div>
+      </div>
+      <label class="gp-choice" style="justify-content:space-between;">
+        <span>Marquer comme urgente</span>
+        <span class="gp-switch"><input type="checkbox"><span class="track"></span></span>
+      </label>
+    </div>
+    <div class="gp-modal__ft">
+      <button class="gp-btn gp-btn--secondary" data-close>Annuler</button>
+      <button class="gp-btn gp-btn--primary" data-close>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale : confirmation destructive -->
+<div class="gp-overlay" id="modalConfirm" data-close-overlay>
+  <div class="gp-modal" role="alertdialog" aria-modal="true" aria-labelledby="mcTitle" style="max-width:400px;">
+    <div class="gp-modal__bd gp-scroll" style="flex-direction:row;">
+      <span class="gp-confirm-icon"><svg class="ti"><use href="#alert-triangle"></use></svg></span>
+      <div>
+        <h3 class="gp-modal__title" id="mcTitle" style="margin-bottom:6px;">Supprimer l'intervention ?</h3>
+        <p style="font-size:13px;color:var(--gp-text-secondary);margin:0;line-height:1.5;">Cette action est définitive. L'historique lié au poste sera conservé.</p>
+      </div>
+    </div>
+    <div class="gp-modal__ft">
+      <button class="gp-btn gp-btn--neutral" data-close autofocus>Annuler</button>
+      <button class="gp-btn gp-btn--danger" data-close>Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Thème clair / sombre */
+const root=document.documentElement, tBtn=document.getElementById('themeBtn'), tLbl=document.getElementById('themeLbl');
+tBtn.addEventListener('click',()=>{
+  const dark=root.dataset.theme==='dark';
+  root.dataset.theme=dark?'light':'dark';
+  tLbl.textContent=dark?'Sombre':'Clair';
+  tBtn.querySelector('use').setAttribute('href',dark?'#moon':'#sun');
+});
+
+/* Case maître indéterminée */
+const master=document.getElementById('master');
+const subs=[...document.querySelectorAll('.gp-sub')];
+function syncMaster(){const n=subs.filter(c=>c.checked).length;master.checked=n===subs.length;master.indeterminate=n>0&&n<subs.length;}
+subs.forEach(c=>c.addEventListener('change',syncMaster));
+master.addEventListener('change',()=>subs.forEach(c=>c.checked=master.checked));
+syncMaster();
+
+/* Combobox */
+document.querySelectorAll('.gp-combobox:not([data-dd])').forEach(cb=>{
+  const trig=cb.querySelector('[data-cb-trigger]'), val=cb.querySelector('[data-cb-value]');
+  if(!trig||!val)return;
+  trig.addEventListener('click',()=>cb.classList.toggle('is-open'));
+  cb.querySelectorAll('[data-cb-opt]').forEach(o=>o.addEventListener('click',()=>{
+    val.textContent=o.textContent;val.style.color='var(--gp-text)';cb.classList.remove('is-open');
+  }));
+  document.addEventListener('click',e=>{if(!cb.contains(e.target))cb.classList.remove('is-open');});
+});
+
+/* Onglets */
+document.querySelectorAll('.gp-tabs').forEach(bar=>{
+  const tabs=[...bar.querySelectorAll('.gp-tab[data-tab]')];
+  const scope=bar.parentElement;
+  tabs.forEach(t=>t.addEventListener('click',()=>{
+    tabs.forEach(x=>x.setAttribute('aria-selected','false'));
+    t.setAttribute('aria-selected','true');
+    scope.querySelectorAll('.gp-tabpanel').forEach(p=>p.hidden=p.dataset.panel!==t.dataset.tab);
+  }));
+});
+/* Segmenté */
+document.querySelectorAll('.gp-seg').forEach(seg=>{
+  seg.querySelectorAll('.gp-seg__item').forEach(it=>it.addEventListener('click',()=>{
+    seg.querySelectorAll('.gp-seg__item').forEach(x=>x.classList.remove('is-active'));it.classList.add('is-active');
+  }));
+});
+
+/* Toasts */
+const region=document.getElementById('toastRegion');
+const TOAST={
+  info:{i:'info-circle',t:'Rapport généré',x:'L\'export des interventions est prêt.',auto:true},
+  success:{i:'circle-check',t:'Modifications enregistrées',x:'La fiche du poste a été mise à jour.',auto:true},
+  warning:{i:'alert-triangle',t:'Astreinte non couverte',x:'Aucun électricien affecté ce week-end.',auto:false},
+  danger:{i:'alert-circle',t:'Échec de la synchronisation',x:'Impossible de joindre le serveur.',auto:false}
+};
+document.querySelectorAll('[data-toast]').forEach(b=>b.addEventListener('click',()=>{
+  const k=b.dataset.toast,d=TOAST[k];
+  const el=document.createElement('div');el.className='gp-toast gp-toast--'+k;
+  el.innerHTML='<svg class="ti gp-toast__icon"><use href="#'+d.i+'"></use></svg><div style="flex:1"><p class="gp-toast__title">'+d.t+
+    '</p><p class="gp-toast__text">'+d.x+'</p></div><button class="gp-toast__close" aria-label="Fermer"><svg class="ti"><use href="#x"></use></svg></button>'+
+    (d.auto?'<div class="gp-toast__bar"></div>':'');
+  el.querySelector('.gp-toast__close').addEventListener('click',()=>el.remove());
+  region.appendChild(el);
+  if(d.auto){const bar=el.querySelector('.gp-toast__bar');bar.style.width='100%';bar.style.transition='width 5s linear';
+    requestAnimationFrame(()=>bar.style.width='0%');setTimeout(()=>el.remove(),5000);}
+}));
+
+/* Modales */
+function openModal(id){const m=document.getElementById(id);m.classList.add('is-open');
+  const f=m.querySelector('[autofocus]')||m.querySelector('button');f&&f.focus();}
+function closeModal(m){m.classList.remove('is-open');}
+document.getElementById('openForm').addEventListener('click',()=>openModal('modalForm'));
+document.getElementById('openConfirm').addEventListener('click',()=>openModal('modalConfirm'));
+document.querySelectorAll('.gp-overlay').forEach(o=>{
+  o.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>closeModal(o)));
+  o.addEventListener('click',e=>{if(e.target===o)closeModal(o);});
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.gp-overlay.is-open').forEach(closeModal);});
+
+/* Slicers — chips, presets, tuiles */
+document.querySelectorAll('[data-chip],[data-tile]').forEach(el=>el.addEventListener('click',()=>{
+  if(el.classList.contains('is-disabled'))return;el.classList.toggle('is-on');}));
+document.querySelectorAll('[data-preset]').forEach(p=>p.addEventListener('click',()=>{
+  p.parentElement.querySelectorAll('[data-preset]').forEach(x=>x.classList.remove('is-on'));p.classList.add('is-on');}));
+
+/* Slicer liste à cocher — compteur + effacer */
+document.querySelectorAll('[data-slicer]').forEach(sl=>{
+  const boxes=[...sl.querySelectorAll('.gp-check')],foot=sl.querySelector('[data-count]');
+  const upd=()=>{const n=boxes.filter(b=>b.checked).length;foot.textContent=n+(n>1?' sélectionnées':' sélectionnée');};
+  boxes.forEach(b=>b.addEventListener('change',upd));
+  sl.querySelector('[data-clear]').addEventListener('click',()=>{boxes.forEach(b=>b.checked=false);upd();});
+  upd();
+});
+
+/* Slicer dropdown */
+document.querySelectorAll('[data-dd]').forEach(dd=>{
+  dd.querySelector('[data-dd-trigger]').addEventListener('click',()=>dd.classList.toggle('is-open'));
+  const val=dd.querySelector('[data-dd-trigger] span');
+  dd.querySelectorAll('.gp-check').forEach(b=>b.addEventListener('change',()=>{
+    const n=[...dd.querySelectorAll('.gp-check')].filter(x=>x.checked).length;
+    val.textContent=n?n+(n>1?' sélectionnées':' sélectionnée'):'Aucune';}));
+  document.addEventListener('click',e=>{if(!dd.contains(e.target))dd.classList.remove('is-open');});
+});
+
+/* Slicer de plage */
+document.querySelectorAll('.gp-range[data-range]').forEach(rg=>{
+  const ins=[...rg.querySelectorAll('input[type=range]')],fill=rg.querySelector('.gp-range__fill');
+  const mn=+ins[0].min,mx=+ins[0].max,pct=v=>(v-mn)/(mx-mn)*100;
+  const bMin=rg.querySelector('[data-bub-min]'),bMax=rg.querySelector('[data-bub-max]');
+  const fields=rg.parentElement.querySelectorAll('[data-range-field]');
+  function upd(){
+    let a=+ins[0].value,b=+ins[1].value;if(a>b){[a,b]=[b,a];}
+    fill.style.left=pct(a)+'%';fill.style.width=(pct(b)-pct(a))+'%';
+    if(bMin){bMin.style.left=pct(a)+'%';bMin.textContent=a;}
+    if(bMax){bMax.style.left=pct(b)+'%';bMax.textContent=b;}
+    if(fields.length){fields[0].value=a;fields[1].value=b;}
+  }
+  ins.forEach(i=>i.addEventListener('input',upd));
+  fields.forEach((f,i)=>f.addEventListener('change',()=>{ins[i].value=f.value;upd();}));
+  upd();
+});
+/* Spin button */
+document.querySelectorAll('[data-spin]').forEach(sp=>{
+  const input=sp.querySelector('input');
+  const inc=sp.querySelector('[data-inc]'), dec=sp.querySelector('[data-dec]');
+  const step=+(input.step)||1;
+  const min=input.min!==''?+input.min:-Infinity, max=input.max!==''?+input.max:Infinity;
+  const clamp=v=>Math.min(max,Math.max(min,v));
+  function sync(){const v=+input.value;if(dec)dec.disabled=v<=min;if(inc)inc.disabled=v>=max;}
+  function nudge(d){input.value=clamp((+input.value||0)+d*step);sync();}
+  inc&&inc.addEventListener('click',()=>nudge(1));
+  dec&&dec.addEventListener('click',()=>nudge(-1));
+  input.addEventListener('input',sync);
+  sync();
+});
+/* Listbox — sélection simple */
+document.querySelectorAll('[data-single-listbox]').forEach(lb=>{
+  lb.querySelectorAll('.gp-opt').forEach(opt=>{
+    if(opt.classList.contains('is-disabled'))return;
+    opt.addEventListener('click',()=>{
+      lb.querySelectorAll('.gp-opt').forEach(o=>{
+        o.classList.remove('is-selected','is-focus');
+        o.querySelectorAll('.js-check').forEach(c=>c.remove());
+      });
+      opt.classList.add('is-selected');
+      opt.insertAdjacentHTML('beforeend','<svg class="ti js-check"><use href="#check"></use></svg>');
+    });
+  });
+});
+/* Tableau — tri multi-colonnes, sélection, redimensionnement, réordonnancement */
+document.querySelectorAll('table.gp-table').forEach(tbl=>{
+  const headRow=tbl.tHead.rows[0], body=tbl.tBodies[0];
+  const sortState=[];
+  const parseDate=s=>{const p=s.split('/');return (+p[2])*1e4+(+p[1])*100+(+p[0]);};
+  const cmp=(a,b,t)=>t==='date'?parseDate(a)-parseDate(b):a.localeCompare(b,'fr',{numeric:true});
+  function applySort(){
+    if(!sortState.length)return;
+    [...body.rows].sort((ra,rb)=>{
+      for(const s of sortState){
+        const i=s.th.cellIndex,t=s.th.dataset.type||'text';
+        const c=cmp(ra.cells[i].innerText.trim(),rb.cells[i].innerText.trim(),t);
+        if(c)return s.dir==='asc'?c:-c;
+      }
+      return 0;
+    }).forEach(r=>body.appendChild(r));
+  }
+  function updateInd(){
+    headRow.querySelectorAll('[data-sort]').forEach(el=>{
+      const ind=el.querySelector('.gp-th__ind'),pri=el.querySelector('.gp-th__pri');
+      ind.querySelector('use').setAttribute('href','#selector');ind.style.color='';pri.hidden=true;pri.textContent='';
+    });
+    sortState.forEach((s,idx)=>{
+      const el=s.th.querySelector('[data-sort]'),ind=el.querySelector('.gp-th__ind'),pri=el.querySelector('.gp-th__pri');
+      ind.querySelector('use').setAttribute('href',s.dir==='asc'?'#arrow-up':'#arrow-down');ind.style.color='var(--gp-primary)';
+      if(sortState.length>1){pri.hidden=false;pri.textContent=idx+1;}
+    });
+  }
+  headRow.querySelectorAll('[data-sort]').forEach(el=>el.addEventListener('click',()=>{
+    const th=el.closest('th'),ex=sortState.find(s=>s.th===th);
+    if(!ex)sortState.push({th,dir:'asc'});
+    else if(ex.dir==='asc')ex.dir='desc';
+    else sortState.splice(sortState.indexOf(ex),1);
+    applySort();updateInd();
+  }));
+  const selAll=tbl.querySelector('[data-selall]');
+  const boxes=()=>[...body.querySelectorAll('[data-rowcheck]')];
+  function syncSelAll(){const b=boxes(),n=b.filter(x=>x.checked).length;if(selAll){selAll.checked=n===b.length&&n>0;selAll.indeterminate=n>0&&n<b.length;}}
+  boxes().forEach(b=>b.addEventListener('change',()=>{b.closest('tr').classList.toggle('is-sel',b.checked);syncSelAll();}));
+  selAll&&selAll.addEventListener('change',()=>boxes().forEach(b=>{b.checked=selAll.checked;b.closest('tr').classList.toggle('is-sel',b.checked);}));
+  headRow.querySelectorAll('[data-rz]').forEach(rz=>rz.addEventListener('mousedown',e=>{
+    e.preventDefault();const th=rz.closest('th'),sx=e.clientX,sw=th.offsetWidth;
+    const mm=ev=>th.style.width=Math.max(60,sw+ev.clientX-sx)+'px';
+    const mu=()=>{document.removeEventListener('mousemove',mm);document.removeEventListener('mouseup',mu);};
+    document.addEventListener('mousemove',mm);document.addEventListener('mouseup',mu);
+  }));
+  let dragIdx=null;
+  function moveColumn(from,to){
+    if(from===to)return;
+    [headRow,...body.rows].forEach(row=>{const cell=row.cells[from],ref=row.cells[to];from<to?ref.after(cell):ref.before(cell);});
+  }
+  headRow.querySelectorAll('.gp-th__grip').forEach(g=>g.addEventListener('dragstart',e=>{dragIdx=g.closest('th').cellIndex;e.dataTransfer.effectAllowed='move';}));
+  headRow.querySelectorAll('th[data-col]').forEach(th=>{
+    th.addEventListener('dragover',e=>{if(dragIdx!==null){e.preventDefault();th.classList.add('drag-over');}});
+    th.addEventListener('dragleave',()=>th.classList.remove('drag-over'));
+    th.addEventListener('drop',e=>{e.preventDefault();th.classList.remove('drag-over');const to=th.cellIndex;if(dragIdx!==null&&to!==dragIdx)moveColumn(dragIdx,to);dragIdx=null;});
+  });
+});
+/* Calendrier (date picker) */
+(function(){
+  const MONTHS=['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  const DAYS=['Lu','Ma','Me','Je','Ve','Sa','Di'];
+  const WE=[5,6]; // index 0=Lu … 6=Di
+  function pad(n){return String(n).padStart(2,'0');}
+  function daysInMonth(y,m){return new Date(y,m+1,0).getDate();}
+  function firstDow(y,m){let d=new Date(y,m,1).getDay();return d===0?6:d-1;}
+
+  document.querySelectorAll('[data-dp]').forEach(dp=>{
+    const inp=dp.querySelector('[data-dp-input]');
+    const panel=dp.querySelector('[data-dp-panel]');
+    const direct=dp.querySelector('[data-dp-direct]');
+    const hint=dp.querySelector('[data-dp-hint]');
+    const grid=dp.querySelector('[data-dp-grid]');
+    const msel=dp.querySelector('[data-dp-msel]');
+    const ysel=dp.querySelector('[data-dp-ysel]');
+    const ddEl=dp.querySelector('[data-dp-dd]');
+    const mmEl=dp.querySelector('[data-dp-mm]');
+    const yyEl=dp.querySelector('[data-dp-yy]');
+
+    const now=new Date();
+    let cur={y:now.getFullYear(),m:now.getMonth()};
+    let sel=null; // {d,m,y}
+
+    function open(){panel.classList.add('is-open');render();}
+    function close(){panel.classList.remove('is-open');direct.classList.remove('is-visible');if(hint)hint.hidden=true;}
+
+    function render(){
+      msel.textContent=MONTHS[cur.m];
+      ysel.textContent=cur.y;
+      const dow=firstDow(cur.y,cur.m);
+      const dim=daysInMonth(cur.y,cur.m);
+      const prev=daysInMonth(cur.y,cur.m-1);
+      let html='';
+      DAYS.forEach((d,i)=>{ html+=`<span class="gp-dp__dow${WE.includes(i)?' we':''}">${d}</span>`; });
+      // cases avant
+      for(let i=0;i<dow;i++){
+        const d=prev-dow+1+i;
+        const col=(i+7)%7;
+        html+=`<span class="gp-dp__day other${WE.includes(col)?' we':''}">${d}</span>`;
+      }
+      for(let d=1;d<=dim;d++){
+        const col=(dow+d-1)%7;
+        const isWe=WE.includes(col);
+        const isSel=sel&&sel.d===d&&sel.m===cur.m&&sel.y===cur.y;
+        const isToday=d===now.getDate()&&cur.m===now.getMonth()&&cur.y===now.getFullYear();
+        html+=`<span class="gp-dp__day${isWe?' we':''}${isSel?' sel':''}${isToday?' today':''}" data-day="${d}">${d}</span>`;
+      }
+      // cases après
+      const total=dow+dim;
+      const after=total%7===0?0:7-total%7;
+      for(let i=1;i<=after;i++){
+        const col=(total+i-1)%7;
+        html+=`<span class="gp-dp__day other${WE.includes(col)?' we':''}">${i}</span>`;
+      }
+      grid.innerHTML=html;
+      grid.querySelectorAll('[data-day]').forEach(el=>el.addEventListener('click',()=>{
+        sel={d:+el.dataset.day,m:cur.m,y:cur.y};
+        inp.value=`${pad(sel.d)}/${pad(sel.m+1)}/${sel.y}`;
+        render();
+      }));
+    }
+
+    function syncDirect(){
+      const v=inp.value;
+      const parts=v.split('/');
+      ddEl.textContent=parts[0]||'--';
+      mmEl.textContent=parts[1]||'--';
+      yyEl.textContent=parts[2]||'----';
+      [ddEl,mmEl,yyEl].forEach(el=>el.classList.remove('is-focus'));
+      if(v.length<=2)ddEl.classList.add('is-focus');
+      else if(v.length<=5)mmEl.classList.add('is-focus');
+      else yyEl.classList.add('is-focus');
+    }
+
+    dp.querySelector('[data-dp-trigger]').addEventListener('click',()=>{
+      panel.classList.contains('is-open')?close():open();
+    });
+    dp.querySelector('[data-dp-prev]').addEventListener('click',e=>{e.stopPropagation();cur.m--;if(cur.m<0){cur.m=11;cur.y--;}render();});
+    dp.querySelector('[data-dp-next]').addEventListener('click',e=>{e.stopPropagation();cur.m++;if(cur.m>11){cur.m=0;cur.y++;}render();});
+    dp.querySelector('[data-dp-today]').addEventListener('click',e=>{e.stopPropagation();sel={d:now.getDate(),m:now.getMonth(),y:now.getFullYear()};cur={y:sel.y,m:sel.m};inp.value=`${pad(sel.d)}/${pad(sel.m+1)}/${sel.y}`;render();});
+    dp.querySelector('[data-dp-ok]').addEventListener('click',e=>{e.stopPropagation();close();});
+
+    inp.addEventListener('input',()=>{
+      const v=inp.value.replace(/[^0-9/]/g,'');
+      inp.value=v;
+      direct.classList.add('is-visible');
+      if(hint)hint.hidden=false;
+      syncDirect();
+      if(v.length===10){
+        const [dd,mm,yy]=v.split('/').map(Number);
+        if(dd>=1&&dd<=31&&mm>=1&&mm<=12&&yy>=1900&&yy<=2100){
+          sel={d:dd,m:mm-1,y:yy};cur={y:yy,m:mm-1};render();
+        }
+      }
+    });
+
+    inp.addEventListener('keydown',e=>{
+      if(e.key==='Escape')close();
+      if(e.key==='Enter'&&sel)close();
+    });
+
+    document.addEventListener('click',e=>{if(!dp.contains(e.target))close();});
+  });
+})();
+</script>
+</body>
+</html>

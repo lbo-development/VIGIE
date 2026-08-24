@@ -1,0 +1,39 @@
+.login-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--gp-page);
+}
+
+.login-panel {
+  width: 100%;
+  max-width: 360px;
+  box-shadow: var(--gp-shadow-float);
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 22px;
+}
+
+.login-brand img {
+  height: 40px;
+}
+
+.login-brand h1 {
+  font-size: 18px;
+  font-weight: 500;
+  margin: 0;
+  color: var(--gp-text);
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}

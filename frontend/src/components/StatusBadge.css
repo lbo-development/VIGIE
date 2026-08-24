@@ -1,0 +1,13 @@
+.status-badge--ok {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.status-badge--error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.status-badge--idle {
+  color: #6b7280;
+}
