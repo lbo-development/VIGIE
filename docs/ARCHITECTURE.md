@@ -165,15 +165,16 @@ limit 1;
 
 ### Couches (suit le modèle `items`)
 
-1. `repositories/parametres.repository.ts` — requête de résolution en cascade ci-dessus,
-   `findByCle`, `upsert`.
-2. `services/parametres.service.ts` — registre `cle → schéma Zod`, valide `valeur` avant
-   écriture et après lecture.
-3. `controllers/parametres.controller.ts` — `GET /parametres` (valeurs effectives pour
+1. Migration Supabase : `supabase/migrations/20260825100000_create_parametre_application.sql`
+   — table, index uniques partiels, policies RLS (voir `ForClaude/SECURITY.md` §2.3).
+2. `repositories/parametres.repository.ts` — requête de résolution en cascade ci-dessus,
+   `findByCle`, `upsert`. *(pas encore créé)*
+3. `services/parametres.service.ts` — registre `cle → schéma Zod`, valide `valeur` avant
+   écriture et après lecture. *(pas encore créé)*
+4. `controllers/parametres.controller.ts` — `GET /parametres` (valeurs effectives pour
    l'acteur courant), `PUT /parametres/:cle` (réservé `ADMIN_APP`, voir
-   `ForClaude/SECURITY.md` §2.3).
-4. `routes/parametres.routes.ts`.
-5. Migration Supabase (non créée à ce stade — voir `database/migrations/README.md`).
+   `ForClaude/SECURITY.md` §2.3). *(pas encore créé)*
+5. `routes/parametres.routes.ts`. *(pas encore créé)*
 
 Ce point technique touche des entités du MCD (DIRECTION/SERVICE) sans y figurer comme
 entité métier arbitrée — à faire valider/intégrer formellement au MCD/MLD si le
