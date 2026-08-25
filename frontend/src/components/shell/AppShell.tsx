@@ -4,6 +4,7 @@ import { useSidebarShell } from '../../hooks/useSidebarShell'
 import { useTheme } from '../../hooks/useTheme'
 import { useAuth } from '../../context/AuthContext'
 import { useInactivityLogout } from '../../hooks/useInactivityLogout'
+import { useParametre } from '../../hooks/useParametre'
 import { NAV_ITEMS } from '../../config/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
@@ -12,7 +13,11 @@ import { InactivityWarning } from './InactivityWarning'
 
 // SECURITY.md §1.1 : délai d'inactivité avant déconnexion automatique (poste
 // partagé), et durée de l'avertissement affiché juste avant l'échéance.
-const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000
+// Le délai lui-même est paramétrable (global/direction/service, voir
+// docs/ARCHITECTURE.md "Paramétrage applicatif") — cette constante n'est plus
+// que la valeur de repli tant que le paramètre n'est pas encore chargé, ou en
+// cas d'échec de lecture.
+const INACTIVITY_TIMEOUT_DEFAULT_MINUTES = 30
 const INACTIVITY_WARNING_MS = 60 * 1000
 
 /**
@@ -26,6 +31,12 @@ export function AppShell() {
   const sidebarShell = useSidebarShell()
   const { session, signOut } = useAuth()
 
+  const inactivityDelayMinutes = useParametre(
+    'auth.inactivite_delai_minutes',
+    INACTIVITY_TIMEOUT_DEFAULT_MINUTES,
+    Boolean(session),
+  )
+
   const onLocalTimeout = useCallback(() => {
     void signOut()
   }, [signOut])
@@ -35,7 +46,7 @@ export function AppShell() {
 
   const inactivity = useInactivityLogout({
     enabled: Boolean(session),
-    timeoutMs: INACTIVITY_TIMEOUT_MS,
+    timeoutMs: inactivityDelayMinutes * 60 * 1000,
     warnBeforeMs: INACTIVITY_WARNING_MS,
     onLocalTimeout,
     onRemoteLogout,

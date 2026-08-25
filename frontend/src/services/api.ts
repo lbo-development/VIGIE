@@ -1,3 +1,5 @@
+import { supabase } from '../lib/supabaseClient'
+
 /**
  * Client HTTP minimal pour appeler l'API backend.
  * Centralise l'URL de base et la gestion des erreurs afin que les hooks
@@ -17,8 +19,20 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  // Attache le JWT de la session Supabase courante (routes protégées par
+  // requireAuth côté backend — voir ForClaude/SECURITY.md §1). Absent des
+  // routes publiques (ex: /health), sans conséquence : le header est
+  // simplement ignoré côté backend si la route ne le vérifie pas.
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
   const res = await fetch(`${API_URL}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...options.headers,
+    },
     ...options,
   })
 
