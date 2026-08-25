@@ -4,6 +4,7 @@ Dérivé de mcd-phase1.md (validé) et mcd-phase2.md (validé le 23/08), par app
 Statut : Phase 1 complète et arbitrée ; Phase 2 validée (MCD Phase 2 arbitré, cf. mcd-phase2.md).
 Remplace mld-phase1.md (qui devient obsolète).
 Cible d'implémentation : Web App + base dédiée type Supabase/PostgreSQL — index uniques partiels et contraintes CHECK ci-dessous y sont implémentables.
+Schéma physique (24/08/2026) : projet Supabase partagé entre plusieurs applications GPMM ; toutes les tables ci-dessous s'implémentent dans le schéma `finances`, pas `public` (sauf `profiles`, hors périmètre de ce MLD, qui reste dans `public` — voir ForClaude/SECURITY.md).
 ---
 
 # 0. Delta par rapport à mld-phase1.md (arbitrages du 22/08)
@@ -44,9 +45,11 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > `MARCHE.#ID_FOURNISSEUR` **nullable en base** (arbitrage 2), résolu à l'import via (service, NUM_TITULAIRE = FOURNISSEUR.NUMPGI), rendu obligatoire par règle applicative une fois l'import consolidé.
 
 ## 2.3 Rôles et suppléance (arbitrage 3)
-- **ROLE** (**ID_ROLE**, #MATRICULE → ACTEUR, TYPE_ROLE *(RC | CDS | DS | CB | ADMIN_SERVICE | ADMIN_APP)*, #(N)ID_CELLULE → CELLULE, #(N)ID_SERVICE → SERVICE, #(N)ID_DIRECTION → DIRECTION, **DATE_DEBUT**, **DATE_FIN** *(N)*, **ACTIF** *(booléen)*)
-- **SUPPLEANCE** (**ID_SUPPLEANCE**, #ID_ROLE → ROLE, #MATRICULE_SUPPLEANT → ACTEUR, DATE_DEBUT, DATE_FIN)
+- **ROLE_ATTRIBUTION** (**ID_ROLE**, #MATRICULE → ACTEUR, TYPE_ROLE *(RC | CDS | DS | CB | ADMIN_SERVICE | ADMIN_APP)*, #(N)ID_CELLULE → CELLULE, #(N)ID_SERVICE → SERVICE, #(N)ID_DIRECTION → DIRECTION, **DATE_DEBUT**, **DATE_FIN** *(N)*, **ACTIF** *(booléen)*)
+- **SUPPLEANCE** (**ID_SUPPLEANCE**, #ID_ROLE → ROLE_ATTRIBUTION, #MATRICULE_SUPPLEANT → ACTEUR, DATE_DEBUT, DATE_FIN)
 
+> **Nom de table physique (24/08/2026) :** l'entité conceptuelle `ROLE` du MCD s'implémente ici sous le nom `ROLE_ATTRIBUTION` — une table nommée `ROLE` entrerait en collision avec la notion native de rôle Postgres/Supabase (rôles `anon`/`authenticated`/`service_role`, fonction `auth.role()`), source classique de confusion à l'écriture des policies RLS (voir `ForClaude/SECURITY.md` §2.1). Décision de niveau MLD/physique uniquement : le MCD reste inchangé (l'entité s'appelle toujours ROLE au niveau conceptuel), seule sa traduction en table SQL change de nom. La colonne `ID_ROLE` (y compris en FK, ex. `SUPPLEANCE.ID_ROLE`) garde son nom : seul le nom de la table cible change.
+>
 > DATE_DEBUT/DATE_FIN/ACTIF ajoutés pour porter l'unicité « un seul actif par périmètre » (RC/CDS/DS) et **conserver l'historique des titulaires** : un changement de titulaire clôt la ligne courante (DATE_FIN renseignée, ACTIF=false) et en crée une nouvelle. **Périmètres : RC→cellule ; CDS, CB, ADMIN_SERVICE→service ; DS→direction ; ADMIN_APP→sans périmètre (transverse)**. CB collective par service ; ADMIN_SERVICE et ADMIN_APP sans unicité (plusieurs possibles).
 
 ## 2.4 Cœur métier — la demande (FAD)
@@ -87,7 +90,7 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 
 **Unicité métier**
 - `FOURNISSEUR` : `UNIQUE (ID_SERVICE, SIRET)` ; `UNIQUE (ID_SERVICE, NUMPGI) WHERE NUMPGI IS NOT NULL`.
-- `ROLE` (unicité du titulaire **actif** par périmètre — arbitrage 3) :
+- `ROLE_ATTRIBUTION` (unicité du titulaire **actif** par périmètre — arbitrage 3) :
   - `UNIQUE (ID_CELLULE) WHERE TYPE_ROLE='RC' AND ACTIF = true`
   - `UNIQUE (ID_SERVICE) WHERE TYPE_ROLE='CDS' AND ACTIF = true`
   - `UNIQUE (ID_DIRECTION) WHERE TYPE_ROLE='DS' AND ACTIF = true`
@@ -98,7 +101,7 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 - `DEMANDE_ACHAT` — imputation (arbitrage 1) :
   `CHECK (CODE_CUG IS NOT NULL)` *(CUG toujours obligatoire)* et
   `CHECK ( (IMPUTATION_COMPTABLE='INVESTISSEMENT' AND NUMERO_OPERATION IS NOT NULL) OR (IMPUTATION_COMPTABLE='FONCTIONNEMENT' AND NUMERO_OPERATION IS NULL) )`
-- `ROLE` — cohérence périmètre / type :
+- `ROLE_ATTRIBUTION` — cohérence périmètre / type :
   `CHECK ( (TYPE_ROLE='RC' AND ID_CELLULE IS NOT NULL AND ID_SERVICE IS NULL AND ID_DIRECTION IS NULL) OR (TYPE_ROLE IN ('CDS','CB','ADMIN_SERVICE') AND ID_SERVICE IS NOT NULL AND ID_CELLULE IS NULL AND ID_DIRECTION IS NULL) OR (TYPE_ROLE='DS' AND ID_DIRECTION IS NOT NULL AND ID_CELLULE IS NULL AND ID_SERVICE IS NULL) OR (TYPE_ROLE='ADMIN_APP' AND ID_CELLULE IS NULL AND ID_SERVICE IS NULL AND ID_DIRECTION IS NULL) )`
   et `CHECK (DATE_FIN IS NULL OR DATE_FIN >= DATE_DEBUT)`.
 - `DEMANDE_ACHAT` — motif : `CHECK ( MOTIF_CHOIX <> 'Autre' OR LIBELLE_MOTIF_CHOIX IS NOT NULL )` ; MOTIF_CHOIX pertinent uniquement si HORS_MARCHE (règle applicative).
@@ -124,7 +127,7 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 
 # 5. Inventaire des tables
 
-**Phase 1 (19)** : DIRECTION, SERVICE, CELLULE, ACTEUR, SITE, SECTEUR, CUG, OPERATION_INVESTISSEMENT, FOURNISSEUR, CONTACT, MARCHE, ROLE, SUPPLEANCE, DEMANDE_ACHAT, DEVIS_CONSULTE, PIECE_JOINTE, STATUT, HISTORIQUE_STATUT, SEUIL_VALIDATION_DS.
+**Phase 1 (19)** : DIRECTION, SERVICE, CELLULE, ACTEUR, SITE, SECTEUR, CUG, OPERATION_INVESTISSEMENT, FOURNISSEUR, CONTACT, MARCHE, ROLE_ATTRIBUTION, SUPPLEANCE, DEMANDE_ACHAT, DEVIS_CONSULTE, PIECE_JOINTE, STATUT, HISTORIQUE_STATUT, SEUIL_VALIDATION_DS.
 
 **Phase 2 (3)** : CERTIFICAT_SERVICE_FAIT, STATUT_CSF, HISTORIQUE_STATUT_CSF.
 *(PIECE_JOINTE est étendue, pas dupliquée.)*
@@ -145,3 +148,4 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 - 23/08/2026 (Phase 2 validée) : intégration des 9 décisions D1–D9. Ajout de CSF_LIQUIDE (statut terminal) ; contrôle de dépassement MONTANT_COMMANDE en alerte (non bloquant) ; rédacteur CSF = demandeur ou RC ; ≥ 1 justificatif à la transmission ; reprise/suppression uniquement en statut rejeté, reprise après rejet Budget ouverte au rédacteur et au RC ; facture non stockée. Phase 2 du MLD figée.
 - 23/08/2026 (correction CB) : périmètre du rôle CB déplacé de DIRECTION vers SERVICE (conforme au CDG : « la CB du service dont il a la charge »). CHECK cohérence ROLE mis à jour (CB avec CDS côté service) ; CB collective par service ; unicités RC/CDS/DS inchangées. À répercuter dans le MCD.
 - 23/08/2026 (extension rôles) : TYPE_ROLE étendu à ADMIN_SERVICE (périmètre service) et ADMIN_APP (transverse, sans périmètre) pour porter les habilitations d'administration. CHECK cohérence complété ; admins sans unicité.
+- 24/08/2026 (renommage technique) : table `ROLE` renommée `ROLE_ATTRIBUTION` au niveau physique (collision avec la notion native de rôle Postgres/Supabase, détectée à la préparation des policies RLS — voir `ForClaude/SECURITY.md` §2.1). Décision de niveau MLD uniquement : l'entité conceptuelle ROLE du MCD est inchangée ; seules les occurrences de la table dans ce document (déclaration, FK de SUPPLEANCE, contraintes d'unicité et de cohérence, inventaire) sont mises à jour. Les entrées d'historique antérieures à cette date, écrites avant le renommage, conservent le nom `ROLE` tel qu'en vigueur à l'époque.

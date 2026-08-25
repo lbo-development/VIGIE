@@ -10,6 +10,13 @@
 
 Application à usage métier (interne/professionnel). Pas de données utilisateurs à caractère très sensible (santé, paiement, biométrie), mais des données personnelles standard (comptes, emails, données métier) qui restent soumises au RGPD.
 
+**Projet Supabase partagé entre plusieurs applications GPMM (décision confirmée le 24/08/2026).** Un seul projet Supabase héberge plusieurs applications métier du port, isolées par schéma PostgreSQL — VIGIE dans le schéma `finances`, au moins une autre application dans `escales`. Conséquences directes pour toute écriture SQL sur ce projet :
+
+- Toutes les tables métier de VIGIE (les 22 tables du MLD) vivent dans le schéma `finances`, jamais `public` — toute référence non qualifiée (`role_attribution`, `demande_achat`, ...) dans une migration, une fonction ou une policy est un bug potentiel : qualifier systématiquement (`finances.role_attribution`).
+- `profiles` (lien `auth.users` ↔ identité métier) reste dans `public`, **partagée entre toutes les applications** du projet — ce n'est pas une table propre à VIGIE. `profiles.matricule` référence l'identifiant de personnel GPMM (cohérent avec un identifiant valable dans plusieurs applications), pas une clé étrangère physique vers `finances.acteur` (un lien FK cross-schema depuis une table partagée vers le schéma d'une seule application créerait un couplage indésirable — la cohérence entre `profiles.matricule` et `finances.acteur.matricule` est assurée applicativement, pas par contrainte FK).
+- Avant que l'API puisse requêter `finances.*`, le schéma doit être ajouté aux *Exposed schemas* de l'API Supabase (Dashboard → Settings → API) — tant que ce n'est pas fait, les tables existent en base mais sont invisibles pour PostgREST/`supabase-js`, RLS activé ou non.
+- Ne jamais écrire, modifier ou même interroger à titre exploratoire un objet du schéma `escales` (ou de tout autre schéma appartenant à une autre application) depuis du code ou une migration VIGIE.
+
 **Objectif** : tout code écrit ou modifié doit viser un niveau de sécurité ≥ 9/10. En cas de doute entre simplicité et sécurité, la sécurité prime. Si une consigne ci-dessous ne peut pas être respectée pour une raison technique, il faut le signaler explicitement dans la réponse plutôt que de l'ignorer silencieusement.
 
 ---
@@ -46,8 +53,13 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
 
 **Décision (23/08/2026, voir mémoire projet) : la table `ROLE` du MCD/MLD remplace `profiles.role` comme source unique de vérité pour l'autorisation.** Un `profiles.role` à valeur unique par utilisateur est structurellement incompatible avec le modèle métier : un `ACTEUR` peut cumuler plusieurs rôles actifs simultanément sur des périmètres différents (ex. RC d'une cellule *et* CDS d'un service), les rôles sont historisés (`DATE_DEBUT`/`DATE_FIN`/`ACTIF`), et les 6 `TYPE_ROLE` (RC, CDS, DS, CB, ADMIN_SERVICE, ADMIN_APP) sont scopés à des niveaux de périmètre différents (cellule/service/direction/transverse).
 
+- **Nom de table physique (24/08/2026) : `ROLE` (entité conceptuelle du MCD) s'implémente en base sous le nom `role_attribution`, jamais `role`.** Une table nommée `role` entre en collision avec la notion native de rôle Postgres/Supabase (rôles `anon`/`authenticated`/`service_role`, fonction `auth.role()`, catalogue `pg_roles`) — deux concepts homonymes mais totalement différents, source classique d'erreur au moment d'écrire ou de relire une policy. `role_attribution` est aussi plus fidèle à ce que la table représente (« instance d'attribution d'un rôle à un `ACTEUR` sur un périmètre », cf. MCD) qu'un simple `role`. Voir MLD §2.3 pour la déclaration physique complète.
 - `profiles` (`id uuid references auth.users(id) primary key`) reste la table de liaison identité ↔ métier, mais ne porte **pas** de colonne `role`. Elle porte une colonne `matricule` (référence `ACTEUR.MATRICULE`), renseignée après coup : le compte Supabase Auth est créé indépendamment, puis lié à un `ACTEUR` existant via cette colonne (voir mémoire projet "ACTEUR ↔ Auth link"). Tant que `matricule` est `null`, l'utilisateur est authentifié mais n'a aucune autorisation métier.
-- Toute vérification d'autorisation dans une policy RLS doit passer par des fonctions `security definer` (jamais de sous-requête directe sur `profiles`/`role`/`suppleance` dans une policy, pour éviter la récursion RLS) :
+- Toute vérification d'autorisation dans une policy RLS doit passer par des fonctions `security definer` (jamais de sous-requête directe sur `profiles`/`role_attribution`/`suppleance` dans une policy, pour éviter la récursion RLS) :
+
+  Cette fonction touche uniquement `public.profiles` (identité, partagée entre applications
+  du projet) : elle reste dans le schéma `public`, réutilisable par d'autres applications
+  du même projet Supabase qui s'appuient aussi sur `profiles.matricule`.
 
   ```sql
   create or replace function public.current_user_matricule()
@@ -55,27 +67,47 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
   language sql
   security definer
   stable
-  set search_path = public
+  set search_path = ''
   as $$
     select matricule from public.profiles where id = auth.uid()
   $$;
+  ```
 
+  Cette seconde fonction porte la logique d'autorisation propre à VIGIE (`TYPE_ROLE`
+  RC/CDS/DS/CB/ADMIN_SERVICE/ADMIN_APP, table `role_attribution`) : elle vit dans le schéma
+  `finances`, pas `public` — ce n'est pas une fonction d'infrastructure partagée.
+
+  ```sql
   -- p_perimeter_id : id_cellule / id_service / id_direction selon le TYPE_ROLE
-  -- (null pour ADMIN_APP, qui est transverse). Couvre aussi la suppléance :
-  -- un suppléant actif hérite des droits du rôle titulaire pendant sa période.
-  create or replace function public.current_user_has_role(p_type_role text, p_perimeter_id uuid default null)
+  -- (null uniquement pour ADMIN_APP, qui est transverse). Couvre aussi la
+  -- suppléance : un suppléant actif hérite des droits du rôle titulaire
+  -- pendant sa période.
+  --
+  -- p_perimeter_id est en `integer`, pas `uuid` (24/08/2026) : les clés des
+  -- tables métier finances.* (id_direction, id_service, id_cellule, id_role...)
+  -- sont des entiers, contrairement à profiles.id/auth.uid() qui restent en
+  -- uuid — ces deux mondes ne se comparent jamais directement, seul le
+  -- matricule (texte) fait le pont entre les deux (cf. §2.1).
+  --
+  -- ⚠️ Le bypass "pas de périmètre" est lié explicitement à p_type_role =
+  -- 'ADMIN_APP', jamais à la seule présence de NULL dans p_perimeter_id.
+  -- Piège évité : p_perimeter_id a une valeur par défaut NULL — un appel qui
+  -- oublierait de la renseigner pour un rôle non transverse (RC/CDS/DS/CB/
+  -- ADMIN_SERVICE) ne doit jamais se retrouver à ignorer le périmètre par
+  -- accident (fail open) ; il doit échouer fermé (aucune ligne ne matche).
+  create or replace function finances.current_user_has_role(p_type_role text, p_perimeter_id integer default null)
   returns boolean
   language sql
   security definer
   stable
-  set search_path = public
+  set search_path = ''
   as $$
     select exists (
-      select 1 from public.role r
+      select 1 from finances.role_attribution r
       where r.type_role = p_type_role
         and r.actif = true
         and (
-          p_perimeter_id is null
+          (p_type_role = 'ADMIN_APP' and p_perimeter_id is null)
           or r.id_cellule = p_perimeter_id
           or r.id_service = p_perimeter_id
           or r.id_direction = p_perimeter_id
@@ -83,8 +115,8 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
         and (
           r.matricule = public.current_user_matricule()
           or exists (
-            select 1 from public.suppleance s
-            where s.id_role = r.id
+            select 1 from finances.suppleance s
+            where s.id_role = r.id_role
               and s.matricule_suppleant = public.current_user_matricule()
               and now() between s.date_debut and s.date_fin
           )
@@ -93,16 +125,20 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
   $$;
   ```
 
-- Les écritures sur `ROLE` et `SUPPLEANCE` (déclarer/clôturer un rôle) sont réservées à `ADMIN_SERVICE` (sur les rôles de son service) et `ADMIN_APP` — jamais en self-service par l'`ACTEUR` concerné. Prévoir des policies `INSERT`/`UPDATE` explicites en ce sens plutôt qu'une policy générique.
+- Les écritures sur `role_attribution` et `SUPPLEANCE` (déclarer/clôturer un rôle) sont réservées à `ADMIN_SERVICE` (sur les rôles de son service) et `ADMIN_APP` — jamais en self-service par l'`ACTEUR` concerné. Prévoir des policies `INSERT`/`UPDATE` explicites en ce sens plutôt qu'une policy générique.
 - Ne jamais créer ou réutiliser une table `users`/`utilisateurs` parallèle à `profiles`/`ACTEUR` — c'est une source de bugs de RLS garantie (double source de vérité). Si une telle table existe encore dans le projet, la fusionner plutôt que la faire évoluer.
+- **`matricule` peut rester `null` indéfiniment** (compte authentifié, pas encore rattaché à un `ACTEUR`) — ce n'est pas un état transitoire garanti court. Deux conséquences à traiter explicitement, pas seulement pour `current_user_has_role()` :
+  - Toute policy RLS, y compris celles qui n'utilisent pas `current_user_has_role()`/`current_user_matricule()`, doit être relue en se demandant explicitement « que se passe-t-il si `matricule` est `null` pour cet utilisateur ? » — la réponse attendue est toujours un refus, jamais un octroi implicite (attention en particulier aux `NOT IN`, `COALESCE(..., true)` ou toute réécriture qui transformerait un `NULL` en autorisation par défaut).
+  - Toute route Express qui contourne le RLS via `service_role` doit vérifier explicitement `matricule IS NOT NULL` pour l'utilisateur courant avant d'exécuter la moindre opération métier — ce n'est pas couvert automatiquement par le fait d'utiliser `service_role`, c'est une vérification applicative à écrire soi-même (voir §6, « appliquer la vérification des droits manuellement dans le code Express »).
 
 ### 2.2 Pièges RLS à connaître et prévenir systématiquement
 
-- **GRANT ≠ POLICY** : une policy RLS n'est évaluée que si le rôle Postgres (`anon`/`authenticated`) a déjà le GRANT SQL de base sur la table. `permission denied for table ...` signale un GRANT manquant, pas un problème de policy — vérifier `GRANT SELECT, INSERT, UPDATE, DELETE ON <table> TO authenticated;` avant de toucher aux policies.
+- **GRANT ≠ POLICY** : une policy RLS n'est évaluée que si le rôle Postgres (`anon`/`authenticated`) a déjà le GRANT SQL de base sur la table. `permission denied for table ...` signale un GRANT manquant, pas un problème de policy — vérifier `GRANT SELECT, INSERT, UPDATE, DELETE ON finances.<table> TO authenticated;` avant de toucher aux policies.
+- **Schéma non-`public` (`finances`) : un `GRANT` sur la table ne suffit pas, il faut aussi le `USAGE` sur le schéma.** Piège spécifique à un schéma dédié comme `finances` (n'existe pas avec `public`, accessible par défaut) : `GRANT USAGE ON SCHEMA finances TO authenticated, anon;` est un préalable oublié en cause fréquente d'un `permission denied for schema finances` qui ressemble à un problème de policy mais n'en est pas un. De même, le schéma doit figurer dans les *Exposed schemas* de l'API Supabase (Dashboard → Settings → API) pour que `supabase-js`/PostgREST puisse seulement l'atteindre.
 - **Un SELECT sans policy matchante ne lève pas d'erreur, il renvoie silencieusement `[]`.** Ne jamais interpréter un résultat vide comme "il n'y a pas de données" sans avoir vérifié qu'une policy SELECT couvre bien le rôle courant.
 - **Un UPDATE dont le `USING` ne matche aucune ligne réussit avec 0 ligne modifiée, sans erreur.** Toujours utiliser `.update(...).select()` côté `supabase-js` et vérifier la longueur du tableau retourné plutôt que l'absence d'exception.
-- **Les policies permissives se combinent en OR, pas en AND.** Ne jamais laisser une policy `USING (true)` de test à côté d'une policy stricte : elle rend l'ensemble aussi permissif que la moins restrictive. Auditer `select * from pg_policies where tablename = '<table>'` avant de considérer une table comme sécurisée.
-- Chaque nouvelle table avec RLS doit définir explicitement une policy par opération (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) alignée sur les `TYPE_ROLE` pertinents (RC, CDS, DS, CB, ADMIN_SERVICE, ADMIN_APP — via `current_user_has_role()`, §2.1) — ne jamais partir du principe qu'une policy `SELECT` couvre implicitement les autres opérations.
+- **Les policies permissives se combinent en OR, pas en AND.** Ne jamais laisser une policy `USING (true)` de test à côté d'une policy stricte : elle rend l'ensemble aussi permissif que la moins restrictive. Auditer `select * from pg_policies where schemaname = 'finances' and tablename = '<table>'` avant de considérer une table comme sécurisée.
+- Chaque nouvelle table avec RLS doit définir explicitement une policy par opération (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) alignée sur les `TYPE_ROLE` pertinents (RC, CDS, DS, CB, ADMIN_SERVICE, ADMIN_APP — via `finances.current_user_has_role()`, §2.1) — ne jamais partir du principe qu'une policy `SELECT` couvre implicitement les autres opérations.
 
 ## 3. Validation et sanitization des données
 
@@ -166,7 +202,7 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
 Avant de considérer une fonctionnalité comme terminée, vérifier que :
 
 1. Toute nouvelle table Supabase a du RLS activé avec des politiques explicites.
-2. Toute route Express nouvelle valide son authentification ET son autorisation.
+2. Toute route Express nouvelle valide son authentification ET son autorisation — et, si elle utilise `service_role`, vérifie explicitement que `matricule` n'est pas `null` pour l'utilisateur courant avant d'agir (voir §2.1).
 3. Toute entrée utilisateur est validée par un schéma avant traitement.
 4. Aucun secret n'a été écrit en dur ou loggué.
 5. Aucune donnée sensible n'est exposée dans une réponse d'erreur.
