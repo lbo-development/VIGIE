@@ -105,14 +105,33 @@ create table finances.parametre_application (
   description   text,
   date_maj      timestamptz not null default now(),
   matricule_maj text references finances.acteur(matricule),
-  unique (cle, id_direction, id_service)
+  -- portée mutuellement exclusive, même patron que le CHECK de role_attribution (MLD §92)
+  check (
+    (id_direction is null and id_service is null)      -- global
+    or (id_direction is not null and id_service is null) -- par direction
+    or (id_direction is null and id_service is not null) -- par service (direction résolue via finances.service.id_direction, jamais dupliquée ici)
+  )
 );
+
+-- une seule valeur par clé à chaque niveau de portée (NULL rend une contrainte UNIQUE
+-- classique inopérante — trois index partiels, un par niveau, comme pour les unicités
+-- RC/CDS/DS de role_attribution, MLD §95-96)
+create unique index parametre_application_global_uk
+  on finances.parametre_application (cle) where id_direction is null and id_service is null;
+create unique index parametre_application_direction_uk
+  on finances.parametre_application (cle, id_direction) where id_direction is not null;
+create unique index parametre_application_service_uk
+  on finances.parametre_application (cle, id_service) where id_service is not null;
 ```
 
-- **Portée** : `id_direction` et `id_service` tous deux `null` = paramètre global ;
-  `id_direction` seul renseigné = valeur par direction ; les deux renseignés = valeur par
-  service. Un service hérite implicitement de la valeur de sa direction, qui hérite du
-  global — pas de portée "service sans rattachement à sa direction".
+- **Portée** : `id_direction` et `id_service` sont mutuellement exclusifs (jamais les deux
+  renseignés — cf. `CHECK` ci-dessus) : tous deux `null` = paramètre global ;
+  `id_direction` seul = valeur par direction ; `id_service` seul = valeur par service, la
+  direction du service se résolvant par jointure sur `finances.service.id_direction`,
+  jamais par une colonne `id_direction` dupliquée sur la ligne (ça éviterait une
+  incohérence si le service change de direction, ou une ligne qui référence une direction
+  différente de celle du service). Un service hérite implicitement de la valeur de sa
+  direction, qui hérite du global.
 - **Typage** : `valeur` en `jsonb` plutôt qu'en `text` + colonne `type` — évite le parsing
   manuel. Un registre `cle → schéma Zod` dans `services/parametres.service.ts` valide
   chaque valeur à la lecture et à l'écriture, côté backend uniquement.
@@ -125,14 +144,22 @@ create table finances.parametre_application (
 ### Résolution en cascade (le plus spécifique gagne)
 
 Pour la valeur effective de `cle` vue par un acteur rattaché à `id_service` (dont la
-direction se résout via `finances.service.id_direction`) :
+direction est résolue par jointure sur `finances.service`) :
 
 ```sql
-select valeur from finances.parametre_application
-where cle = $1
-  and (id_service = $2 or id_service is null)
-  and (id_direction = $3 or id_direction is null)
-order by id_service nulls last, id_direction nulls last
+select pa.valeur
+from finances.parametre_application pa
+where pa.cle = $1
+  and (
+    pa.id_service = $2
+    or (pa.id_service is null and pa.id_direction = (
+      select s.id_direction from finances.service s where s.id_service = $2
+    ))
+    or (pa.id_direction is null and pa.id_service is null)
+  )
+order by
+  (pa.id_service is not null) desc,
+  (pa.id_direction is not null) desc
 limit 1;
 ```
 
