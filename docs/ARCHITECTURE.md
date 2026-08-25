@@ -47,7 +47,7 @@ backend/src/
 ├── controllers/       Traduction requête <-> réponse HTTP, délègue aux services
 ├── services/            Logique métier, validation, orchestration
 ├── repositories/          Seule couche qui parle à Supabase/la base de données
-├── middlewares/             Error handling, 404, (auth à ajouter si besoin)
+├── middlewares/             Error handling, 404, auth (requireAuth, requireRole)
 ├── app.ts                    Assemble l'app Express (sans écouter de port)
 └── server.ts                  Point d'entrée : démarre le serveur HTTP
 ```
@@ -143,8 +143,12 @@ create unique index parametre_application_service_uk
 
 ### Résolution en cascade (le plus spécifique gagne)
 
-Pour la valeur effective de `cle` vue par un acteur rattaché à `id_service` (dont la
-direction est résolue par jointure sur `finances.service`) :
+Implémentée comme fonction SQL plutôt que reconstruite côté JS (logique proche de la
+donnée qu'elle contraint, réutilisable) :
+`finances.parametre_effectif(p_cle text, p_id_service integer)`, voir
+`supabase/migrations/20260825110000_add_parametre_application_functions.sql`. Pour la
+valeur effective de `cle` vue par un acteur rattaché à `id_service` (dont la direction est
+résolue par jointure sur `finances.service`, jamais dupliquée sur la ligne) :
 
 ```sql
 select pa.valeur
@@ -163,18 +167,36 @@ order by
 limit 1;
 ```
 
+L'upsert (portée mutuellement exclusive, donc pas de cible `ON CONFLICT` unique
+exploitable directement par `supabase-js`) est de même porté par une fonction SQL,
+`finances.upsert_parametre_application(...)`, dans la même migration.
+
 ### Couches (suit le modèle `items`)
 
-1. Migration Supabase : `supabase/migrations/20260825100000_create_parametre_application.sql`
-   — table, index uniques partiels, policies RLS (voir `ForClaude/SECURITY.md` §2.3).
-2. `repositories/parametres.repository.ts` — requête de résolution en cascade ci-dessus,
-   `findByCle`, `upsert`. *(pas encore créé)*
-3. `services/parametres.service.ts` — registre `cle → schéma Zod`, valide `valeur` avant
-   écriture et après lecture. *(pas encore créé)*
-4. `controllers/parametres.controller.ts` — `GET /parametres` (valeurs effectives pour
-   l'acteur courant), `PUT /parametres/:cle` (réservé `ADMIN_APP`, voir
-   `ForClaude/SECURITY.md` §2.3). *(pas encore créé)*
-5. `routes/parametres.routes.ts`. *(pas encore créé)*
+1. Migrations Supabase : `20260825100000_create_parametre_application.sql` (table, index
+   uniques partiels, policies RLS — voir `ForClaude/SECURITY.md` §2.3) et
+   `20260825110000_add_parametre_application_functions.sql` (fonctions de résolution/upsert
+   ci-dessus).
+2. `repositories/parametres.repository.ts` — appelle les deux fonctions SQL via `.rpc()`.
+   `repositories/acteurs.repository.ts` — résout `id_service` d'un acteur
+   (`acteur.id_cellule → cellule.id_service`, indépendant des rôles applicatifs).
+   `repositories/auth.repository.ts` — résolution matricule ↔ compte Auth, vérification de
+   rôle actif (`role_attribution`, sans la suppléance : d'après le MCD elle ne couvre que
+   RC/CDS/DS, pas ADMIN_APP).
+3. `services/parametres.service.ts` — registre `cle → { schéma Zod, valeur par défaut }`,
+   une seule entrée à ce stade : `auth.inactivite_delai_minutes` (entier, 1-240, défaut 30 —
+   voir `ForClaude/SECURITY.md` §1.1). Valide `valeur` à l'écriture et à la lecture, rejette
+   une clé inconnue (404) ou une portée `idDirection`+`idService` simultanée (400).
+4. `middlewares/requireAuth.ts` (vérifie le JWT Supabase, résout `req.matricule` —
+   `types/express.d.ts` augmente `Express.Request`) et `middlewares/requireRole.ts` (factory
+   `requireRole(typeRole)`) — première route protégée du backend, voir
+   `ForClaude/SECURITY.md` §1 et §2.1.
+5. `controllers/parametres.controller.ts` — `GET /parametres/:cle` (valeur effective pour
+   l'acteur courant), `PUT /parametres/:cle` (réservé `ADMIN_APP` via `requireRole`).
+6. `routes/parametres.routes.ts`, montées sur `/api/parametres` (`routes/index.ts`).
+7. `database/seeds/seed.ts` — seed la valeur globale par défaut (30 min) via
+   `upsert_parametre_application`. Pas de valeur de portée service seedée : nécessite un
+   `id_service` réel, à fournir.
 
 Ce point technique touche des entités du MCD (DIRECTION/SERVICE) sans y figurer comme
 entité métier arbitrée — à faire valider/intégrer formellement au MCD/MLD si le
