@@ -19,10 +19,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  // Attache le JWT de la session Supabase courante (routes protégées par
-  // requireAuth côté backend — voir ForClaude/SECURITY.md §1). Absent des
-  // routes publiques (ex: /health), sans conséquence : le header est
-  // simplement ignoré côté backend si la route ne le vérifie pas.
+  // Le token est relu à chaque appel (plutôt que mis en cache) : supabase-js
+  // le rafraîchit automatiquement en arrière-plan, getSession() renvoie
+  // toujours la valeur courante sans requête réseau superflue.
   const {
     data: { session },
   } = await supabase.auth.getSession()
