@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import healthRoutes from './health.routes.js'
 import itemsRoutes from './items.routes.js'
+import meRoutes from './me.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -10,5 +11,6 @@ const router = Router()
 
 router.use('/health', healthRoutes)
 router.use('/items', itemsRoutes)
+router.use('/me', meRoutes)
 
 export default router
