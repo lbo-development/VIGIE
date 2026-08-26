@@ -33,8 +33,13 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > **Clé technique pour DIRECTION / SERVICE / CELLULE.** PK = ID de substitution immuable ; le code métier (CODE_*) devient un attribut NOT NULL + UNIQUE, mutable en cas de réorganisation sans impact sur les FK. ACTEUR.MATRICULE et les référentiels PGI (CUG.CODE_CUG, MARCHE.NUMMARCHE, NUMERO_OPERATION) conservent leur clé naturelle (identifiant stable / clé de rapprochement à l'import).
 
 ## 2.2 Référentiels métier
-- **SITE** (**CODE_SITE**, LIBELLE_SITE)
-- **SECTEUR** (**CODE_SECTEUR**, LIBELLE_SECTEUR)
+- **SITE** (**CODE_SITE**, LIB_SITE, ORDRE_SITE, #(N)ID_SERVICE → SERVICE)
+- **SOUS_SITE** (**#CODE_SITE → SITE**, **CODE_SOUS_SITE**, ORDRE_SOUS_SITE, ACTIF) — PK composite (CODE_SITE, CODE_SOUS_SITE)
+- **SECTEUR** (**CODE_SECTEUR**, LIB_SECTEUR, ORDRE_SECTEUR, #(N)ID_SERVICE → SERVICE)
+- **SOUS_SECTEUR** (**#CODE_SECTEUR → SECTEUR**, **CODE_SOUS_SECTEUR**, ORDRE_SOUS_SECTEUR, ACTIF) — PK composite (CODE_SECTEUR, CODE_SOUS_SECTEUR)
+
+> **Normalisation SITE / SECTEUR (26/08/2026).** Chaque gisement géographique (SITE) et technique (SECTEUR) est décomposé en deux niveaux : la table parent porte le libellé, l'ordre d'affichage et l'attachement au service ; la table enfant porte le code de sous-niveau, son ordre et son flag ACTIF. `ID_SERVICE` nullable en base à ce stade : il sera valorisé une fois le référentiel organisationnel (SERVICE) chargé. La FK de DEMANDE_ACHAT cible la table enfant (SOUS_SITE / SOUS_SECTEUR) via une clé composite, garantissant que toute demande est positionnée sur un sous-niveau précis.
+
 - **CUG** (**CODE_CUG**, LIBELLE_CUG, #ID_SERVICE → SERVICE)
 - **OPERATION_INVESTISSEMENT** (**NUMERO_OPERATION**, LIBELLE, MT_AP1, MT_AP8, MT_CP1, MT_CP8, DATE_CREATION, MT_INITIAL)
 - **FOURNISSEUR** (**ID_FOURNISSEUR**, #ID_SERVICE → SERVICE, **ETATFOURNISSEUR** *(Actif | Inactif — ajout arbitrage 4)*, RAISON_SOCIALE_PGI, RAISON_SOCIALE_SERVICE, SIRET, NUMPGI, ADR1, ADR2, CP, VILLE, CEDEX, TYPE_CREATION)
@@ -53,7 +58,7 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > DATE_DEBUT/DATE_FIN/ACTIF ajoutés pour porter l'unicité « un seul actif par périmètre » (RC/CDS/DS) et **conserver l'historique des titulaires** : un changement de titulaire clôt la ligne courante (DATE_FIN renseignée, ACTIF=false) et en crée une nouvelle. **Périmètres : RC→cellule ; CDS, CB, ADMIN_SERVICE→service ; DS→direction ; ADMIN_APP→sans périmètre (transverse)**. CB collective par service ; ADMIN_SERVICE et ADMIN_APP sans unicité (plusieurs possibles).
 
 ## 2.4 Cœur métier — la demande (FAD)
-- **DEMANDE_ACHAT** (**NUMERO**, OBJET, DESCRIPTION, MONTANT_DEMANDE, IMPUTATION_COMPTABLE, PROCEDURE_ACHAT, TYPE_ACHAT, TYPE_FAD, MOTIF_CHOIX, LIBELLE_MOTIF_CHOIX, MONTANT_RETENU, MONTANT_COMMANDE, DATE_CREATION, #MATRICULE_DEMANDEUR → ACTEUR, #CODE_SITE → SITE, #CODE_SECTEUR → SECTEUR, **#CODE_CUG → CUG** *(NOT NULL — arbitrage 1)*, #(N)NUMERO_OPERATION → OPERATION_INVESTISSEMENT, #(N)NUMMARCHE → MARCHE, #(N)ID_FOURNISSEUR_RETENU → FOURNISSEUR, #CODE_STATUT → STATUT *(statut courant)*)
+- **DEMANDE_ACHAT** (**NUMERO**, OBJET, DESCRIPTION, MONTANT_DEMANDE, IMPUTATION_COMPTABLE, PROCEDURE_ACHAT, TYPE_ACHAT, TYPE_FAD, MOTIF_CHOIX, LIBELLE_MOTIF_CHOIX, MONTANT_RETENU, MONTANT_COMMANDE, DATE_CREATION, #MATRICULE_DEMANDEUR → ACTEUR, **#(CODE_SITE, CODE_SOUS_SITE) → SOUS_SITE** *(FK composite)*, **#(CODE_SECTEUR, CODE_SOUS_SECTEUR) → SOUS_SECTEUR** *(FK composite)*, **#CODE_CUG → CUG** *(NOT NULL — arbitrage 1)*, #(N)NUMERO_OPERATION → OPERATION_INVESTISSEMENT, #(N)NUMMARCHE → MARCHE, #(N)ID_FOURNISSEUR_RETENU → FOURNISSEUR, #CODE_STATUT → STATUT *(statut courant)*)
 - **DEVIS_CONSULTE** (**ID_DEVIS**, #NUMERO → DEMANDE_ACHAT, #ID_FOURNISSEUR → FOURNISSEUR, MONTANT_DEVIS, FICHIER_PDF, RETENU)
 - **PIECE_JOINTE** (**ID_PIECE**, #(N)NUMERO → DEMANDE_ACHAT, **#(N)NUMERO_CSF → CERTIFICAT_SERVICE_FAIT** *(Phase 2)*, TYPE_PIECE, **ORIGINE** *(UTILISATEUR | SYSTEME)*, FICHIER, NOM_FICHIER)
 
@@ -127,12 +132,12 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 
 # 5. Inventaire des tables
 
-**Phase 1 (19)** : DIRECTION, SERVICE, CELLULE, ACTEUR, SITE, SECTEUR, CUG, OPERATION_INVESTISSEMENT, FOURNISSEUR, CONTACT, MARCHE, ROLE_ATTRIBUTION, SUPPLEANCE, DEMANDE_ACHAT, DEVIS_CONSULTE, PIECE_JOINTE, STATUT, HISTORIQUE_STATUT, SEUIL_VALIDATION_DS.
+**Phase 1 (21)** : DIRECTION, SERVICE, CELLULE, ACTEUR, SITE, SOUS_SITE, SECTEUR, SOUS_SECTEUR, CUG, OPERATION_INVESTISSEMENT, FOURNISSEUR, CONTACT, MARCHE, ROLE_ATTRIBUTION, SUPPLEANCE, DEMANDE_ACHAT, DEVIS_CONSULTE, PIECE_JOINTE, STATUT, HISTORIQUE_STATUT, SEUIL_VALIDATION_DS.
 
 **Phase 2 (3)** : CERTIFICAT_SERVICE_FAIT, STATUT_CSF, HISTORIQUE_STATUT_CSF.
 *(PIECE_JOINTE est étendue, pas dupliquée.)*
 
-**Total : 22 tables**, toujours sans aucune table de jointure (aucune association N:M sur l'ensemble des deux phases).
+**Total : 24 tables**, toujours sans aucune table de jointure (aucune association N:M sur l'ensemble des deux phases).
 
 ---
 
@@ -149,3 +154,4 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 - 23/08/2026 (correction CB) : périmètre du rôle CB déplacé de DIRECTION vers SERVICE (conforme au CDG : « la CB du service dont il a la charge »). CHECK cohérence ROLE mis à jour (CB avec CDS côté service) ; CB collective par service ; unicités RC/CDS/DS inchangées. À répercuter dans le MCD.
 - 23/08/2026 (extension rôles) : TYPE_ROLE étendu à ADMIN_SERVICE (périmètre service) et ADMIN_APP (transverse, sans périmètre) pour porter les habilitations d'administration. CHECK cohérence complété ; admins sans unicité.
 - 24/08/2026 (renommage technique) : table `ROLE` renommée `ROLE_ATTRIBUTION` au niveau physique (collision avec la notion native de rôle Postgres/Supabase, détectée à la préparation des policies RLS — voir `ForClaude/SECURITY.md` §2.1). Décision de niveau MLD uniquement : l'entité conceptuelle ROLE du MCD est inchangée ; seules les occurrences de la table dans ce document (déclaration, FK de SUPPLEANCE, contraintes d'unicité et de cohérence, inventaire) sont mises à jour. Les entrées d'historique antérieures à cette date, écrites avant le renommage, conservent le nom `ROLE` tel qu'en vigueur à l'époque.
+- 26/08/2026 (normalisation SITE / SECTEUR) : SITE et SECTEUR éclatés chacun en une table parent + une table enfant. **SITE** (**CODE_SITE**, LIB_SITE, ORDRE_SITE, #(N)ID_SERVICE) et **SOUS_SITE** (PK composite CODE_SITE + CODE_SOUS_SITE, ORDRE_SOUS_SITE, ACTIF) ; **SECTEUR** (**CODE_SECTEUR**, LIB_SECTEUR, ORDRE_SECTEUR, #(N)ID_SERVICE) et **SOUS_SECTEUR** (PK composite CODE_SECTEUR + CODE_SOUS_SECTEUR, ORDRE_SOUS_SECTEUR, ACTIF). La FK dans DEMANDE_ACHAT devient composite : (CODE_SITE, CODE_SOUS_SITE) → SOUS_SITE et (CODE_SECTEUR, CODE_SOUS_SECTEUR) → SOUS_SECTEUR. Rattachement à SERVICE nullable (ID_SERVICE NOT NULL à valoriser une fois le référentiel organisationnel chargé). Total Phase 1 : 19 → 21 tables ; total général : 22 → 24 tables.
