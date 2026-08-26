@@ -1,11 +1,10 @@
-import type { NextFunction, Response } from 'express'
-import type { AuthenticatedRequest } from '../middlewares/auth.js'
+import type { NextFunction, Request, Response } from 'express'
 import * as meService from '../services/me.service.js'
 
-export async function getMe(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function getMe(req: Request, res: Response, next: NextFunction) {
   try {
-    // req.user est garanti par le middleware requireAuth monté sur cette route.
-    const me = await meService.getCurrentUser(req.user!.id)
+    // req.matricule est renseigné par requireAuth (peut être null — voir me.service.ts).
+    const me = await meService.getCurrentUser(req.matricule ?? null)
     res.json(me)
   } catch (err) {
     next(err)

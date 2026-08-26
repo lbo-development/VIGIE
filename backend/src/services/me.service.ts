@@ -1,4 +1,3 @@
-import * as profilesRepository from '../repositories/profiles.repository.js'
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
 
@@ -15,12 +14,12 @@ export interface MeResponse {
 }
 
 /**
- * Vue « qui suis-je » pour l'utilisateur authentifié courant : matricule
- * (peut être null tant que le compte n'est pas rattaché à un ACTEUR, voir
- * ForClaude/SECURITY.md §2.1), identité et rôles actifs.
+ * Vue « qui suis-je » pour l'utilisateur authentifié courant : identité et
+ * rôles actifs. matricule est déjà résolu par requireAuth (peut être null
+ * tant que le compte n'est pas rattaché à un ACTEUR, voir
+ * ForClaude/SECURITY.md §2.1) — ce service ne le re-résout pas.
  */
-export async function getCurrentUser(authUserId: string): Promise<MeResponse> {
-  const matricule = await profilesRepository.findMatriculeByAuthId(authUserId)
+export async function getCurrentUser(matricule: string | null): Promise<MeResponse> {
   if (!matricule) {
     return { matricule: null, nom: null, prenom: null, roles: [] }
   }

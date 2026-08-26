@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import * as parametresRepository from '../repositories/parametres.repository.js'
-import * as acteursRepository from '../repositories/acteurs.repository.js'
+import * as acteurRepository from '../repositories/acteur.repository.js'
 import { AppError } from '../middlewares/errorHandler.js'
 
 /**
@@ -29,7 +29,7 @@ function assertCleConnue(cle: string): asserts cle is CleParametre {
 
 export async function getParametreEffectif(matricule: string, cle: string) {
   assertCleConnue(cle)
-  const idService = await acteursRepository.findIdServiceByMatricule(matricule)
+  const idService = await acteurRepository.findIdServiceByMatricule(matricule)
   const valeurBrute = await parametresRepository.findValeurEffective(cle, idService)
   const { schema, defaut } = PARAMETRES[cle]
   const valeur = schema.parse(valeurBrute ?? defaut)

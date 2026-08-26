@@ -5,10 +5,19 @@ import { AppError } from './errorHandler.js'
 
 /**
  * Vérifie le JWT Supabase (header Authorization: Bearer <token>) et résout le
- * matricule ACTEUR lié au compte (voir ForClaude/SECURITY.md §2.1). Rejette en
- * 401 si le token est absent/invalide, en 403 si le compte n'est pas encore
- * rattaché à un ACTEUR (matricule null — état durable, pas transitoire).
- * Renseigne req.matricule (voir types/express.d.ts) pour les handlers en aval.
+ * matricule ACTEUR lié au compte, si déjà rattaché (voir
+ * ForClaude/SECURITY.md §2.1). Rejette en 401 si le token est absent/invalide.
+ *
+ * Ne rejette PAS si matricule est null : un compte authentifié mais pas
+ * encore rattaché à un ACTEUR doit pouvoir atteindre les routes qui exposent
+ * cet état (ex. GET /me, pour afficher "en attente de rattachement"). Les
+ * routes qui exigent un rattachement vérifient req.matricule elles-mêmes
+ * (ex. parametres.controller.ts), ou passent par requireRole — qui rejette
+ * de toute façon naturellement : aucun rôle actif n'est possible sans
+ * matricule.
+ *
+ * Renseigne req.matricule et req.user (voir types/express.d.ts) pour les
+ * handlers en aval.
  */
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   try {
@@ -19,10 +28,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     const { data, error } = await supabase.auth.getUser(token)
     if (error || !data.user) throw new AppError('Session invalide ou expirée', 401)
 
-    const matricule = await authRepository.findMatriculeByUserId(data.user.id)
-    if (!matricule) throw new AppError('Compte non rattaché à un acteur', 403)
-
-    req.matricule = matricule
+    req.user = { id: data.user.id, email: data.user.email }
+    req.matricule = await authRepository.findMatriculeByUserId(data.user.id)
     next()
   } catch (err) {
     next(err)

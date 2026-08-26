@@ -23,3 +23,28 @@ export async function findByMatricule(matricule: string): Promise<Acteur | null>
   if (error) throw error
   return data
 }
+
+/**
+ * Rattachement organisationnel d'un ACTEUR (acteur.id_cellule -> CELLULE ->
+ * SERVICE), indépendant des rôles applicatifs (role_attribution). Voir MLD
+ * ForClaude/CDC/mld-phases-1-2.md §2.2.
+ */
+export async function findIdServiceByMatricule(matricule: string): Promise<number | null> {
+  const { data: acteur, error: acteurError } = await supabase
+    .schema('finances')
+    .from('acteur')
+    .select('id_cellule')
+    .eq('matricule', matricule)
+    .maybeSingle()
+  if (acteurError) throw acteurError
+  if (!acteur?.id_cellule) return null
+
+  const { data: cellule, error: celluleError } = await supabase
+    .schema('finances')
+    .from('cellule')
+    .select('id_service')
+    .eq('id_cellule', acteur.id_cellule)
+    .maybeSingle()
+  if (celluleError) throw celluleError
+  return cellule?.id_service ?? null
+}

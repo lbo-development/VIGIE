@@ -8,7 +8,7 @@ vi.mock('../repositories/parametres.repository.js', () => ({
   findValeurEffective: (...args: unknown[]) => findValeurEffective(...args),
   upsert: (...args: unknown[]) => upsert(...args),
 }))
-vi.mock('../repositories/acteurs.repository.js', () => ({
+vi.mock('../repositories/acteur.repository.js', () => ({
   findIdServiceByMatricule: (...args: unknown[]) => findIdServiceByMatricule(...args),
 }))
 
