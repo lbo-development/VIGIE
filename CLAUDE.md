@@ -37,6 +37,7 @@ suit le modèle de `items` (`backend/src/{repositories,services,controllers,rout
 - Les variables d'environnement ne sont jamais commitées (`.env`, `.env.local` sont dans `.gitignore`) ; seuls les `.env.example` sont versionnés.
 - Toute nouvelle variable d'environnement doit être ajoutée à la fois dans le fichier réel (non commité) et dans le `.env.example` correspondant, avec une valeur d'exemple neutre.
 - Tout changement de schéma de base de données passe par une migration Supabase CLI (voir `database/migrations/README.md`), jamais par une modification manuelle non versionnée.
+- **Claude Code ne modifie jamais directement la base Supabase (schéma ou données) — ni via le SDK, ni via l'API REST, ni via une commande shell.** La lecture (vérification, introspection) reste autorisée, jamais l'écriture (INSERT/UPDATE/DELETE/DDL/GRANT...). Si une modification est nécessaire, toujours proposer le script SQL correspondant et laisser l'utilisateur l'exécuter lui-même dans l'éditeur SQL du dashboard Supabase.
 
 ## Commandes utiles
 
@@ -49,6 +50,7 @@ npm run test                  # tests frontend + backend
 npm run lint                   # lint frontend + backend
 npm run seed                    # peuple la base avec des données de test
 docker compose up                # frontend + backend via Docker (dev)
+```
 
 ## Spécifications fonctionnelles de l'application (interface utilisateur)
 
@@ -72,5 +74,3 @@ Ce projet vise un niveau de sécurité ≥ 9/10. Toutes les consignes détaillé
 **Avant d'écrire ou modifier du code touchant à l'authentification, aux données utilisateur, à Supabase (tables, policies RLS, storage) ou à une route Express, lire `ForClaude/SECURITY.md` et respecter ses consignes.**
 
 Si une consigne de `SECURITY.md` ne peut pas être respectée pour une raison technique, le signaler explicitement dans la réponse plutôt que de l'ignorer silencieusement.
-
-```
