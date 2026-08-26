@@ -25,8 +25,10 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - **ACTEUR** : MATRICULE (id), NOM, PRENOM, FONCTION (métier réel ; le rôle applicatif est porté par ROLE)
 
 ## Référentiels métier (import PGI ou gestion autonome)
-- **SITE** : CODE_SITE (id), LIBELLE_SITE — gisement géographique (BI)
-- **SECTEUR** : CODE_SECTEUR (id), LIBELLE_SECTEUR — gisement technique (BI)
+- **SITE** : CODE_SITE (id), LIB_SITE, ORDRE_SITE, ACTIF — gisement géographique (BI) ; rattaché à un SERVICE
+- **SOUS_SITE** : CODE_SOUS_SITE (id partiel, avec CODE_SITE), ORDRE_SOUS_SITE, ACTIF — déclinaison d'un SITE (ex. poste, quai) ; identifiant conceptuel = (CODE_SITE, CODE_SOUS_SITE)
+- **SECTEUR** : CODE_SECTEUR (id), LIB_SECTEUR, ORDRE_SECTEUR, ACTIF — gisement technique (BI) ; rattaché à un SERVICE
+- **SOUS_SECTEUR** : CODE_SOUS_SECTEUR (id partiel, avec CODE_SECTEUR), ORDRE_SOUS_SECTEUR, ACTIF — déclinaison d'un SECTEUR ; identifiant conceptuel = (CODE_SECTEUR, CODE_SOUS_SECTEUR)
 - **CUG** : CODE_CUG (id), LIBELLE_CUG — rattaché à un SERVICE (Compte Unitaire de Gestion, analytique)
 - **OPERATION_INVESTISSEMENT** : NUMERO_OPERATION (id), LIBELLE, MT_AP1, MT_AP8, MT_CP1, MT_CP8, DATE_CREATION, MT_INITIAL
 - **MARCHE** : NUMMARCHE (id), ETATMARCHE (Actif | Inactif), TYPE_CREATION (SERVICE | AUTRE), TYPEPROC, TYPEDECOMPOPRIX, NATUREPRESTA, LIBPGI, LIBELLE_SERVICE, TITULAIRE, NUM_TITULAIRE, TITULAIRE_SERVICE, AGENTGESTION, CUGGestion (réf. CUG), DTENOTIF, DTEVALID, DTEDEBUT, DTEFINMAX, MTMINI, MTMAXI, ALERTEMT, ALERTEDATE, LASTMTREALISE, LASTMTENGAGE, DTELASTSOLDE, PLANPREVENTIONACTIF. MT_SOLDE = attribut calculé non stocké (MTMAXI − (LASTMTREALISE + LASTMTENGAGE)). Un seul titulaire par marché ; NUM_TITULAIRE = clé de rapprochement avec FOURNISSEUR.NUMPGI.
@@ -58,8 +60,12 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - ACTEUR (0,N) — titulaire de — (1,1) ROLE ; ROLE rattaché à CELLULE (RC), SERVICE (CDS, CB, ADMIN_SERVICE), DIRECTION (DS), ou sans périmètre (ADMIN_APP)
 - ROLE (1,1, si RC/CDS/DS) — peut faire l'objet de — (0,N) SUPPLEANCE ; SUPPLEANCE (1,1) — désigne — (1,1) ACTEUR suppléant
 - **SERVICE (1,1) — définit — (0,N) SEUIL_VALIDATION_DS** *(correction 22/08 : seuil d'exemption DS propre à chaque service ; paramétré par le DS)*
+- **SERVICE (1,1) — agrège — (0,N) SITE** *(chaque site est géré par un service — rattachement géographique BI)*
+- **SITE (1,1) — comprend — (1,N) SOUS_SITE**
+- **SERVICE (1,1) — agrège — (0,N) SECTEUR** *(chaque secteur est géré par un service — rattachement technique BI)*
+- **SECTEUR (1,1) — comprend — (1,N) SOUS_SECTEUR**
 - ACTEUR (1,1) — dépose — (0,N) DEMANDE_ACHAT (rôle Demandeur, sans entité ROLE dédiée)
-- DEMANDE_ACHAT (1,1) — localisée sur — (1,1) SITE ; DEMANDE_ACHAT (1,1) — relève de — (1,1) SECTEUR
+- DEMANDE_ACHAT (1,1) — localisée sur — (1,1) SOUS_SITE *(identifiant composite CODE_SITE + CODE_SOUS_SITE)* ; DEMANDE_ACHAT (1,1) — relève de — (1,1) SOUS_SECTEUR *(identifiant composite CODE_SECTEUR + CODE_SOUS_SECTEUR)*
 - **DEMANDE_ACHAT (1,1) — imputée analytiquement sur — (1,1) CUG** *(arbitrage 1 : CUG obligatoire en toutes circonstances)*
 - DEMANDE_ACHAT (0,1) — imputée sur — (0,1) OPERATION_INVESTISSEMENT *(si INVESTISSEMENT)*
 - DEMANDE_ACHAT (0,1) — s'appuie sur — (0,N) MARCHE *(si PROCEDURE_ACHAT = MARCHE)*
@@ -111,3 +117,4 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - 22/08/2026 : arbitrages MLD (CUG obligatoire, rôles historisés, ETATFOURNISSEUR) ; correction seuil DS rattaché au service (gouvernance DS confirmée) ; clés techniques DIRECTION/SERVICE/CELLULE (niveau MLD).
 - 23/08/2026 : MCD Phase 2 validé (décisions D1–D9) ; consolidation Phases 1 & 2 dans le présent document.
 - 23/08/2026 (correction CB) : périmètre du rôle CB déplacé de DIRECTION vers SERVICE (conforme au CDG). CB collective par service. Répercuté sur le MLD et le dictionnaire.
+- 26/08/2026 (normalisation SITE / SECTEUR) : SITE et SECTEUR chacun décomposés en deux entités. Ajout de SOUS_SITE (déclinaison d'un SITE : CODE_SOUS_SITE, ORDRE_SOUS_SITE, ACTIF) et de SOUS_SECTEUR (déclinaison d'un SECTEUR : CODE_SOUS_SECTEUR, ORDRE_SOUS_SECTEUR, ACTIF). Ajout de l'attribut ORDRE_SITE / ORDRE_SECTEUR sur les entités parent. Nouvelles associations : SERVICE (1,1) — agrège — (0,N) SITE ; SITE (1,1) — comprend — (1,N) SOUS_SITE ; SERVICE (1,1) — agrège — (0,N) SECTEUR ; SECTEUR (1,1) — comprend — (1,N) SOUS_SECTEUR. Association DEMANDE_ACHAT — localisée sur modifiée : cible désormais SOUS_SITE ; association — relève de modifiée : cible désormais SOUS_SECTEUR. Répercuté dans le MLD (§2.2, §2.4, §5, §7).
