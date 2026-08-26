@@ -33,9 +33,9 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > **Clé technique pour DIRECTION / SERVICE / CELLULE.** PK = ID de substitution immuable ; le code métier (CODE_*) devient un attribut NOT NULL + UNIQUE, mutable en cas de réorganisation sans impact sur les FK. ACTEUR.MATRICULE et les référentiels PGI (CUG.CODE_CUG, MARCHE.NUMMARCHE, NUMERO_OPERATION) conservent leur clé naturelle (identifiant stable / clé de rapprochement à l'import).
 
 ## 2.2 Référentiels métier
-- **SITE** (**CODE_SITE**, LIB_SITE, ORDRE_SITE, #(N)ID_SERVICE → SERVICE)
+- **SITE** (**CODE_SITE**, LIB_SITE, ORDRE_SITE, ACTIF, #(N)ID_SERVICE → SERVICE)
 - **SOUS_SITE** (**#CODE_SITE → SITE**, **CODE_SOUS_SITE**, ORDRE_SOUS_SITE, ACTIF) — PK composite (CODE_SITE, CODE_SOUS_SITE)
-- **SECTEUR** (**CODE_SECTEUR**, LIB_SECTEUR, ORDRE_SECTEUR, #(N)ID_SERVICE → SERVICE)
+- **SECTEUR** (**CODE_SECTEUR**, LIB_SECTEUR, ORDRE_SECTEUR, ACTIF, #(N)ID_SERVICE → SERVICE)
 - **SOUS_SECTEUR** (**#CODE_SECTEUR → SECTEUR**, **CODE_SOUS_SECTEUR**, ORDRE_SOUS_SECTEUR, ACTIF) — PK composite (CODE_SECTEUR, CODE_SOUS_SECTEUR)
 
 > **Normalisation SITE / SECTEUR (26/08/2026).** Chaque gisement géographique (SITE) et technique (SECTEUR) est décomposé en deux niveaux : la table parent porte le libellé, l'ordre d'affichage et l'attachement au service ; la table enfant porte le code de sous-niveau, son ordre et son flag ACTIF. `ID_SERVICE` nullable en base à ce stade : il sera valorisé une fois le référentiel organisationnel (SERVICE) chargé. La FK de DEMANDE_ACHAT cible la table enfant (SOUS_SITE / SOUS_SECTEUR) via une clé composite, garantissant que toute demande est positionnée sur un sous-niveau précis.

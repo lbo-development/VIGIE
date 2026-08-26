@@ -25,9 +25,9 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - **ACTEUR** : MATRICULE (id), NOM, PRENOM, FONCTION (métier réel ; le rôle applicatif est porté par ROLE)
 
 ## Référentiels métier (import PGI ou gestion autonome)
-- **SITE** : CODE_SITE (id), LIB_SITE, ORDRE_SITE — gisement géographique (BI) ; rattaché à un SERVICE
+- **SITE** : CODE_SITE (id), LIB_SITE, ORDRE_SITE, ACTIF — gisement géographique (BI) ; rattaché à un SERVICE
 - **SOUS_SITE** : CODE_SOUS_SITE (id partiel, avec CODE_SITE), ORDRE_SOUS_SITE, ACTIF — déclinaison d'un SITE (ex. poste, quai) ; identifiant conceptuel = (CODE_SITE, CODE_SOUS_SITE)
-- **SECTEUR** : CODE_SECTEUR (id), LIB_SECTEUR, ORDRE_SECTEUR — gisement technique (BI) ; rattaché à un SERVICE
+- **SECTEUR** : CODE_SECTEUR (id), LIB_SECTEUR, ORDRE_SECTEUR, ACTIF — gisement technique (BI) ; rattaché à un SERVICE
 - **SOUS_SECTEUR** : CODE_SOUS_SECTEUR (id partiel, avec CODE_SECTEUR), ORDRE_SOUS_SECTEUR, ACTIF — déclinaison d'un SECTEUR ; identifiant conceptuel = (CODE_SECTEUR, CODE_SOUS_SECTEUR)
 - **CUG** : CODE_CUG (id), LIBELLE_CUG — rattaché à un SERVICE (Compte Unitaire de Gestion, analytique)
 - **OPERATION_INVESTISSEMENT** : NUMERO_OPERATION (id), LIBELLE, MT_AP1, MT_AP8, MT_CP1, MT_CP8, DATE_CREATION, MT_INITIAL
