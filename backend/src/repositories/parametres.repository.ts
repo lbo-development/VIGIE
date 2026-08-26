@@ -20,6 +20,18 @@ export interface ParametreApplication {
   matricule_maj: string | null
 }
 
+/** Toutes les lignes existantes pour une clé (une par portée : global/direction/service). */
+export async function findAllRows(cle: string): Promise<ParametreApplication[]> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('parametre_application')
+    .select('*')
+    .eq('cle', cle)
+    .order('id_parametre', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}
+
 export async function findValeurEffective(cle: string, idService: number | null): Promise<unknown | null> {
   const { data, error } = await supabase
     .schema('finances')

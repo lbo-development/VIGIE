@@ -3,9 +3,10 @@ import { Outlet } from 'react-router-dom'
 import { useSidebarShell } from '../../hooks/useSidebarShell'
 import { useTheme } from '../../hooks/useTheme'
 import { useAuth } from '../../context/AuthContext'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { useInactivityLogout } from '../../hooks/useInactivityLogout'
 import { useParametre } from '../../hooks/useParametre'
-import { NAV_ITEMS } from '../../config/navigation'
+import { NAV_ITEMS, SIDEBAR_GROUPS, filterSidebarGroups } from '../../config/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
@@ -30,6 +31,11 @@ export function AppShell() {
   const { theme, toggleTheme } = useTheme()
   const sidebarShell = useSidebarShell()
   const { session, signOut } = useAuth()
+  const { data: currentUser } = useCurrentUser()
+
+  const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
+  const isAdminService = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_SERVICE') ?? false
+  const visibleSidebarGroups = filterSidebarGroups(SIDEBAR_GROUPS, { isAdminApp, isAdminService })
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',
@@ -61,7 +67,13 @@ export function AppShell() {
           <Outlet />
         </section>
 
-        <Sidebar items={NAV_ITEMS} hidden={sidebarShell.sidebarHidden} theme={theme} onToggleTheme={toggleTheme} />
+        <Sidebar
+          items={[]}
+          groups={visibleSidebarGroups}
+          hidden={sidebarShell.sidebarHidden}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+        />
 
         <button
           type="button"

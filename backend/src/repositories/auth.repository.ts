@@ -29,3 +29,26 @@ export async function hasActiveRole(matricule: string, typeRole: string): Promis
   if (error) throw error
   return (data?.length ?? 0) > 0
 }
+
+/**
+ * Variante scopée à un périmètre service — pour ADMIN_SERVICE, dont le rôle
+ * n'autorise que le service sur lequel il est attribué (jamais transverse,
+ * contrairement à ADMIN_APP). Voir ForClaude/SECURITY.md §2.1.
+ */
+export async function hasActiveRoleForService(
+  matricule: string,
+  typeRole: string,
+  idService: number,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('role_attribution')
+    .select('id_role')
+    .eq('matricule', matricule)
+    .eq('type_role', typeRole)
+    .eq('id_service', idService)
+    .eq('actif', true)
+    .limit(1)
+  if (error) throw error
+  return (data?.length ?? 0) > 0
+}

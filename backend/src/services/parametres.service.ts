@@ -14,6 +14,7 @@ import { AppError } from '../middlewares/errorHandler.js'
  */
 const PARAMETRES = {
   'auth.inactivite_delai_minutes': {
+    libelle: "Délai d'inactivité avant déconnexion automatique (minutes)",
     schema: z.number().int().min(1).max(240),
     defaut: 30,
   },
@@ -25,6 +26,21 @@ function assertCleConnue(cle: string): asserts cle is CleParametre {
   if (!(cle in PARAMETRES)) {
     throw new AppError(`Paramètre inconnu : "${cle}"`, 404)
   }
+}
+
+/** Métadonnées des paramètres connus (pour un écran d'administration). */
+export function listParametreKeys() {
+  return Object.entries(PARAMETRES).map(([cle, def]) => ({
+    cle,
+    libelle: def.libelle,
+    defaut: def.defaut,
+  }))
+}
+
+/** Toutes les lignes existantes (une par portée) pour une clé connue. */
+export async function listRows(cle: string) {
+  assertCleConnue(cle)
+  return parametresRepository.findAllRows(cle)
 }
 
 export async function getParametreEffectif(matricule: string, cle: string) {

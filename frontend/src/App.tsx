@@ -5,6 +5,12 @@ import { RequireAuth } from './components/RequireAuth'
 import { AppShell } from './components/shell/AppShell'
 import { Login } from './pages/Login'
 import { Home } from './pages/Home'
+import { GisementGeographique } from './pages/GisementGeographique'
+import { GisementTechnique } from './pages/GisementTechnique'
+import { Reglages } from './pages/Reglages'
+import { Directions } from './pages/Directions'
+import { Services } from './pages/Services'
+import { Cellules } from './pages/Cellules'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -27,6 +33,12 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<Home />} />
+              <Route path="/parametres/gisement-geographique" element={<GisementGeographique />} />
+              <Route path="/parametres/gisement-technique" element={<GisementTechnique />} />
+              <Route path="/parametres/reglages" element={<Reglages />} />
+              <Route path="/parametres/directions" element={<Directions />} />
+              <Route path="/parametres/services" element={<Services />} />
+              <Route path="/parametres/cellules" element={<Cellules />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

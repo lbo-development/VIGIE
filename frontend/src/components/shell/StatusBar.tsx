@@ -5,7 +5,7 @@ const APP_VERSION = 'v0.1.0'
 const ENVIRONMENT_LABEL = import.meta.env.MODE === 'production' ? 'Production' : 'Développement'
 
 export function StatusBar() {
-  const { session } = useAuth()
+  const { session, signOut } = useAuth()
 
   return (
     <footer className="status-bar" role="status">
@@ -23,6 +23,12 @@ export function StatusBar() {
           <>
             <span className="status-sep">•</span>
             <span>{session.user.email}</span>
+            <button type="button" className="status-logout" onClick={() => void signOut()}>
+              <svg className="ti">
+                <use href="#i-log-out" />
+              </svg>
+              Se déconnecter
+            </button>
           </>
         )}
       </div>

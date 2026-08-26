@@ -90,6 +90,9 @@ button,input{font:inherit;} a{color:inherit;text-decoration:none;}
 .app-shell.sidebar-collapsed .app-main{grid-template-columns:var(--sidebar-collapsed-w) minmax(0,1fr);}
 .status-bar{grid-row:3;position:relative;z-index:60;min-width:0;height:var(--app-status-h);background:var(--gp-surface);border-top:1px solid var(--gp-border);display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 10px;font-size:11px;color:var(--gp-text-secondary);white-space:nowrap;overflow:hidden;}
 .status-left,.status-right{display:flex;align-items:center;gap:6px;min-width:0;} .status-dot{width:6px;height:6px;border-radius:50%;background:var(--gp-success);flex:none;} .status-sep{color:var(--gp-text-muted);}
+.status-logout{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 6px;margin:0;border:none;border-radius:var(--gp-radius);background:transparent;color:inherit;font:inherit;cursor:pointer;flex:none;}
+.status-logout:hover{background:var(--gp-surface-sunken);color:var(--gp-primary);}
+.status-logout .ti{font-size:13px;}
 
 /* Header : bloc marque + barre d'onglets de navigation principale */
 .brand-block{display:flex;align-items:center;gap:12px;padding:0 18px;flex:none;min-width:0;}

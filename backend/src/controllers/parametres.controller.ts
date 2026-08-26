@@ -8,6 +8,23 @@ import { AppError } from '../middlewares/errorHandler.js'
  * req.matricule est renseigné par requireAuth (monté sur ce routeur).
  */
 
+export async function getParametreKeys(_req: Request, res: Response, next: NextFunction) {
+  try {
+    res.json(parametresService.listParametreKeys())
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getParametreRows(req: Request, res: Response, next: NextFunction) {
+  try {
+    const rows = await parametresService.listRows(req.params.cle)
+    res.json(rows)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function getParametre(req: Request, res: Response, next: NextFunction) {
   try {
     if (!req.matricule) throw new AppError('Authentification requise', 401)

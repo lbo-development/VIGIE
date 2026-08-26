@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 export interface MeRole {
   typeRole: string
   perimeterLabel: string | null
+  idService: number | null
 }
 
 export interface MeResponse {

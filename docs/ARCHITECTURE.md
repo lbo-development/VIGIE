@@ -178,8 +178,9 @@ exploitable directement par `supabase-js`) est de même porté par une fonction 
    `20260825110000_add_parametre_application_functions.sql` (fonctions de résolution/upsert
    ci-dessus).
 2. `repositories/parametres.repository.ts` — appelle les deux fonctions SQL via `.rpc()`.
-   `repositories/acteurs.repository.ts` — résout `id_service` d'un acteur
-   (`acteur.id_cellule → cellule.id_service`, indépendant des rôles applicatifs).
+   `repositories/acteur.repository.ts` — résout `id_service` d'un acteur
+   (`acteur.id_cellule → cellule.id_service`, indépendant des rôles applicatifs) — fichier
+   partagé avec `site.service.ts`/`sousSite.service.ts`, pas dupliqué par ressource.
    `repositories/auth.repository.ts` — résolution matricule ↔ compte Auth, vérification de
    rôle actif (`role_attribution`, sans la suppléance : d'après le MCD elle ne couvre que
    RC/CDS/DS, pas ADMIN_APP).

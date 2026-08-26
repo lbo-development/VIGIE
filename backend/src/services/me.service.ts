@@ -4,6 +4,7 @@ import * as roleAttributionRepository from '../repositories/roleAttribution.repo
 export interface MeRole {
   typeRole: string
   perimeterLabel: string | null
+  idService: number | null
 }
 
 export interface MeResponse {
@@ -33,6 +34,7 @@ export async function getCurrentUser(matricule: string | null): Promise<MeRespon
     roleRows.map(async (row) => ({
       typeRole: row.type_role,
       perimeterLabel: await roleAttributionRepository.resolvePerimeterLabel(row),
+      idService: row.id_service,
     })),
   )
 
