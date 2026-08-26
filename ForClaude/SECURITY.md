@@ -140,6 +140,29 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
 - **Les policies permissives se combinent en OR, pas en AND.** Ne jamais laisser une policy `USING (true)` de test à côté d'une policy stricte : elle rend l'ensemble aussi permissif que la moins restrictive. Auditer `select * from pg_policies where schemaname = 'finances' and tablename = '<table>'` avant de considérer une table comme sécurisée.
 - Chaque nouvelle table avec RLS doit définir explicitement une policy par opération (`SELECT`, `INSERT`, `UPDATE`, `DELETE`) alignée sur les `TYPE_ROLE` pertinents (RC, CDS, DS, CB, ADMIN_SERVICE, ADMIN_APP — via `finances.current_user_has_role()`, §2.1) — ne jamais partir du principe qu'une policy `SELECT` couvre implicitement les autres opérations.
 
+### 2.3 Paramétrage applicatif (`finances.parametre_application`)
+
+Voir `docs/ARCHITECTURE.md` (section « Paramétrage applicatif ») pour le schéma complet
+(portée global/direction/service, résolution en cascade). Consignes RLS spécifiques à
+cette table :
+
+- **Lecture** : ouverte à tout `authenticated` avec `matricule` non `null` — un acteur
+  doit pouvoir lire les paramètres effectifs de son propre périmètre (et les valeurs
+  globales) pour que l'application fonctionne, quel que soit son rôle métier (RC, CDS,
+  DS, CB, ADMIN_SERVICE...).
+- **Écriture** (`INSERT`/`UPDATE`/`DELETE`) : réservée à `ADMIN_APP`, via
+  `finances.current_user_has_role('ADMIN_APP')` (§2.1) — jamais de policy générique
+  `authenticated` en écriture sur cette table, même pour un acteur `DS`/`ADMIN_SERVICE`
+  agissant sur le périmètre de sa propre direction/service (contrairement à
+  `seuil_validation_ds`, où le `DS` peut écrire sur le périmètre de sa direction : ici la
+  décision produit est que seul `ADMIN_APP` modifie, quelle que soit la portée de la
+  ligne visée).
+- Le typage de `valeur` (`jsonb`) n'est validé qu'applicativement (Zod, côté service) — la
+  RLS ne peut pas contraindre la forme d'un `jsonb`. Ne jamais faire confiance à une
+  écriture directe depuis le frontend même pour un compte `ADMIN_APP` authentifié :
+  l'écriture passe par le backend (`service_role`), qui applique le registre de schémas
+  avant d'exécuter la requête.
+
 ## 3. Validation et sanitization des données
 
 - Toute donnée entrante (body, query params, headers, params d'URL) côté Express doit être validée avec un schéma explicite (ex. `zod` ou `yup`) avant traitement — jamais utilisée brute.

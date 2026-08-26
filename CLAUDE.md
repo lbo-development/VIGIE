@@ -74,3 +74,13 @@ Ce projet vise un niveau de sécurité ≥ 9/10. Toutes les consignes détaillé
 **Avant d'écrire ou modifier du code touchant à l'authentification, aux données utilisateur, à Supabase (tables, policies RLS, storage) ou à une route Express, lire `ForClaude/SECURITY.md` et respecter ses consignes.**
 
 Si une consigne de `SECURITY.md` ne peut pas être respectée pour une raison technique, le signaler explicitement dans la réponse plutôt que de l'ignorer silencieusement.
+
+## Paramétrage applicatif
+
+Les paramètres de configuration modifiables sans déploiement (ex : longueur max de
+l'objet d'une FAD) suivent un modèle clé/valeur avec portée organisationnelle — global,
+par direction ou par service, résolution en cascade où le plus spécifique gagne (un
+service hérite implicitement de sa direction) — géré exclusivement par le rôle
+`ADMIN_APP`. Décision et schéma détaillés dans `docs/ARCHITECTURE.md` (section
+« Paramétrage applicatif »), policies RLS dans `ForClaude/SECURITY.md` §2.3. Ne pas
+réinventer un autre mécanisme de configuration dynamique sans repartir de cette décision.

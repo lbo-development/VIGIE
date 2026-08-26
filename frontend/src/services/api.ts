@@ -1,10 +1,10 @@
+import { supabase } from '../lib/supabaseClient'
+
 /**
  * Client HTTP minimal pour appeler l'API backend.
  * Centralise l'URL de base et la gestion des erreurs afin que les hooks
  * et les pages n'aient jamais besoin d'appeler fetch() directement.
  */
-
-import { supabase } from '../lib/supabaseClient'
 
 const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:3001/api'
 
