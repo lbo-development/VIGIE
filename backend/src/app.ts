@@ -27,7 +27,20 @@ const frontendDistPath = path.resolve(__dirname, '../../frontend/dist')
 const frontendIndexPath = path.join(frontendDistPath, 'index.html')
 const hasFrontendBuild = fs.existsSync(frontendIndexPath)
 
-app.use(helmet())
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        // Le frontend appelle Supabase Auth/REST directement depuis le
+        // navigateur : sans ça, connect-src retombe sur 'self' et le
+        // navigateur bloque silencieusement ces requêtes (ex: le login
+        // échoue avec une erreur réseau générique, jamais envoyée).
+        connectSrc: ["'self'", env.supabaseUrl],
+      },
+    },
+  }),
+)
 app.use(cors({ origin: env.corsOrigins }))
 app.use(express.json({ limit: '100kb' }))
 app.use(apiLimiter)

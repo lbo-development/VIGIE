@@ -12,25 +12,6 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap"
       rel="stylesheet"
     />
-    <script>
-      // Applique le thème GPMM sur <html data-theme> avant le premier rendu React,
-      // pour éviter un flash de mauvais thème. Miroir exact de la logique de repli
-      // de app.js (localStorage 'gpmm-theme', sinon préférence système).
-      (function () {
-        try {
-          var stored = localStorage.getItem('gpmm-theme')
-          var theme =
-            stored === 'dark' || stored === 'light'
-              ? stored
-              : window.matchMedia('(prefers-color-scheme: dark)').matches
-                ? 'dark'
-                : 'light'
-          document.documentElement.dataset.theme = theme
-        } catch (e) {
-          document.documentElement.dataset.theme = 'light'
-        }
-      })()
-    </script>
   </head>
   <body>
     <div id="root"></div>

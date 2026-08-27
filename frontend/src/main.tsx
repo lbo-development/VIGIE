@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import './styles/gpmm.css'
 import './index.css'
 import App from './App.tsx'
+import { applyStoredTheme } from './lib/theme'
+
+applyStoredTheme()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
