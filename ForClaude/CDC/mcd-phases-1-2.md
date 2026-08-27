@@ -1,30 +1,35 @@
 ---
 MCD (Modèle Conceptuel de Données) - CONSOLIDÉ Phases 1 & 2
-Synthèse notation Merise (entités, associations, cardinalités). Phase 1 issue du MCD validé les 20-21/08/2026 (claude_mcd-phase1.md), avec la correction du seuil DS du 22/08. Phase 2 validée le 23/08/2026 (9 décisions D1–D9).
+Synthèse de notation Merise (entités, associations, cardinalités). Phase 1 issue du MCD validé les 20-21/08/2026 (claude_mcd-phase1.md), avec la correction du seuil DS du 22/08. Phase 2 validée le 23/08/2026 (9 décisions D1–D9).
 Statut : Phases 1 & 2 validées. Document de référence conceptuel unique. Le MLD consolidé (mld-phases-1-2.md) et le dictionnaire (MLD_Dictionnaire_Donnees_Phases1-2.xlsx) en découlent.
 ---
 
 # Note de lecture
 
 Ce MCD est conceptuel : il décrit les données indépendamment de leur implémentation. Deux décisions prises pendant les travaux relèvent du **niveau logique (MLD/MPD)** et ne sont donc **pas** représentées ici, mais le sont dans le MLD :
+
 - Clés de substitution techniques (ID) pour DIRECTION, SERVICE, CELLULE et FOURNISSEUR — conceptuellement, ces entités restent identifiées par leur code/attributs métier.
 - Dénormalisation du statut courant sur DEMANDE_ACHAT / CERTIFICAT_SERVICE_FAIT — la source d'autorité conceptuelle reste l'historique.
 
 Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analytique obligatoire (arbitrage 1) ; historisation des rôles (arbitrage 3) ; état sur FOURNISSEUR (arbitrage 4) ; seuil DS rattaché au service (correction 22/08) ; entités CSF (Phase 2).
 
 ═══════════════════════════════════════════
+
 # PARTIE 1 — PHASE 1 (Demande → Autorisation de commande)
+
 ═══════════════════════════════════════════
 
 # 1. Entités et attributs
 
 ## Référentiel organisationnel
+
 - **DIRECTION** : CODE_DIRECTION (id), LIBELLE_DIRECTION
 - **SERVICE** : CODE_SERVICE (id), LIBELLE_SERVICE
 - **CELLULE** : CODE_CELLULE (id), LIBELLE_CELLULE
 - **ACTEUR** : MATRICULE (id), NOM, PRENOM, FONCTION (métier réel ; le rôle applicatif est porté par ROLE)
 
 ## Référentiels métier (import PGI ou gestion autonome)
+
 - **SITE** : CODE_SITE (id), LIB_SITE, ORDRE_SITE, ACTIF — gisement géographique (BI) ; rattaché à un SERVICE
 - **SOUS_SITE** : CODE_SOUS_SITE (id partiel, avec CODE_SITE), ORDRE_SOUS_SITE, ACTIF — déclinaison d'un SITE (ex. poste, quai) ; identifiant conceptuel = (CODE_SITE, CODE_SOUS_SITE)
 - **SECTEUR** : CODE_SECTEUR (id), LIB_SECTEUR, ORDRE_SECTEUR, ACTIF — gisement technique (BI) ; rattaché à un SERVICE
@@ -36,10 +41,12 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - **CONTACT** : ID_CONTACT (id), NOM, PRENOM, MAIL, TELFIXE, TELMOBILE, FONCTION, NATUREFONCTION (liste fermée) — rattaché à un FOURNISSEUR (0..N par fournisseur).
 
 ## Rôles applicatifs
-- **ROLE** *(niveau physique/MLD : table `ROLE_ATTRIBUTION`, pour éviter la collision avec la notion native de rôle Postgres/Supabase — cf. MLD §2.3, décision du 24/08/2026 ; l'entité conceptuelle reste ROLE ici)* : ID_ROLE (id), TYPE_ROLE (RC | CDS | DS | CB | ADMIN_SERVICE | ADMIN_APP), DATE_DEBUT, DATE_FIN, ACTIF (historisation — arbitrage 3). Instance d'attribution d'un rôle à un ACTEUR sur un périmètre : CELLULE pour RC ; SERVICE pour CDS, CB et ADMIN_SERVICE ; DIRECTION pour DS ; **sans périmètre pour ADMIN_APP** (habilitation transverse). Unicité d'un actif par périmètre pour RC/CDS/DS ; CB collective par service ; ADMIN_SERVICE et ADMIN_APP sans contrainte d'unicité. L'historisation conserve la trace des titulaires successifs. *(ADMIN_SERVICE : administration locale au service — référentiel fournisseurs, imports, déclaration des rôles/suppléances, référentiel géographique SITE/SOUS_SITE et technique SECTEUR/SOUS_SECTEUR de son service (décision du 26/08/2026, pas de rôle ADMIN_DATA distinct) ; ADMIN_APP : paramètres transverses et comptes utilisateurs, avec les mêmes droits que ADMIN_SERVICE sur SITE/SOUS_SITE et SECTEUR/SOUS_SECTEUR mais sans restriction de service.)*
+
+- **ROLE** _(niveau physique/MLD : table `ROLE_ATTRIBUTION`, pour éviter la collision avec la notion native de rôle Postgres/Supabase — cf. MLD §2.3, décision du 24/08/2026 ; l'entité conceptuelle reste ROLE ici)_ : ID_ROLE (id), TYPE_ROLE (RC | CDS | DS | CB | ADMIN_SERVICE | ADMIN_APP), DATE_DEBUT, DATE_FIN, ACTIF (historisation — arbitrage 3). Instance d'attribution d'un rôle à un ACTEUR sur un périmètre : CELLULE pour RC ; SERVICE pour CDS, CB et ADMIN_SERVICE ; DIRECTION pour DS ; **sans périmètre pour ADMIN_APP** (habilitation transverse). Unicité d'un actif par périmètre pour RC/CDS/DS ; CB collective par service ; ADMIN_SERVICE et ADMIN_APP sans contrainte d'unicité. L'historisation conserve la trace des titulaires successifs. _(ADMIN_SERVICE : administration locale au service — référentiel fournisseurs, imports, déclaration des rôles/suppléances, référentiel géographique SITE/SOUS_SITE et technique SECTEUR/SOUS_SECTEUR de son service (décision du 26/08/2026, pas de rôle ADMIN_DATA distinct) ; ADMIN_APP : paramètres transverses et comptes utilisateurs, avec les mêmes droits que ADMIN_SERVICE sur SITE/SOUS_SITE et SECTEUR/SOUS_SECTEUR mais sans restriction de service.)_
 - **SUPPLEANCE** : ID_SUPPLEANCE (id), DATE_DEBUT, DATE_FIN — relie un ROLE (titulaire absent, RC/CDS/DS) à un ACTEUR suppléant détenant un rôle de même TYPE_ROLE. Modèle horizontal, auto-déclaré, une suppléance active à la fois.
 
 ## Cœur métier : la demande
+
 - **DEMANDE_ACHAT** (cycle DA → FAD, un seul numéro) : NUMERO (id, AAAA-MM-JJ-XXX par service), OBJET (80 car.), DESCRIPTION (256 car.), MONTANT_DEMANDE, IMPUTATION_COMPTABLE (FONCTIONNEMENT | INVESTISSEMENT), PROCEDURE_ACHAT (MARCHE | HORS_MARCHE), TYPE_ACHAT (TRAVAUX | FOURNITURES | SERVICES, BI), TYPE_FAD (CONTRAT | OUVERTE | FERMEE), MOTIF_CHOIX (Prix | Délai | Technique | Autre, si HORS_MARCHE), LIBELLE_MOTIF_CHOIX, MONTANT_RETENU, MONTANT_COMMANDE (saisi par la CB), DATE_CREATION, STATUT_COURANT (réf. STATUT).
 - **DEVIS_CONSULTE** (uniquement si HORS_MARCHE) : ID_DEVIS (id), MONTANT_DEVIS, FICHIER_PDF, RETENU (un seul RETENU=vrai par demande).
 - **PIECE_JOINTE** : ID_PIECE (id), TYPE_PIECE, ORIGINE (UTILISATEUR | SYSTEME), FICHIER (PDF, 10 Mo max), NOM_FICHIER. En Phase 2, rattachable aussi à un CSF (cf. Partie 2). À l'autorisation de la FAD, une **fiche récapitulative PDF** est générée automatiquement et ajoutée en PIECE_JOINTE (ORIGINE=SYSTEME, TYPE_PIECE=FICHE_FAD), non supprimable par l'utilisateur.
@@ -59,23 +66,25 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - MARCHE (0,N) — a pour titulaire — (1,1) FOURNISSEUR (via NUMPGI = NUM_TITULAIRE ; même SERVICE que le marché)
 - ACTEUR (0,N) — titulaire de — (1,1) ROLE ; ROLE rattaché à CELLULE (RC), SERVICE (CDS, CB, ADMIN_SERVICE), DIRECTION (DS), ou sans périmètre (ADMIN_APP)
 - ROLE (1,1, si RC/CDS/DS) — peut faire l'objet de — (0,N) SUPPLEANCE ; SUPPLEANCE (1,1) — désigne — (1,1) ACTEUR suppléant
-- **SERVICE (1,1) — définit — (0,N) SEUIL_VALIDATION_DS** *(correction 22/08 : seuil d'exemption DS propre à chaque service ; paramétré par le DS)*
-- **SERVICE (1,1) — agrège — (0,N) SITE** *(chaque site est géré par un service — rattachement géographique BI)*
+- **SERVICE (1,1) — définit — (0,N) SEUIL_VALIDATION_DS** _(correction 22/08 : seuil d'exemption DS propre à chaque service ; paramétré par le DS)_
+- **SERVICE (1,1) — agrège — (0,N) SITE** _(chaque site est géré par un service — rattachement géographique BI)_
 - **SITE (1,1) — comprend — (1,N) SOUS_SITE**
-- **SERVICE (1,1) — agrège — (0,N) SECTEUR** *(chaque secteur est géré par un service — rattachement technique BI)*
+- **SERVICE (1,1) — agrège — (0,N) SECTEUR** _(chaque secteur est géré par un service — rattachement technique BI)_
 - **SECTEUR (1,1) — comprend — (1,N) SOUS_SECTEUR**
 - ACTEUR (1,1) — dépose — (0,N) DEMANDE_ACHAT (rôle Demandeur, sans entité ROLE dédiée)
-- DEMANDE_ACHAT (1,1) — localisée sur — (1,1) SOUS_SITE *(identifiant composite CODE_SITE + CODE_SOUS_SITE)* ; DEMANDE_ACHAT (1,1) — relève de — (1,1) SOUS_SECTEUR *(identifiant composite CODE_SECTEUR + CODE_SOUS_SECTEUR)*
-- **DEMANDE_ACHAT (1,1) — imputée analytiquement sur — (1,1) CUG** *(arbitrage 1 : CUG obligatoire en toutes circonstances)*
-- DEMANDE_ACHAT (0,1) — imputée sur — (0,1) OPERATION_INVESTISSEMENT *(si INVESTISSEMENT)*
-- DEMANDE_ACHAT (0,1) — s'appuie sur — (0,N) MARCHE *(si PROCEDURE_ACHAT = MARCHE)*
-- DEMANDE_ACHAT (1,1) — génère — (0,N) DEVIS_CONSULTE *(si HORS_MARCHE)* ; DEVIS_CONSULTE (1,1) — émis par — (1,1) FOURNISSEUR
-- DEMANDE_ACHAT (1,1) — retient — (1,1) FOURNISSEUR *(fournisseur retenu ; nullable jusqu'au stade FAD au niveau logique)*
+- DEMANDE_ACHAT (1,1) — localisée sur — (1,1) SOUS_SITE _(identifiant composite CODE_SITE + CODE_SOUS_SITE)_ ; DEMANDE_ACHAT (1,1) — relève de — (1,1) SOUS_SECTEUR _(identifiant composite CODE_SECTEUR + CODE_SOUS_SECTEUR)_
+- **DEMANDE_ACHAT (1,1) — imputée analytiquement sur — (1,1) CUG** _(arbitrage 1 : CUG obligatoire en toutes circonstances)_
+- DEMANDE_ACHAT (0,1) — imputée sur — (0,1) OPERATION_INVESTISSEMENT _(si INVESTISSEMENT)_
+- DEMANDE_ACHAT (0,1) — s'appuie sur — (0,N) MARCHE _(si PROCEDURE_ACHAT = MARCHE)_
+- DEMANDE_ACHAT (1,1) — génère — (0,N) DEVIS_CONSULTE _(si HORS_MARCHE)_ ; DEVIS_CONSULTE (1,1) — émis par — (1,1) FOURNISSEUR
+- DEMANDE_ACHAT (1,1) — retient — (1,1) FOURNISSEUR _(fournisseur retenu ; nullable jusqu'au stade FAD au niveau logique)_
 - DEMANDE_ACHAT (1,1) — comporte — (0,N) PIECE_JOINTE
 - DEMANDE_ACHAT (1,1) — suit — (1,N) HISTORIQUE_STATUT ; HISTORIQUE_STATUT (1,1) — référence — (1,1) STATUT et (1,1) — réalisé par — (1,1) ACTEUR (le suppléant le cas échéant, renvoi vers la SUPPLEANCE)
 
 ═══════════════════════════════════════════
+
 # PARTIE 2 — PHASE 2 (Service Fait → paiement fournisseur) — VALIDÉE 23/08
+
 ═══════════════════════════════════════════
 
 # 3. Entités et attributs — Phase 2
@@ -87,15 +96,16 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 
 # 4. Associations et cardinalités — Phase 2
 
-- DEMANDE_ACHAT (1,1) — donne lieu à — (0,N) CERTIFICAT_SERVICE_FAIT *(FAD au statut FAD_COMMANDEE — R1)*
-- ACTEUR (0,N) — élabore — (1,1) CERTIFICAT_SERVICE_FAIT *(rédacteur = demandeur initial ou RC du demandeur — D4/R3)*
+- DEMANDE_ACHAT (1,1) — donne lieu à — (0,N) CERTIFICAT_SERVICE_FAIT _(FAD au statut FAD_COMMANDEE — R1)_
+- ACTEUR (0,N) — élabore — (1,1) CERTIFICAT_SERVICE_FAIT _(rédacteur = demandeur initial ou RC du demandeur — D4/R3)_
 - CERTIFICAT_SERVICE_FAIT (1,1) — a pour statut courant — (1,1) STATUT_CSF
 - CERTIFICAT_SERVICE_FAIT (1,1) — suit — (1,N) HISTORIQUE_STATUT_CSF ; HISTORIQUE_STATUT_CSF (1,1) — référence — (1,1) STATUT_CSF et (1,1) — réalisé par — (1,1) ACTEUR (suppléant le cas échéant)
-- CERTIFICAT_SERVICE_FAIT (1,1) — comporte — (1,N) PIECE_JOINTE *(au moins un justificatif à la transmission — D7/R5)*
+- CERTIFICAT_SERVICE_FAIT (1,1) — comporte — (1,N) PIECE_JOINTE _(au moins un justificatif à la transmission — D7/R5)_
 
 # 5. Circuit CSF (STATUT_CSF)
 
 Élaboration (demandeur ou RC) → CSF_A_TRAITER → [RC] transmet (CSF_TRANSMIS_BUDGET) ou rejette (CSF_REJETE_RC) → [CB] valide (CSF_VALIDE_BUDGET, déclenche le paiement PGI) ou rejette (CSF_REJETE_BUDGET) → liquidation dans le PGI → CSF_LIQUIDE (terminal, verrouille).
+
 - CSF_REJETE_RC → CSF_A_TRAITER (modification en place, resoumission).
 - CSF_REJETE_BUDGET → CSF_A_TRAITER (reprise par le rédacteur ou le RC).
 
@@ -109,10 +119,12 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - **R6** : CSF_LIQUIDE positionné manuellement par la CB après liquidation de la facture dans le PGI ; terminal, verrouille le CSF. La facture n'est pas stockée dans l'application.
 
 # 7. Points ouverts (non structurants)
+
 - Organisation : décision A/B en attente sur l'archivage (ETAT sur DIRECTION/SERVICE/CELLULE et ACTEUR) et le figeage du rattachement organisationnel de la FAD à sa création (protection contre les réorganisations). À trancher.
 - Points résiduels mineurs Phase 1 (referentiel-fournisseurs-phase1.md) : doublon ADR1, vocabulaire TYPE_CREATION, redondance FONCTION/NATUREFONCTION.
 
 # 8. Historique de validation
+
 - 20-21/08/2026 : MCD Phase 1 validé (entités, MARCHE, FOURNISSEUR/CONTACT).
 - 22/08/2026 : arbitrages MLD (CUG obligatoire, rôles historisés, ETATFOURNISSEUR) ; correction seuil DS rattaché au service (gouvernance DS confirmée) ; clés techniques DIRECTION/SERVICE/CELLULE (niveau MLD).
 - 23/08/2026 : MCD Phase 2 validé (décisions D1–D9) ; consolidation Phases 1 & 2 dans le présent document.
