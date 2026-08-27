@@ -1,4 +1,4 @@
-# Déconnexion automatique par inactivité
+# Déconnexion automatique par l'inactivité
 
 > Complète `ForClaude/SECURITY.md` §1.1 (« Postes partagés & inactivité ») : ce document décrit le
 > mécanisme tel qu'implémenté côté frontend, pour relecture avant intégration définitive.
@@ -18,12 +18,12 @@ d'inactivité, et aucune page `/login` encore branchée à un vrai écran de con
 
 ## 2. Paramètres retenus
 
-| Paramètre | Valeur | Origine |
-|---|---|---|
-| Délai d'inactivité avant déconnexion | **30 minutes** | Choix utilisateur (arbitrage entre les 15 min d'exemple de SECURITY.md et le contexte réel des postes GPMM concernés) |
-| Durée de l'avertissement avant expiration | 1 minute | Choix par défaut, non discuté en détail — à ajuster si besoin |
-| Avertissement avant déconnexion | Oui, avec action « Rester connecté » | Choix utilisateur (plutôt qu'une déconnexion silencieuse) |
-| Page de destination après déconnexion | `/login` (nouvelle page créée) | Choix utilisateur — aucune page de connexion n'existait avant ce chantier |
+| Paramètre                                 | Valeur                               | Origine                                                                                                               |
+| ----------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| Délai d'inactivité avant déconnexion      | **30 minutes**                       | Choix utilisateur (arbitrage entre les 15 min d'exemple de SECURITY.md et le contexte réel des postes GPMM concernés) |
+| Durée de l'avertissement avant expiration | 1 minute                             | Choix par défaut, non discuté en détail — à ajuster si besoin                                                         |
+| Avertissement avant déconnexion           | Oui, avec action « Rester connecté » | Choix utilisateur (plutôt qu'une déconnexion silencieuse)                                                             |
+| Page de destination après déconnexion     | `/login` (nouvelle page créée)       | Choix utilisateur — aucune page de connexion n'existait avant ce chantier                                             |
 
 ## 3. Mécanisme
 
@@ -33,7 +33,7 @@ d'inactivité, et aucune page `/login` encore branchée à un vrai écran de con
 `scroll`, `touchstart` sur `window` (liste exacte de SECURITY.md §1.1), avec un throttle d'1 seconde pour
 éviter les resets excessifs. Chaque activité réinitialise deux minuteurs :
 
-- un minuteur d'avertissement, déclenché à *délai total − durée d'avertissement* (29 min) ;
+- un minuteur d'avertissement, déclenché à _délai total − durée d'avertissement_ (29 min) ;
 - un minuteur de déconnexion, déclenché au délai total (30 min).
 
 Le hook n'installe écouteurs et minuteurs **que si une session existe** (`enabled: Boolean(session)`) — sans
@@ -62,6 +62,7 @@ messages :
 ### 3.4 Déconnexion réelle
 
 `AuthContext.tsx` — `signOut()` :
+
 1. diffuse `{ type: 'logout' }` aux autres onglets ;
 2. appelle `supabase.auth.signOut()` (révocation réelle du refresh token côté Supabase, pas un simple
    nettoyage d'état local) ;
@@ -83,12 +84,14 @@ automatiquement vers `/` si une session est déjà active.
 ## 4. Fichiers concernés
 
 **Créés**
+
 - `frontend/src/hooks/useInactivityLogout.ts`
 - `frontend/src/components/shell/InactivityWarning.tsx`
 - `frontend/src/pages/Login.tsx`
 - `frontend/src/pages/Login.css`
 
 **Modifiés**
+
 - `frontend/src/context/AuthContext.tsx` — `signOut()` réel + diffusion multi-onglets + rechargement complet ; contexte mémoïsé (`useCallback`/`useMemo`) pour la stabilité des minuteurs.
 - `frontend/src/components/shell/AppShell.tsx` — branchement du minuteur (actif si session) et affichage de l'avertissement.
 - `frontend/src/App.tsx` — route `/login` publique ; sprite d'icônes remonté à la racine (nécessaire aux deux côtés du shell).
