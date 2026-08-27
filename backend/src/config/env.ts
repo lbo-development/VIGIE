@@ -7,8 +7,11 @@ import 'dotenv/config'
  */
 export const env = {
   port: process.env.PORT ? Number(process.env.PORT) : 3001,
-  supabaseUrl: process.env.SUPABASE_URL ?? '',
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? '',
+  // .trim() : une valeur d'URL collée dans un dashboard (Railway, etc.) peut
+  // embarquer un retour à la ligne invisible en fin de chaîne, ce qui fait
+  // planter helmet au moment de construire le header Content-Security-Policy.
+  supabaseUrl: (process.env.SUPABASE_URL ?? '').trim(),
+  supabaseServiceRoleKey: (process.env.SUPABASE_SERVICE_ROLE_KEY ?? '').trim(),
   nodeEnv: process.env.NODE_ENV ?? 'development',
   // Liste blanche CORS : une ou plusieurs origines séparées par des virgules
   // (ex: "http://localhost:5173,https://mon-app.vercel.app"). Jamais de '*'
