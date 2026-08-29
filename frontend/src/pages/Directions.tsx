@@ -1,6 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { useDirections, type OrgDirection } from '../hooks/useDirections'
+import { Combobox } from '../components/Combobox'
 import { api, ApiError } from '../services/api'
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Actif' },
+  { value: 'inactive', label: 'Inactif' },
+]
+
+function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
+  if (filter === null) return true
+  return filter === 'active' ? actif : !actif
+}
 
 /**
  * Administration du référentiel organisationnel DIRECTION, montée sur
@@ -21,6 +32,9 @@ import { api, ApiError } from '../services/api'
 export function Directions() {
   const { directions, loading, refetch } = useDirections()
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; direction: OrgDirection | null } | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
+
+  const filteredDirections = directions.filter((d) => matchesStatusFilter(d.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -39,37 +53,59 @@ export function Directions() {
         </div>
       </div>
 
+      <div className="gp-field" style={{ maxWidth: 200 }}>
+        <label className="gp-label">Statut</label>
+        <Combobox
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={setStatusFilter}
+          placeholder="Tous"
+          clearLabel="Tous"
+          ariaLabel="Filtrer les directions par statut"
+        />
+      </div>
+
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
           <thead>
             <tr>
               <th>Code</th>
               <th>Libellé</th>
+              <th>Statut</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={3}>Chargement…</td>
+                <td colSpan={4}>Chargement…</td>
               </tr>
             )}
-            {!loading && directions.length === 0 && (
+            {!loading && filteredDirections.length === 0 && (
               <tr>
-                <td colSpan={3}>Aucune direction.</td>
+                <td colSpan={4}>{directions.length === 0 ? 'Aucune direction.' : 'Aucune direction pour ce statut.'}</td>
               </tr>
             )}
-            {directions.map((direction) => (
+            {filteredDirections.map((direction) => (
               <tr key={direction.id_direction}>
                 <td className="mono">{direction.code_direction}</td>
                 <td>{direction.libelle_direction}</td>
                 <td>
+                  {direction.actif ? (
+                    <span className="gp-badge gp-badge--success">Actif</span>
+                  ) : (
+                    <span className="gp-badge gp-badge--danger">Inactif</span>
+                  )}
+                </td>
+                <td>
                   <div className="gp-rowacts">
-                    <button aria-label="Modifier" onClick={() => setModal({ mode: 'edit', direction })}>
-                      <svg className="ti">
-                        <use href="#i-pencil" />
-                      </svg>
-                    </button>
+                    <span className="gp-tip" data-tip="Modifier la direction">
+                      <button aria-label="Modifier la direction" onClick={() => setModal({ mode: 'edit', direction })}>
+                        <svg className="ti">
+                          <use href="#i-pencil" />
+                        </svg>
+                      </button>
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -103,6 +139,7 @@ interface DirectionFormModalProps {
 function DirectionFormModal({ mode, direction, onClose, onSaved }: DirectionFormModalProps) {
   const [codeDirection, setCodeDirection] = useState(direction?.code_direction ?? '')
   const [libelleDirection, setLibelleDirection] = useState(direction?.libelle_direction ?? '')
+  const [actif, setActif] = useState(direction?.actif ?? true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -111,7 +148,7 @@ function DirectionFormModal({ mode, direction, onClose, onSaved }: DirectionForm
     setError(null)
     setSubmitting(true)
     try {
-      const payload = { codeDirection, libelleDirection }
+      const payload = { codeDirection, libelleDirection, actif }
       if (mode === 'create') {
         await api.post('/directions', payload)
       } else if (direction) {
@@ -166,6 +203,13 @@ function DirectionFormModal({ mode, direction, onClose, onSaved }: DirectionForm
                 maxLength={200}
               />
             </div>
+            <label className="gp-choice" style={{ justifyContent: 'space-between' }}>
+              <span>Actif</span>
+              <span className="gp-switch">
+                <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} />
+                <span className="track" />
+              </span>
+            </label>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

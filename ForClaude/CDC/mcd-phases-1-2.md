@@ -23,17 +23,17 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 
 ## Référentiel organisationnel
 
-- **DIRECTION** : CODE_DIRECTION (id), LIBELLE_DIRECTION
-- **SERVICE** : CODE_SERVICE (id), LIBELLE_SERVICE
-- **CELLULE** : CODE_CELLULE (id), LIBELLE_CELLULE
+- **DIRECTION** : CODE_DIRECTION (id), LIBELLE_DIRECTION, ACTIF _(archivage/désactivation — décision du 28/08/2026, cf. §7)_
+- **SERVICE** : CODE_SERVICE (id), LIBELLE_SERVICE, ACTIF _(idem DIRECTION)_
+- **CELLULE** : CODE_CELLULE (id), LIBELLE_CELLULE, ACTIF _(idem DIRECTION)_
 - **ACTEUR** : MATRICULE (id), NOM, PRENOM, FONCTION (métier réel ; le rôle applicatif est porté par ROLE)
 
 ## Référentiels métier (import PGI ou gestion autonome)
 
 - **SITE** : CODE_SITE (id), LIB_SITE, ORDRE_SITE, ACTIF — gisement géographique (BI) ; rattaché à un SERVICE
-- **SOUS_SITE** : CODE_SOUS_SITE (id partiel, avec CODE_SITE), ORDRE_SOUS_SITE, ACTIF — déclinaison d'un SITE (ex. poste, quai) ; identifiant conceptuel = (CODE_SITE, CODE_SOUS_SITE)
+- **SOUS_SITE** : CODE_SOUS_SITE (id partiel, avec CODE_SITE), LIB_SOUS_SITE, ORDRE_SOUS_SITE, ACTIF — déclinaison d'un SITE (ex. poste, quai) ; identifiant conceptuel = (CODE_SITE, CODE_SOUS_SITE) _(LIB_SOUS_SITE ajouté le 28/08/2026 — auparavant seul le code servait d'affichage)_
 - **SECTEUR** : CODE_SECTEUR (id), LIB_SECTEUR, ORDRE_SECTEUR, ACTIF — gisement technique (BI) ; rattaché à un SERVICE
-- **SOUS_SECTEUR** : CODE_SOUS_SECTEUR (id partiel, avec CODE_SECTEUR), ORDRE_SOUS_SECTEUR, ACTIF — déclinaison d'un SECTEUR ; identifiant conceptuel = (CODE_SECTEUR, CODE_SOUS_SECTEUR)
+- **SOUS_SECTEUR** : CODE_SOUS_SECTEUR (id partiel, avec CODE_SECTEUR), LIB_SOUS_SECTEUR, ORDRE_SOUS_SECTEUR, ACTIF — déclinaison d'un SECTEUR ; identifiant conceptuel = (CODE_SECTEUR, CODE_SOUS_SECTEUR) _(LIB_SOUS_SECTEUR ajouté le 28/08/2026, idem SOUS_SITE)_
 - **CUG** : CODE_CUG (id), LIBELLE_CUG — rattaché à un SERVICE (Compte Unitaire de Gestion, analytique)
 - **OPERATION_INVESTISSEMENT** : NUMERO_OPERATION (id), LIBELLE, MT_AP1, MT_AP8, MT_CP1, MT_CP8, DATE_CREATION, MT_INITIAL
 - **MARCHE** : NUMMARCHE (id), ETATMARCHE (Actif | Inactif), TYPE_CREATION (SERVICE | AUTRE), TYPEPROC, TYPEDECOMPOPRIX, NATUREPRESTA, LIBPGI, LIBELLE_SERVICE, TITULAIRE, NUM_TITULAIRE, TITULAIRE_SERVICE, AGENTGESTION, CUGGestion (réf. CUG), DTENOTIF, DTEVALID, DTEDEBUT, DTEFINMAX, MTMINI, MTMAXI, ALERTEMT, ALERTEDATE, LASTMTREALISE, LASTMTENGAGE, DTELASTSOLDE, PLANPREVENTIONACTIF. MT_SOLDE = attribut calculé non stocké (MTMAXI − (LASTMTREALISE + LASTMTENGAGE)). Un seul titulaire par marché ; NUM_TITULAIRE = clé de rapprochement avec FOURNISSEUR.NUMPGI.
@@ -52,7 +52,7 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - **PIECE_JOINTE** : ID_PIECE (id), TYPE_PIECE, ORIGINE (UTILISATEUR | SYSTEME), FICHIER (PDF, 10 Mo max), NOM_FICHIER. En Phase 2, rattachable aussi à un CSF (cf. Partie 2). À l'autorisation de la FAD, une **fiche récapitulative PDF** est générée automatiquement et ajoutée en PIECE_JOINTE (ORIGINE=SYSTEME, TYPE_PIECE=FICHE_FAD), non supprimable par l'utilisateur.
 - **STATUT** (référentiel) : CODE_STATUT (id) — DA_ENREGISTREE, DA_REJETEE, FAD_TRANSMISE_CDS, FAD_REJETEE_CDS, FAD_TRANSMISE_BUDGET, FAD_REJETEE_BUDGET, FAD_TRANSMISE_DS, FAD_REJETEE_DS, FAD_VALIDEE_DS, FAD_COMMANDEE, FAD_CLOTUREE ; LIBELLE, COMMENTAIRE.
 - **HISTORIQUE_STATUT** : ID_HISTO (id), DATE_HEURE, COMMENTAIRE / MOTIF (notamment rejet).
-- **SEUIL_VALIDATION_DS** (paramétrage évolutif, historisé, **défini par service** — correction 22/08) : ID_SEUIL (id), TYPE_IMPUTATION (FONCTIONNEMENT | INVESTISSEMENT), MONTANT_SEUIL, DATE_APPLICATION. Fixé/modifié par le DS pour les services de sa direction.
+- **SEUIL_VALIDATION_DS** (paramétrage, **un au plus par service, plus d'historisation** — simplification du 28/08/2026, annule "historisé" ci-avant) : SEUIL_FONCTIONNEMENT, SEUIL_INVESTISSEMENT. Identifiant conceptuel = SERVICE (rattachement 1:1 optionnel, pas d'id propre). Un service sans ligne est considéré à seuil 0 pour les deux types d'imputation. Prévu au 22/08 comme fixé/modifié par le DS pour les services de sa direction ; décision définitive du 29/08/2026 : écriture ouverte à ADMIN_APP (transverse) ou **ADMIN_SERVICE scopé à son propre service** — même modèle que SITE/SECTEUR, pas le rôle DS envisagé au 22/08 (voir MLD §2.6).
 
 # 2. Associations et cardinalités — Phase 1
 
@@ -66,13 +66,13 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - MARCHE (0,N) — a pour titulaire — (1,1) FOURNISSEUR (via NUMPGI = NUM_TITULAIRE ; même SERVICE que le marché)
 - ACTEUR (0,N) — titulaire de — (1,1) ROLE ; ROLE rattaché à CELLULE (RC), SERVICE (CDS, CB, ADMIN_SERVICE), DIRECTION (DS), ou sans périmètre (ADMIN_APP)
 - ROLE (1,1, si RC/CDS/DS) — peut faire l'objet de — (0,N) SUPPLEANCE ; SUPPLEANCE (1,1) — désigne — (1,1) ACTEUR suppléant
-- **SERVICE (1,1) — définit — (0,N) SEUIL_VALIDATION_DS** _(correction 22/08 : seuil d'exemption DS propre à chaque service ; paramétré par le DS)_
+- **SERVICE (1,1) — définit — (0,1) SEUIL_VALIDATION_DS** _(seuil d'exemption DS propre à chaque service ; cardinalité revue de (0,N) à (0,1) le 28/08/2026 avec l'abandon de l'historisation)_
 - **SERVICE (1,1) — agrège — (0,N) SITE** _(chaque site est géré par un service — rattachement géographique BI)_
 - **SITE (1,1) — comprend — (1,N) SOUS_SITE**
 - **SERVICE (1,1) — agrège — (0,N) SECTEUR** _(chaque secteur est géré par un service — rattachement technique BI)_
 - **SECTEUR (1,1) — comprend — (1,N) SOUS_SECTEUR**
 - ACTEUR (1,1) — dépose — (0,N) DEMANDE_ACHAT (rôle Demandeur, sans entité ROLE dédiée)
-- DEMANDE_ACHAT (1,1) — localisée sur — (1,1) SOUS_SITE _(identifiant composite CODE_SITE + CODE_SOUS_SITE)_ ; DEMANDE_ACHAT (1,1) — relève de — (1,1) SOUS_SECTEUR _(identifiant composite CODE_SECTEUR + CODE_SOUS_SECTEUR)_
+- DEMANDE_ACHAT (1,1) — localisée sur — (0,1) SOUS_SITE _(identifiant composite CODE_SITE + CODE_SOUS_SITE — décision du 28/08/2026 : CODE_SITE reste obligatoire, mais le sous-niveau CODE_SOUS_SITE est optionnel, une FAD peut être positionnée sur un SITE sans préciser de sous-site)_ ; DEMANDE_ACHAT (1,1) — relève de — (0,1) SOUS_SECTEUR _(idem, CODE_SECTEUR obligatoire / CODE_SOUS_SECTEUR optionnel)_
 - **DEMANDE_ACHAT (1,1) — imputée analytiquement sur — (1,1) CUG** _(arbitrage 1 : CUG obligatoire en toutes circonstances)_
 - DEMANDE_ACHAT (0,1) — imputée sur — (0,1) OPERATION_INVESTISSEMENT _(si INVESTISSEMENT)_
 - DEMANDE_ACHAT (0,1) — s'appuie sur — (0,N) MARCHE _(si PROCEDURE_ACHAT = MARCHE)_
@@ -120,7 +120,7 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 
 # 7. Points ouverts (non structurants)
 
-- Organisation : décision A/B en attente sur l'archivage (ETAT sur DIRECTION/SERVICE/CELLULE et ACTEUR) et le figeage du rattachement organisationnel de la FAD à sa création (protection contre les réorganisations). À trancher.
+- Organisation : décision A/B sur l'archivage tranchée **partiellement** le 28/08/2026 — ACTIF ajouté sur DIRECTION, SERVICE et CELLULE (désactivation, jamais de suppression physique, même principe que SITE/SECTEUR et MARCHE/FOURNISSEUR). **ACTEUR reste sans ACTIF à ce stade** (non traité, toujours à trancher si un besoin d'archivage des comptes utilisateurs émerge). Le figeage du rattachement organisationnel de la FAD à sa création (protection contre les réorganisations) reste également à trancher.
 - Points résiduels mineurs Phase 1 (referentiel-fournisseurs-phase1.md) : doublon ADR1, vocabulaire TYPE_CREATION, redondance FONCTION/NATUREFONCTION.
 
 # 8. Historique de validation
@@ -131,3 +131,6 @@ Décisions conceptuelles intégrées depuis le MCD Phase 1 initial : CUG analyti
 - 23/08/2026 (correction CB) : périmètre du rôle CB déplacé de DIRECTION vers SERVICE (conforme au CDG). CB collective par service. Répercuté sur le MLD et le dictionnaire.
 - 26/08/2026 (normalisation SITE / SECTEUR) : SITE et SECTEUR chacun décomposés en deux entités. Ajout de SOUS_SITE (déclinaison d'un SITE : CODE_SOUS_SITE, ORDRE_SOUS_SITE, ACTIF) et de SOUS_SECTEUR (déclinaison d'un SECTEUR : CODE_SOUS_SECTEUR, ORDRE_SOUS_SECTEUR, ACTIF). Ajout de l'attribut ORDRE_SITE / ORDRE_SECTEUR sur les entités parent. Nouvelles associations : SERVICE (1,1) — agrège — (0,N) SITE ; SITE (1,1) — comprend — (1,N) SOUS_SITE ; SERVICE (1,1) — agrège — (0,N) SECTEUR ; SECTEUR (1,1) — comprend — (1,N) SOUS_SECTEUR. Association DEMANDE_ACHAT — localisée sur modifiée : cible désormais SOUS_SITE ; association — relève de modifiée : cible désormais SOUS_SECTEUR. Répercuté dans le MLD (§2.2, §2.4, §5, §7).
 - 26/08/2026 (habilitation SITE/SOUS_SITE et SECTEUR/SOUS_SECTEUR) : pas de rôle ADMIN_DATA distinct — la gestion de ces référentiels (création/modification) est une responsabilité supplémentaire d'ADMIN_SERVICE (périmètre service, cohérent avec sa description existante) et d'ADMIN_APP (transverse, tous services). TYPE_ROLE, `chk_role_perimetre` et la table `ROLE_ATTRIBUTION` restent inchangés.
+- 28/08/2026 (relecture schéma physique) : ajout de **ACTIF** sur DIRECTION, SERVICE, CELLULE (tranche partiellement le point ouvert §7 — ACTEUR non concerné) ; ajout de **LIB_SOUS_SITE** sur SOUS_SITE et **LIB_SOUS_SECTEUR** sur SOUS_SECTEUR (affichage propre du sous-niveau, indépendant du code) ; confirmation que le sous-niveau de DEMANDE_ACHAT est **optionnel** — CODE_SITE/CODE_SECTEUR restent obligatoires, CODE_SOUS_SITE/CODE_SOUS_SECTEUR passent en (0,1). Constat fait en confrontant ce MCD au schéma physique Supabase réel (`finances.*`) ; répercuté dans le MLD (§2.1, §2.2, §2.4, §4).
+- 28/08/2026 (simplification SEUIL_VALIDATION_DS) : abandon de l'historisation, jugée trop complexe à administrer. SEUIL_VALIDATION_DS passe de "un ID_SEUIL par changement daté (TYPE_IMPUTATION, MONTANT_SEUIL, DATE_APPLICATION)" à "un au plus par SERVICE, deux attributs SEUIL_FONCTIONNEMENT/SEUIL_INVESTISSEMENT en colonnes, pas d'id propre". Association SERVICE — définit — SEUIL_VALIDATION_DS revue de (0,N) à (0,1). Absence de ligne = seuils à 0 pour les deux imputations (règle de gestion nouvelle, à retenir pour l'implémentation du contrôle CB — OP1.4 du MCT). Répercuté dans le MLD (§2.6) et le MCT (OP1.4).
+- 29/08/2026 (habilitation SEUIL_VALIDATION_DS) : même principe que l'habilitation SITE/SOUS_SITE et SECTEUR/SOUS_SECTEUR du 26/08 — la gestion de SEUIL_VALIDATION_DS devient une responsabilité d'ADMIN_SERVICE (périmètre service) et d'ADMIN_APP (transverse), plutôt que du rôle DS par direction envisagé au 22/08. Remplace la restriction ADMIN_APP seul actée le 28/08/2026. TYPE_ROLE inchangé. Répercuté dans le MLD (§2.6) et le MOT.

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 
 export interface ComboboxOption {
   value: string
@@ -14,6 +14,12 @@ interface ComboboxProps {
   clearLabel?: string
   /** Nom accessible du déclencheur — le trigger n'est pas un <label>-able natif. */
   ariaLabel?: string
+  /**
+   * Applique sur la racine .gp-combobox — sert notamment à lever le
+   * max-width:340px par défaut (gpmm.css) quand la combo doit occuper toute
+   * la largeur d'un champ de formulaire, comme les .gp-input voisins.
+   */
+  style?: CSSProperties
 }
 
 /**
@@ -21,7 +27,7 @@ interface ComboboxProps {
  * .gp-combobox du template GPMM (app.js gère normalement ce toggle, non
  * chargé ici — voir la mémoire projet "UX React integration").
  */
-export function Combobox({ options, value, onChange, placeholder, clearLabel, ariaLabel }: ComboboxProps) {
+export function Combobox({ options, value, onChange, placeholder, clearLabel, ariaLabel, style }: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -41,7 +47,7 @@ export function Combobox({ options, value, onChange, placeholder, clearLabel, ar
   }
 
   return (
-    <div className={`gp-combobox${open ? ' is-open' : ''}`} ref={rootRef}>
+    <div className={`gp-combobox${open ? ' is-open' : ''}`} style={style} ref={rootRef}>
       <div
         className="gp-inputgroup"
         data-cb-trigger

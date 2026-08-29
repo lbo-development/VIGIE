@@ -6,6 +6,7 @@ export interface OrgService {
   code_service: string
   libelle_service: string
   id_direction: number
+  actif: boolean
 }
 
 /** Référentiel organisationnel SERVICE, pour peupler filtres et sélecteurs. */

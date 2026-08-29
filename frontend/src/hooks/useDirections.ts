@@ -5,6 +5,7 @@ export interface OrgDirection {
   id_direction: number
   code_direction: string
   libelle_direction: string
+  actif: boolean
 }
 
 /** Référentiel organisationnel DIRECTION, pour peupler filtres et sélecteurs. */

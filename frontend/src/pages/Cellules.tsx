@@ -1,8 +1,19 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { useCellules, type OrgCellule } from '../hooks/useCellules'
 import { useServices, type OrgService } from '../hooks/useServices'
+import { useDirections, type OrgDirection } from '../hooks/useDirections'
 import { Combobox } from '../components/Combobox'
 import { api, ApiError } from '../services/api'
+
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Actif' },
+  { value: 'inactive', label: 'Inactif' },
+]
+
+function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
+  if (filter === null) return true
+  return filter === 'active' ? actif : !actif
+}
 
 /**
  * Administration du référentiel organisationnel CELLULE, montée sur
@@ -18,18 +29,57 @@ import { api, ApiError } from '../services/api'
  * dans le périmètre de cet écran). CODE_CELLULE est une clé métier UNIQUE
  * mutable (pas la PK — voir ForClaude/CDC/mld-phases-1-2.md §2.1), donc
  * éditable en modification, contrairement au code d'un SITE.
+ *
+ * Direction ET service obligatoires pour afficher la liste (décision
+ * utilisateur, comme SeuilsValidationDs.tsx) : pas d'option "Toutes les
+ * directions" ni "Tous les services" — la combo Service reste en cascade
+ * (masquée tant qu'aucune direction n'est choisie, filtrée à celle-ci).
  */
 export function Cellules() {
+  const { directions } = useDirections()
   const { services } = useServices()
   const { cellules, loading, refetch } = useCellules()
+  const [filterIdDirection, setFilterIdDirection] = useState<string | null>(null)
   const [filterIdService, setFilterIdService] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; cellule: OrgCellule | null } | null>(null)
 
-  const serviceOptions = services.map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
+  const directionOptions = directions.map((d) => ({ value: String(d.id_direction), label: d.libelle_direction }))
+
+  // Filtre en cascade : la combo Service ne propose que les services de la
+  // direction sélectionnée (ou tous si aucune direction n'est choisie).
+  const servicesForFilter =
+    filterIdDirection === null
+      ? services
+      : services.filter((s) => s.id_direction === Number(filterIdDirection))
+  const serviceOptions = servicesForFilter.map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
   const serviceLabel = (idService: number) => services.find((s) => s.id_service === idService)?.libelle_service ?? '—'
 
+  useEffect(() => {
+    // "Toutes les directions" : pas de filtre Service possible (le champ est
+    // masqué — voir JSX) — on efface toute sélection résiduelle. Changement
+    // vers une direction précise : le service sélectionné peut ne plus lui
+    // appartenir — on retombe sur "Tous les services" plutôt que de garder un
+    // filtre incohérent.
+    if (filterIdDirection === null) {
+      setFilterIdService(null)
+      return
+    }
+    if (filterIdService === null) return
+    const stillValid = servicesForFilter.some((s) => s.id_service === Number(filterIdService))
+    if (!stillValid) setFilterIdService(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterIdDirection])
+
+  // Direction ET service obligatoires pour afficher la liste (décision
+  // utilisateur, comme SeuilsValidationDs.tsx) : pas d'option "Toutes les
+  // directions" ni "Tous les services".
   const displayedCellules =
-    filterIdService === null ? cellules : cellules.filter((c) => c.id_service === Number(filterIdService))
+    filterIdDirection === null || filterIdService === null
+      ? []
+      : cellules
+          .filter((c) => c.id_service === Number(filterIdService))
+          .filter((c) => matchesStatusFilter(c.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -48,16 +98,43 @@ export function Cellules() {
         </div>
       </div>
 
-      <div className="gp-field" style={{ maxWidth: 340 }}>
-        <label className="gp-label">Service</label>
-        <Combobox
-          options={serviceOptions}
-          value={filterIdService}
-          onChange={setFilterIdService}
-          placeholder="Tous les services"
-          clearLabel="Tous les services"
-          ariaLabel="Filtrer par service"
-        />
+      <div className="row">
+        <div className="gp-field" style={{ width: 404 }}>
+          <label className="gp-label">Direction</label>
+          <Combobox
+            options={directionOptions}
+            value={filterIdDirection}
+            onChange={setFilterIdDirection}
+            placeholder="Choisir une direction…"
+            ariaLabel="Filtrer par direction"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
+        {filterIdDirection !== null && (
+          <div className="gp-field" style={{ width: 404 }}>
+            <label className="gp-label">Service</label>
+            <Combobox
+              options={serviceOptions}
+              value={filterIdService}
+              onChange={setFilterIdService}
+              placeholder="Choisir un service…"
+              ariaLabel="Filtrer par service"
+              style={{ maxWidth: 'none' }}
+            />
+          </div>
+        )}
+        <div className="gp-field" style={{ maxWidth: 404 }}>
+          <label className="gp-label">Statut</label>
+          <Combobox
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            style={{ maxWidth: 'none' }}
+            placeholder="Tous"
+            clearLabel="Tous"
+            ariaLabel="Filtrer les cellules par statut"
+          />
+        </div>
       </div>
 
       <div className="gp-table-wrap gp-scroll">
@@ -67,18 +144,23 @@ export function Cellules() {
               <th>Code</th>
               <th>Libellé</th>
               <th>Service</th>
+              <th>Statut</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={4}>Chargement…</td>
+                <td colSpan={5}>Chargement…</td>
               </tr>
             )}
             {!loading && displayedCellules.length === 0 && (
               <tr>
-                <td colSpan={4}>Aucune cellule.</td>
+                <td colSpan={5}>
+                  {filterIdDirection === null || filterIdService === null
+                    ? 'Sélectionne une direction et un service pour afficher les cellules.'
+                    : 'Aucune cellule pour ce filtre.'}
+                </td>
               </tr>
             )}
             {displayedCellules.map((cellule) => (
@@ -87,12 +169,21 @@ export function Cellules() {
                 <td>{cellule.libelle_cellule}</td>
                 <td>{serviceLabel(cellule.id_service)}</td>
                 <td>
+                  {cellule.actif ? (
+                    <span className="gp-badge gp-badge--success">Actif</span>
+                  ) : (
+                    <span className="gp-badge gp-badge--danger">Inactif</span>
+                  )}
+                </td>
+                <td>
                   <div className="gp-rowacts">
-                    <button aria-label="Modifier" onClick={() => setModal({ mode: 'edit', cellule })}>
-                      <svg className="ti">
-                        <use href="#i-pencil" />
-                      </svg>
-                    </button>
+                    <span className="gp-tip" data-tip="Modifier la cellule">
+                      <button aria-label="Modifier la cellule" onClick={() => setModal({ mode: 'edit', cellule })}>
+                        <svg className="ti">
+                          <use href="#i-pencil" />
+                        </svg>
+                      </button>
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -105,6 +196,7 @@ export function Cellules() {
         <CelluleFormModal
           mode={modal.mode}
           cellule={modal.cellule}
+          directions={directions}
           services={services}
           onClose={() => setModal(null)}
           onSaved={() => {
@@ -120,26 +212,53 @@ export function Cellules() {
 interface CelluleFormModalProps {
   mode: 'create' | 'edit'
   cellule: OrgCellule | null
+  directions: OrgDirection[]
   services: OrgService[]
   onClose: () => void
   onSaved: () => void
 }
 
-function CelluleFormModal({ mode, cellule, services, onClose, onSaved }: CelluleFormModalProps) {
+/**
+ * À la création, la Direction n'est pas un champ de la cellule (celle-ci ne
+ * connaît que son SERVICE) — elle sert uniquement à filtrer la combo Service
+ * en cascade, pour imposer l'ordre de sélection Direction → Service (décision
+ * utilisateur). En modification, la cellule a déjà un service : pas de
+ * cascade, la combo Service liste tout directement (comme avant).
+ */
+function CelluleFormModal({ mode, cellule, directions, services, onClose, onSaved }: CelluleFormModalProps) {
   const [codeCellule, setCodeCellule] = useState(cellule?.code_cellule ?? '')
   const [libelleCellule, setLibelleCellule] = useState(cellule?.libelle_cellule ?? '')
+  const [idDirection, setIdDirection] = useState<string | null>(null)
   const [idService, setIdService] = useState<string | null>(
     cellule?.id_service != null ? String(cellule.id_service) : null,
   )
+  const [actif, setActif] = useState(cellule?.actif ?? true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const serviceOptions = services.map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
+  const directionOptions = directions.map((d) => ({ value: String(d.id_direction), label: d.libelle_direction }))
+  const servicesForDirection = idDirection === null ? [] : services.filter((s) => s.id_direction === Number(idDirection))
+  const serviceOptions = (mode === 'create' ? servicesForDirection : services).map((s) => ({
+    value: String(s.id_service),
+    label: s.libelle_service,
+  }))
+
+  useEffect(() => {
+    // Changement de direction (création) : le service déjà choisi peut ne
+    // plus lui appartenir.
+    if (mode !== 'create' || idService === null) return
+    if (!servicesForDirection.some((s) => s.id_service === Number(idService))) setIdService(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idDirection])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setError(null)
 
+    if (mode === 'create' && !idDirection) {
+      setError('La direction est obligatoire.')
+      return
+    }
     if (!idService) {
       setError('Le service est obligatoire.')
       return
@@ -147,7 +266,7 @@ function CelluleFormModal({ mode, cellule, services, onClose, onSaved }: Cellule
 
     setSubmitting(true)
     try {
-      const payload = { codeCellule, libelleCellule, idService: Number(idService) }
+      const payload = { codeCellule, libelleCellule, idService: Number(idService), actif }
       if (mode === 'create') {
         await api.post('/cellules', payload)
       } else if (cellule) {
@@ -176,6 +295,32 @@ function CelluleFormModal({ mode, cellule, services, onClose, onSaved }: Cellule
         </div>
         <form onSubmit={handleSubmit}>
           <div className="gp-modal__bd gp-scroll stack">
+            {mode === 'create' && (
+              <div className="gp-field">
+                <label className="gp-label">Direction</label>
+                <Combobox
+                  options={directionOptions}
+                  value={idDirection}
+                  onChange={setIdDirection}
+                  placeholder="Choisir une direction…"
+                  ariaLabel="Direction"
+                  style={{ maxWidth: 'none' }}
+                />
+              </div>
+            )}
+            {(mode === 'edit' || idDirection !== null) && (
+              <div className="gp-field">
+                <label className="gp-label">Service</label>
+                <Combobox
+                  options={serviceOptions}
+                  value={idService}
+                  onChange={setIdService}
+                  placeholder="Choisir un service…"
+                  ariaLabel="Service"
+                  style={{ maxWidth: 'none' }}
+                />
+              </div>
+            )}
             <div className="gp-field">
               <label className="gp-label" htmlFor="cellule-code">
                 Code
@@ -202,16 +347,13 @@ function CelluleFormModal({ mode, cellule, services, onClose, onSaved }: Cellule
                 maxLength={200}
               />
             </div>
-            <div className="gp-field">
-              <label className="gp-label">Service</label>
-              <Combobox
-                options={serviceOptions}
-                value={idService}
-                onChange={setIdService}
-                placeholder="Choisir un service…"
-                ariaLabel="Service"
-              />
-            </div>
+            <label className="gp-choice" style={{ justifyContent: 'space-between' }}>
+              <span>Actif</span>
+              <span className="gp-switch">
+                <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} />
+                <span className="track" />
+              </span>
+            </label>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

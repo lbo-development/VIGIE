@@ -5,11 +5,13 @@ import { AppError } from '../middlewares/errorHandler.js'
 
 const createSousSiteSchema = z.object({
   codeSousSite: z.string().trim().min(1).max(20),
+  libSousSite: z.string().trim().min(1).max(200),
   ordreSousSite: z.number().int().min(0).default(0),
   actif: z.boolean().default(true),
 })
 
 const updateSousSiteSchema = z.object({
+  libSousSite: z.string().trim().min(1).max(200).optional(),
   ordreSousSite: z.number().int().min(0).optional(),
   actif: z.boolean().optional(),
 })
@@ -29,6 +31,7 @@ export async function createSousSite(matricule: string | null, codeSite: string,
   return sousSiteRepository.create({
     code_site: codeSite,
     code_sous_site: result.data.codeSousSite,
+    lib_sous_site: result.data.libSousSite,
     ordre_sous_site: result.data.ordreSousSite,
     actif: result.data.actif,
   })
@@ -43,6 +46,7 @@ export async function updateSousSite(matricule: string | null, codeSite: string,
   await assertManagesSite(matricule, codeSite)
 
   return sousSiteRepository.update(codeSite, codeSousSite, {
+    lib_sous_site: result.data.libSousSite,
     ordre_sous_site: result.data.ordreSousSite,
     actif: result.data.actif,
   })

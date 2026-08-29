@@ -68,7 +68,7 @@ Statut : premier jet complet, à valider.
 | Gérer le référentiel fournisseurs (création/màj, état Actif/Inactif) | admin_service | TI | TR | Périmètre : son service. |
 | Lancer les imports PGI (marchés, CUG, opérations) | admin_service | TI | TR | Cf. OP3.1. |
 | Déclarer les rôles et leur validité (RC/CDS/CB du service) et les suppléances | admin_service | TI | TR | Alimente ROLE (DATE_DEBUT/FIN/ACTIF) et SUPPLEANCE. |
-| Paramétrer les seuils DS (par service) | DS | TI | TR | Déjà acté : responsabilité DS ; historisé. |
+| Paramétrer les seuils DS (par service) | admin_service (son service) / admin_app (transverse) | TI | TR | Décision du 29/08/2026 : même modèle que Gisement géographique/technique (SITE/SECTEUR), pas le DS par direction envisagé le 22/08, ni l'ADMIN_APP seul du 28/08/2026. Sans historisation (un seuil FONCTIONNEMENT + un seuil INVESTISSEMENT par service, absence = 0). Voir MLD §2.6. |
 | Gérer les paramètres transverses | admin_app | TI | TR | Ex. libellés paramétrables (longueurs OBJET/DESCRIPTION), référentiels transverses. |
 | Gérer les comptes utilisateurs | admin_app | TI | TR | Création/désactivation des comptes (authentification propre à l'application). |
 
@@ -84,3 +84,5 @@ Statut : premier jet complet, à valider.
 
 # Historique
 - 23/08/2026 : premier jet du MOT Phases 1 & 2, après validation du périmètre CB (service), des postes d'administration (admin_service / admin_app, extension TYPE_ROLE), et de la temporalité d'import (synchrone temps réel).
+- 28/08/2026 (simplification SEUIL_VALIDATION_DS) : tâche "Paramétrer les seuils DS" reposée sur admin_app (implémentation réelle) plutôt que DS (voir MLD §2.6 pour l'écart avec la décision du 22/08) ; retrait de la mention "historisé", abandonnée le même jour.
+- 29/08/2026 (habilitation SEUIL_VALIDATION_DS) : tâche "Paramétrer les seuils DS" ouverte à admin_service (son propre service) en plus d'admin_app (transverse) — même modèle que les tâches de gestion SITE/SECTEUR, remplace la restriction admin_app seul du 28/08/2026. Voir MLD/MCD.

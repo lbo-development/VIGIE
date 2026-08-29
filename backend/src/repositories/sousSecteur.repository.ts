@@ -8,6 +8,7 @@ import { supabase } from '../config/supabaseClient.js'
 export interface SousSecteur {
   code_secteur: string
   code_sous_secteur: string
+  lib_sous_secteur: string
   ordre_sous_secteur: number
   actif: boolean
 }
@@ -33,7 +34,7 @@ export async function create(input: SousSecteur): Promise<SousSecteur> {
 export async function update(
   codeSecteur: string,
   codeSousSecteur: string,
-  input: Partial<Pick<SousSecteur, 'ordre_sous_secteur' | 'actif'>>,
+  input: Partial<Pick<SousSecteur, 'lib_sous_secteur' | 'ordre_sous_secteur' | 'actif'>>,
 ): Promise<SousSecteur> {
   const { data, error } = await supabase
     .schema('finances')

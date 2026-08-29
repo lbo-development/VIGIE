@@ -39,6 +39,7 @@ export const SIDEBAR_GROUPS: NavGroup[] = [
       { to: '/parametres/directions', label: 'Directions', icon: '' },
       { to: '/parametres/services', label: 'Services', icon: '' },
       { to: '/parametres/cellules', label: 'Cellules', icon: '' },
+      { to: '/parametres/seuils-validation-ds', label: 'Seuils de validation DS', icon: '' },
     ],
   },
 ]
@@ -49,7 +50,10 @@ export const SIDEBAR_GROUPS: NavGroup[] = [
  * applicatif) et le référentiel organisationnel Direction/Service/Cellule —
  * DIRECTION/SERVICE/CELLULE forment la hiérarchie elle-même, leur gestion
  * est nécessairement transverse (pas de périmètre ADMIN_SERVICE possible,
- * contrairement à SITE/SECTEUR — voir organisation.service.ts).
+ * contrairement à SITE/SECTEUR). "Seuils de validation DS" a rejoint
+ * SITE/SECTEUR le 29/08/2026 (accessible à ADMIN_SERVICE, scopé à son
+ * service — voir seuilValidationDs.service.ts) : elle n'est donc plus dans
+ * cet ensemble.
  */
 const ADMIN_APP_ONLY_LABELS = new Set(['Réglages', 'Directions', 'Services', 'Cellules'])
 

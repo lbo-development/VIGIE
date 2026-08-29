@@ -90,7 +90,11 @@ describe('createDirection', () => {
 
     await createDirection({ codeDirection: 'DG', libelleDirection: 'Direction générale' })
 
-    expect(directionCreate).toHaveBeenCalledWith({ code_direction: 'DG', libelle_direction: 'Direction générale' })
+    expect(directionCreate).toHaveBeenCalledWith({
+      code_direction: 'DG',
+      libelle_direction: 'Direction générale',
+      actif: true,
+    })
   })
 })
 
@@ -155,7 +159,12 @@ describe('createService', () => {
 
     await createService({ codeService: 'X', libelleService: 'Service X', idDirection: 1 })
 
-    expect(serviceCreate).toHaveBeenCalledWith({ code_service: 'X', libelle_service: 'Service X', id_direction: 1 })
+    expect(serviceCreate).toHaveBeenCalledWith({
+      code_service: 'X',
+      libelle_service: 'Service X',
+      id_direction: 1,
+      actif: true,
+    })
   })
 })
 
@@ -210,7 +219,12 @@ describe('createCellule', () => {
 
     await createCellule({ codeCellule: 'X', libelleCellule: 'Cellule X', idService: 1 })
 
-    expect(celluleCreate).toHaveBeenCalledWith({ code_cellule: 'X', libelle_cellule: 'Cellule X', id_service: 1 })
+    expect(celluleCreate).toHaveBeenCalledWith({
+      code_cellule: 'X',
+      libelle_cellule: 'Cellule X',
+      id_service: 1,
+      actif: true,
+    })
   })
 })
 

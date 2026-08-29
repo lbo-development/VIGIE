@@ -44,7 +44,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 
 ## OP1.4 — Contrôler les éléments financiers et budgétaires (CB)
 - **Événement** : FAD_TRANSMISE_BUDGET.
-- **Synchronisation** : lecture du SEUIL_VALIDATION_DS applicable = (service de la FAD, imputation), valeur en vigueur à la date.
+- **Synchronisation** : lecture du SEUIL_VALIDATION_DS du service de la FAD, colonne correspondant à l'imputation (SEUIL_FONCTIONNEMENT ou SEUIL_INVESTISSEMENT) — plus de notion de date/historique depuis le 28/08/2026 (MCD/MLD). **Absence de ligne pour ce service = seuil considéré à 0** pour les deux imputations (donc `montant ≥ seuil` presque toujours vrai en pratique → transmission systématique au DS tant qu'aucun seuil n'a été paramétré, jamais d'exemption automatique par défaut).
 - **Actions** : contrôle des budgets alloués, validité/plafond des marchés, cohérence de l'imputation ; décision.
 - **Règles d'émission** :
   - rejeté (budget non alloué, marché périmé/saturé, incohérence) → FAD rejetée (duplication) ;
@@ -140,7 +140,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 # Contrôle croisé avec le MCD (couverture des données)
 
 Chaque opération dispose des données requises dans le MCD consolidé :
-- OP1.4 (seuil) : SEUIL_VALIDATION_DS (service, imputation, historisé) ✔
+- OP1.4 (seuil) : SEUIL_VALIDATION_DS (service, SEUIL_FONCTIONNEMENT/SEUIL_INVESTISSEMENT — plus d'historisation depuis le 28/08/2026) ✔
 - OP1.6 : MONTANT_COMMANDE sur DEMANDE_ACHAT ✔
 - OP1.5b : PIECE_JOINTE.ORIGINE (SYSTEME) + TYPE_PIECE (FICHE_FAD) — support de la fiche générée ✔
 - OP2.1 : rattachement FAD + rédacteur (ACTEUR) + PIECE_JOINTE (justificatif) ✔
@@ -155,3 +155,4 @@ Aucune donnée manquante identifiée à ce stade.
 
 # Historique
 - 23/08/2026 : premier jet du MCT Phases 1 & 2, après validation du découpage (3 processus), de l'inventaire évènementiel (retours PGI en événements externes ; création CSF = entrée du P2) et du mode d'import (opération unique automatique).
+- 28/08/2026 (simplification SEUIL_VALIDATION_DS) : OP1.4 mise à jour — la synchronisation ne lit plus un seuil "en vigueur à la date" (l'historisation est abandonnée, voir MCD/MLD) mais directement SEUIL_FONCTIONNEMENT/SEUIL_INVESTISSEMENT du service, avec un service sans ligne traité comme seuil 0 pour les deux imputations.

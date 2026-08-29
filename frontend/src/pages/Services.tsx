@@ -4,6 +4,16 @@ import { useDirections, type OrgDirection } from '../hooks/useDirections'
 import { Combobox } from '../components/Combobox'
 import { api, ApiError } from '../services/api'
 
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Actif' },
+  { value: 'inactive', label: 'Inactif' },
+]
+
+function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
+  if (filter === null) return true
+  return filter === 'active' ? actif : !actif
+}
+
 /**
  * Administration du référentiel organisationnel SERVICE, montée sur
  * /parametres/services. Écriture réservée ADMIN_APP (contrôle réel côté
@@ -22,14 +32,21 @@ export function Services() {
   const { directions } = useDirections()
   const { services, loading, refetch } = useServices()
   const [filterIdDirection, setFilterIdDirection] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; service: OrgService | null } | null>(null)
 
   const directionOptions = directions.map((d) => ({ value: String(d.id_direction), label: d.libelle_direction }))
   const directionLabel = (idDirection: number) =>
     directions.find((d) => d.id_direction === idDirection)?.libelle_direction ?? '—'
 
+  // Direction obligatoire pour afficher la liste (décision utilisateur, comme
+  // SeuilsValidationDs.tsx) : pas d'option "Toutes les directions".
   const displayedServices =
-    filterIdDirection === null ? services : services.filter((s) => s.id_direction === Number(filterIdDirection))
+    filterIdDirection === null
+      ? []
+      : services
+          .filter((s) => s.id_direction === Number(filterIdDirection))
+          .filter((s) => matchesStatusFilter(s.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -48,16 +65,30 @@ export function Services() {
         </div>
       </div>
 
-      <div className="gp-field" style={{ maxWidth: 340 }}>
-        <label className="gp-label">Direction</label>
-        <Combobox
-          options={directionOptions}
-          value={filterIdDirection}
-          onChange={setFilterIdDirection}
-          placeholder="Toutes les directions"
-          clearLabel="Toutes les directions"
-          ariaLabel="Filtrer par direction"
-        />
+      <div className="row">
+        <div className="gp-field" style={{ width: 404 }}>
+          <label className="gp-label">Direction</label>
+          <Combobox
+            options={directionOptions}
+            value={filterIdDirection}
+            onChange={setFilterIdDirection}
+            placeholder="Choisir une direction…"
+            ariaLabel="Filtrer par direction"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
+        <div className="gp-field" style={{ maxWidth: 404 }}>
+          <label className="gp-label">Statut</label>
+          <Combobox
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="Tous"
+            clearLabel="Tous"
+            ariaLabel="Filtrer les services par statut"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
       </div>
 
       <div className="gp-table-wrap gp-scroll">
@@ -67,18 +98,23 @@ export function Services() {
               <th>Code</th>
               <th>Libellé</th>
               <th>Direction</th>
+              <th>Statut</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={4}>Chargement…</td>
+                <td colSpan={5}>Chargement…</td>
               </tr>
             )}
             {!loading && displayedServices.length === 0 && (
               <tr>
-                <td colSpan={4}>Aucun service.</td>
+                <td colSpan={5}>
+                  {filterIdDirection === null
+                    ? 'Sélectionne une direction pour afficher les services.'
+                    : 'Aucun service pour ce filtre.'}
+                </td>
               </tr>
             )}
             {displayedServices.map((service) => (
@@ -87,12 +123,21 @@ export function Services() {
                 <td>{service.libelle_service}</td>
                 <td>{directionLabel(service.id_direction)}</td>
                 <td>
+                  {service.actif ? (
+                    <span className="gp-badge gp-badge--success">Actif</span>
+                  ) : (
+                    <span className="gp-badge gp-badge--danger">Inactif</span>
+                  )}
+                </td>
+                <td>
                   <div className="gp-rowacts">
-                    <button aria-label="Modifier" onClick={() => setModal({ mode: 'edit', service })}>
-                      <svg className="ti">
-                        <use href="#i-pencil" />
-                      </svg>
-                    </button>
+                    <span className="gp-tip" data-tip="Modifier le service">
+                      <button aria-label="Modifier le service" onClick={() => setModal({ mode: 'edit', service })}>
+                        <svg className="ti">
+                          <use href="#i-pencil" />
+                        </svg>
+                      </button>
+                    </span>
                   </div>
                 </td>
               </tr>
@@ -131,6 +176,7 @@ function ServiceFormModal({ mode, service, directions, onClose, onSaved }: Servi
   const [idDirection, setIdDirection] = useState<string | null>(
     service?.id_direction != null ? String(service.id_direction) : null,
   )
+  const [actif, setActif] = useState(service?.actif ?? true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -140,14 +186,17 @@ function ServiceFormModal({ mode, service, directions, onClose, onSaved }: Servi
     event.preventDefault()
     setError(null)
 
-    if (!idDirection) {
+    if (mode === 'create' && !idDirection) {
       setError('La direction est obligatoire.')
       return
     }
 
     setSubmitting(true)
     try {
-      const payload = { codeService, libelleService, idDirection: Number(idDirection) }
+      const payload =
+        mode === 'create'
+          ? { codeService, libelleService, idDirection: Number(idDirection), actif }
+          : { codeService, libelleService, actif }
       if (mode === 'create') {
         await api.post('/services', payload)
       } else if (service) {
@@ -202,16 +251,25 @@ function ServiceFormModal({ mode, service, directions, onClose, onSaved }: Servi
                 maxLength={200}
               />
             </div>
-            <div className="gp-field">
-              <label className="gp-label">Direction</label>
-              <Combobox
-                options={directionOptions}
-                value={idDirection}
-                onChange={setIdDirection}
-                placeholder="Choisir une direction…"
-                ariaLabel="Direction"
-              />
-            </div>
+            {mode === 'create' && (
+              <div className="gp-field">
+                <label className="gp-label">Direction</label>
+                <Combobox
+                  options={directionOptions}
+                  value={idDirection}
+                  onChange={setIdDirection}
+                  placeholder="Choisir une direction…"
+                  ariaLabel="Direction"
+                />
+              </div>
+            )}
+            <label className="gp-choice" style={{ justifyContent: 'space-between' }}>
+              <span>Actif</span>
+              <span className="gp-switch">
+                <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} />
+                <span className="track" />
+              </span>
+            </label>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

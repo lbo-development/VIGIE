@@ -8,6 +8,7 @@ import { supabase } from '../config/supabaseClient.js'
 export interface SousSite {
   code_site: string
   code_sous_site: string
+  lib_sous_site: string
   ordre_sous_site: number
   actif: boolean
 }
@@ -33,7 +34,7 @@ export async function create(input: SousSite): Promise<SousSite> {
 export async function update(
   codeSite: string,
   codeSousSite: string,
-  input: Partial<Pick<SousSite, 'ordre_sous_site' | 'actif'>>,
+  input: Partial<Pick<SousSite, 'lib_sous_site' | 'ordre_sous_site' | 'actif'>>,
 ): Promise<SousSite> {
   const { data, error } = await supabase
     .schema('finances')

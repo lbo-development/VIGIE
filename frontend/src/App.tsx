@@ -11,6 +11,7 @@ import { Reglages } from './pages/Reglages'
 import { Directions } from './pages/Directions'
 import { Services } from './pages/Services'
 import { Cellules } from './pages/Cellules'
+import { SeuilsValidationDs } from './pages/SeuilsValidationDs'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -39,6 +40,7 @@ function App() {
               <Route path="/parametres/directions" element={<Directions />} />
               <Route path="/parametres/services" element={<Services />} />
               <Route path="/parametres/cellules" element={<Cellules />} />
+              <Route path="/parametres/seuils-validation-ds" element={<SeuilsValidationDs />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

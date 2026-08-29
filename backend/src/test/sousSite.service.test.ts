@@ -44,7 +44,9 @@ describe('createSousSite', () => {
   it('rejette si le site parent est introuvable (404)', async () => {
     findByCode.mockResolvedValue(null)
 
-    await expect(createSousSite(MATRICULE, 'INCONNU', { codeSousSite: 'A1' })).rejects.toMatchObject({ status: 404 })
+    await expect(
+      createSousSite(MATRICULE, 'INCONNU', { codeSousSite: 'A1', libSousSite: 'A1' }),
+    ).rejects.toMatchObject({ status: 404 })
     expect(create).not.toHaveBeenCalled()
   })
 
@@ -53,19 +55,21 @@ describe('createSousSite', () => {
     hasActiveRole.mockResolvedValue(false)
     hasActiveRoleForService.mockResolvedValue(false)
 
-    await expect(createSousSite(MATRICULE, CODE_SITE, { codeSousSite: 'A1' })).rejects.toMatchObject({ status: 403 })
+    await expect(
+      createSousSite(MATRICULE, CODE_SITE, { codeSousSite: 'A1', libSousSite: 'A1' }),
+    ).rejects.toMatchObject({ status: 403 })
     expect(create).not.toHaveBeenCalled()
   })
 
   it('autorise et délègue au repository avec le code_site du parent', async () => {
     findByCode.mockResolvedValue(SITE)
     hasActiveRole.mockResolvedValue(true)
-    create.mockResolvedValue({ code_site: CODE_SITE, code_sous_site: 'A1', ordre_sous_site: 0, actif: true })
+    create.mockResolvedValue({ code_site: CODE_SITE, code_sous_site: 'A1', lib_sous_site: 'A1', ordre_sous_site: 0, actif: true })
 
-    await createSousSite(MATRICULE, CODE_SITE, { codeSousSite: 'A1' })
+    await createSousSite(MATRICULE, CODE_SITE, { codeSousSite: 'A1', libSousSite: 'A1' })
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ code_site: CODE_SITE, code_sous_site: 'A1', actif: true }),
+      expect.objectContaining({ code_site: CODE_SITE, code_sous_site: 'A1', lib_sous_site: 'A1', actif: true }),
     )
   })
 })

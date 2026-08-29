@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+// .trim() : une valeur collée dans un dashboard (Railway, etc.) peut embarquer
+// un retour à la ligne invisible en fin/début de chaîne — silencieusement fatal
+// ici car la clé anon part ensuite comme header HTTP `apikey` sur chaque appel.
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 if (!supabaseUrl || !supabaseAnonKey) {
   console.warn(

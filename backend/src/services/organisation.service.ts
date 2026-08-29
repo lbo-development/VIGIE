@@ -23,35 +23,41 @@ import { AppError } from '../middlewares/errorHandler.js'
 const createDirectionSchema = z.object({
   codeDirection: z.string().trim().min(1).max(20),
   libelleDirection: z.string().trim().min(1).max(200),
+  actif: z.boolean().default(true),
 })
 
 const updateDirectionSchema = z.object({
   codeDirection: z.string().trim().min(1).max(20).optional(),
   libelleDirection: z.string().trim().min(1).max(200).optional(),
+  actif: z.boolean().optional(),
 })
 
 const createServiceSchema = z.object({
   codeService: z.string().trim().min(1).max(20),
   libelleService: z.string().trim().min(1).max(200),
   idDirection: z.number().int(),
+  actif: z.boolean().default(true),
 })
 
 const updateServiceSchema = z.object({
   codeService: z.string().trim().min(1).max(20).optional(),
   libelleService: z.string().trim().min(1).max(200).optional(),
   idDirection: z.number().int().optional(),
+  actif: z.boolean().optional(),
 })
 
 const createCelluleSchema = z.object({
   codeCellule: z.string().trim().min(1).max(20),
   libelleCellule: z.string().trim().min(1).max(200),
   idService: z.number().int(),
+  actif: z.boolean().default(true),
 })
 
 const updateCelluleSchema = z.object({
   codeCellule: z.string().trim().min(1).max(20).optional(),
   libelleCellule: z.string().trim().min(1).max(200).optional(),
   idService: z.number().int().optional(),
+  actif: z.boolean().optional(),
 })
 
 export function listDirections() {
@@ -76,6 +82,7 @@ export async function createDirection(input: unknown) {
   return directionRepository.create({
     code_direction: result.data.codeDirection,
     libelle_direction: result.data.libelleDirection,
+    actif: result.data.actif,
   })
 }
 
@@ -94,6 +101,7 @@ export async function updateDirection(idDirection: number, input: unknown) {
   return directionRepository.update(idDirection, {
     code_direction: result.data.codeDirection,
     libelle_direction: result.data.libelleDirection,
+    actif: result.data.actif,
   })
 }
 
@@ -111,6 +119,7 @@ export async function createService(input: unknown) {
     code_service: result.data.codeService,
     libelle_service: result.data.libelleService,
     id_direction: result.data.idDirection,
+    actif: result.data.actif,
   })
 }
 
@@ -135,6 +144,7 @@ export async function updateService(idService: number, input: unknown) {
     code_service: result.data.codeService,
     libelle_service: result.data.libelleService,
     id_direction: result.data.idDirection,
+    actif: result.data.actif,
   })
 }
 
@@ -152,6 +162,7 @@ export async function createCellule(input: unknown) {
     code_cellule: result.data.codeCellule,
     libelle_cellule: result.data.libelleCellule,
     id_service: result.data.idService,
+    actif: result.data.actif,
   })
 }
 
@@ -176,5 +187,6 @@ export async function updateCellule(idCellule: number, input: unknown) {
     code_cellule: result.data.codeCellule,
     libelle_cellule: result.data.libelleCellule,
     id_service: result.data.idService,
+    actif: result.data.actif,
   })
 }

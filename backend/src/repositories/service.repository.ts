@@ -10,13 +10,14 @@ export interface Service {
   code_service: string
   libelle_service: string
   id_direction: number
+  actif: boolean
 }
 
 export async function findAll(): Promise<Service[]> {
   const { data, error } = await supabase
     .schema('finances')
     .from('service')
-    .select('id_service, code_service, libelle_service, id_direction')
+    .select('id_service, code_service, libelle_service, id_direction, actif')
     .order('libelle_service', { ascending: true })
   if (error) throw error
   return data ?? []
@@ -26,7 +27,7 @@ export async function findById(idService: number): Promise<Service | null> {
   const { data, error } = await supabase
     .schema('finances')
     .from('service')
-    .select('id_service, code_service, libelle_service, id_direction')
+    .select('id_service, code_service, libelle_service, id_direction, actif')
     .eq('id_service', idService)
     .maybeSingle()
   if (error) throw error
@@ -37,7 +38,7 @@ export async function findByCode(codeService: string): Promise<Service | null> {
   const { data, error } = await supabase
     .schema('finances')
     .from('service')
-    .select('id_service, code_service, libelle_service, id_direction')
+    .select('id_service, code_service, libelle_service, id_direction, actif')
     .eq('code_service', codeService)
     .maybeSingle()
   if (error) throw error

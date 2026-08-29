@@ -4,6 +4,7 @@ import { api } from '../services/api'
 export interface SousSecteur {
   code_secteur: string
   code_sous_secteur: string
+  lib_sous_secteur: string
   ordre_sous_secteur: number
   actif: boolean
 }

@@ -5,11 +5,13 @@ import { AppError } from '../middlewares/errorHandler.js'
 
 const createSousSecteurSchema = z.object({
   codeSousSecteur: z.string().trim().min(1).max(20),
+  libSousSecteur: z.string().trim().min(1).max(200),
   ordreSousSecteur: z.number().int().min(0).default(0),
   actif: z.boolean().default(true),
 })
 
 const updateSousSecteurSchema = z.object({
+  libSousSecteur: z.string().trim().min(1).max(200).optional(),
   ordreSousSecteur: z.number().int().min(0).optional(),
   actif: z.boolean().optional(),
 })
@@ -29,6 +31,7 @@ export async function createSousSecteur(matricule: string | null, codeSecteur: s
   return sousSecteurRepository.create({
     code_secteur: codeSecteur,
     code_sous_secteur: result.data.codeSousSecteur,
+    lib_sous_secteur: result.data.libSousSecteur,
     ordre_sous_secteur: result.data.ordreSousSecteur,
     actif: result.data.actif,
   })
@@ -48,6 +51,7 @@ export async function updateSousSecteur(
   await assertManagesSecteur(matricule, codeSecteur)
 
   return sousSecteurRepository.update(codeSecteur, codeSousSecteur, {
+    lib_sous_secteur: result.data.libSousSecteur,
     ordre_sous_secteur: result.data.ordreSousSecteur,
     actif: result.data.actif,
   })

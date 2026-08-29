@@ -9,13 +9,14 @@ export interface Direction {
   id_direction: number
   code_direction: string
   libelle_direction: string
+  actif: boolean
 }
 
 export async function findAll(): Promise<Direction[]> {
   const { data, error } = await supabase
     .schema('finances')
     .from('direction')
-    .select('id_direction, code_direction, libelle_direction')
+    .select('id_direction, code_direction, libelle_direction, actif')
     .order('libelle_direction', { ascending: true })
   if (error) throw error
   return data ?? []
@@ -25,7 +26,7 @@ export async function findById(idDirection: number): Promise<Direction | null> {
   const { data, error } = await supabase
     .schema('finances')
     .from('direction')
-    .select('id_direction, code_direction, libelle_direction')
+    .select('id_direction, code_direction, libelle_direction, actif')
     .eq('id_direction', idDirection)
     .maybeSingle()
   if (error) throw error
@@ -36,7 +37,7 @@ export async function findByCode(codeDirection: string): Promise<Direction | nul
   const { data, error } = await supabase
     .schema('finances')
     .from('direction')
-    .select('id_direction, code_direction, libelle_direction')
+    .select('id_direction, code_direction, libelle_direction, actif')
     .eq('code_direction', codeDirection)
     .maybeSingle()
   if (error) throw error

@@ -48,7 +48,9 @@ describe('createSousSecteur', () => {
   it('rejette si le secteur parent est introuvable (404)', async () => {
     findByCode.mockResolvedValue(null)
 
-    await expect(createSousSecteur(MATRICULE, 'INCONNU', { codeSousSecteur: 'A1' })).rejects.toMatchObject({
+    await expect(
+      createSousSecteur(MATRICULE, 'INCONNU', { codeSousSecteur: 'A1', libSousSecteur: 'A1' }),
+    ).rejects.toMatchObject({
       status: 404,
     })
     expect(create).not.toHaveBeenCalled()
@@ -59,7 +61,9 @@ describe('createSousSecteur', () => {
     hasActiveRole.mockResolvedValue(false)
     hasActiveRoleForService.mockResolvedValue(false)
 
-    await expect(createSousSecteur(MATRICULE, CODE_SECTEUR, { codeSousSecteur: 'A1' })).rejects.toMatchObject({
+    await expect(
+      createSousSecteur(MATRICULE, CODE_SECTEUR, { codeSousSecteur: 'A1', libSousSecteur: 'A1' }),
+    ).rejects.toMatchObject({
       status: 403,
     })
     expect(create).not.toHaveBeenCalled()
@@ -68,12 +72,23 @@ describe('createSousSecteur', () => {
   it('autorise et délègue au repository avec le code_secteur du parent', async () => {
     findByCode.mockResolvedValue(SECTEUR)
     hasActiveRole.mockResolvedValue(true)
-    create.mockResolvedValue({ code_secteur: CODE_SECTEUR, code_sous_secteur: 'A1', ordre_sous_secteur: 0, actif: true })
+    create.mockResolvedValue({
+      code_secteur: CODE_SECTEUR,
+      code_sous_secteur: 'A1',
+      lib_sous_secteur: 'A1',
+      ordre_sous_secteur: 0,
+      actif: true,
+    })
 
-    await createSousSecteur(MATRICULE, CODE_SECTEUR, { codeSousSecteur: 'A1' })
+    await createSousSecteur(MATRICULE, CODE_SECTEUR, { codeSousSecteur: 'A1', libSousSecteur: 'A1' })
 
     expect(create).toHaveBeenCalledWith(
-      expect.objectContaining({ code_secteur: CODE_SECTEUR, code_sous_secteur: 'A1', actif: true }),
+      expect.objectContaining({
+        code_secteur: CODE_SECTEUR,
+        code_sous_secteur: 'A1',
+        lib_sous_secteur: 'A1',
+        actif: true,
+      }),
     )
   })
 })

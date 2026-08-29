@@ -4,6 +4,7 @@ import { api } from '../services/api'
 export interface SousSite {
   code_site: string
   code_sous_site: string
+  lib_sous_site: string
   ordre_sous_site: number
   actif: boolean
 }

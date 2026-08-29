@@ -152,11 +152,30 @@ cette table :
   DS, CB, ADMIN_SERVICE...).
 - **Écriture** (`INSERT`/`UPDATE`/`DELETE`) : réservée à `ADMIN_APP`, via
   `finances.current_user_has_role('ADMIN_APP')` (§2.1) — jamais de policy générique
-  `authenticated` en écriture sur cette table, même pour un acteur `DS`/`ADMIN_SERVICE`
-  agissant sur le périmètre de sa propre direction/service (contrairement à
-  `seuil_validation_ds`, où le `DS` peut écrire sur le périmètre de sa direction : ici la
-  décision produit est que seul `ADMIN_APP` modifie, quelle que soit la portée de la
-  ligne visée).
+  `authenticated` en écriture sur cette table, même pour un acteur `ADMIN_SERVICE`
+  agissant sur le périmètre de son propre service (contrairement à
+  `finances.site`/`finances.secteur`/`finances.seuil_validation_ds`, où `ADMIN_SERVICE`
+  peut écrire sur son propre service — voir §2.4 : ici la décision produit est que seul
+  `ADMIN_APP` modifie `parametre_application`, quelle que soit la portée de la ligne
+  visée).
+
+### 2.4 Référentiels scopés par service (`finances.site`, `finances.secteur` et leurs sous-niveaux, `finances.seuil_validation_ds`)
+
+- **Lecture** : ouverte à tout `authenticated` avec `matricule` non `null`, sans
+  distinction de rôle (RLS `using (public.current_user_matricule() is not null)`).
+- **Écriture** (`INSERT`/`UPDATE`/`DELETE`) : `ADMIN_APP` (transverse) **ou**
+  `ADMIN_SERVICE` sur le service concerné. Au niveau RLS, ce n'est qu'une vérification
+  de rôle (`current_user_has_role('ADMIN_APP') OR current_user_has_role('ADMIN_SERVICE')`),
+  **pas** une vérification que le service visé correspond bien à celui d'ADMIN_SERVICE —
+  le scoping fin par service est appliqué exclusivement côté Express
+  (`assertManagesService`, `backend/src/services/authorization.service.ts`), avant toute
+  écriture, indépendamment du fait que le backend utilise `service_role` (qui contourne
+  le RLS — voir §6). Ne jamais considérer la policy RLS seule comme suffisante pour ces
+  tables : c'est la vérification manuelle Express qui porte la granularité par service.
+- `finances.seuil_validation_ds` a rejoint ce modèle le 29/08/2026 (remplace une
+  restriction ADMIN_APP seul actée le 28/08/2026 — voir
+  `ForClaude/CDC/mld-phases-1-2.md` §2.6). Migration RLS :
+  `supabase/migrations/20260829120000_seuil_validation_ds_admin_service.sql`.
 - Le typage de `valeur` (`jsonb`) n'est validé qu'applicativement (Zod, côté service) — la
   RLS ne peut pas contraindre la forme d'un `jsonb`. Ne jamais faire confiance à une
   écriture directe depuis le frontend même pour un compte `ADMIN_APP` authentifié :

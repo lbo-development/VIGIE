@@ -6,6 +6,7 @@ export interface OrgCellule {
   code_cellule: string
   libelle_cellule: string
   id_service: number
+  actif: boolean
 }
 
 /** Référentiel organisationnel CELLULE, pour peupler filtres et sélecteurs. */

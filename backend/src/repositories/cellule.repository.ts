@@ -10,13 +10,14 @@ export interface Cellule {
   code_cellule: string
   libelle_cellule: string
   id_service: number
+  actif: boolean
 }
 
 export async function findAll(): Promise<Cellule[]> {
   const { data, error } = await supabase
     .schema('finances')
     .from('cellule')
-    .select('id_cellule, code_cellule, libelle_cellule, id_service')
+    .select('id_cellule, code_cellule, libelle_cellule, id_service, actif')
     .order('libelle_cellule', { ascending: true })
   if (error) throw error
   return data ?? []
@@ -26,7 +27,7 @@ export async function findById(idCellule: number): Promise<Cellule | null> {
   const { data, error } = await supabase
     .schema('finances')
     .from('cellule')
-    .select('id_cellule, code_cellule, libelle_cellule, id_service')
+    .select('id_cellule, code_cellule, libelle_cellule, id_service, actif')
     .eq('id_cellule', idCellule)
     .maybeSingle()
   if (error) throw error
@@ -37,7 +38,7 @@ export async function findByCode(codeCellule: string): Promise<Cellule | null> {
   const { data, error } = await supabase
     .schema('finances')
     .from('cellule')
-    .select('id_cellule, code_cellule, libelle_cellule, id_service')
+    .select('id_cellule, code_cellule, libelle_cellule, id_service, actif')
     .eq('code_cellule', codeCellule)
     .maybeSingle()
   if (error) throw error
