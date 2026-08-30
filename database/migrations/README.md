@@ -32,21 +32,24 @@ supabase db push
 
 ## Exemple de migration de départ
 
-Pour tester le repository d'exemple fourni dans `backend/src/repositories/items.repository.ts`,
-tu peux créer une première migration avec ce contenu :
+Pour une nouvelle ressource (ex. `orders`, voir `docs/ARCHITECTURE.md` "Ajouter une nouvelle
+ressource"), une première migration ressemble à ceci :
 
 ```sql
-create table if not exists items (
+create table if not exists orders (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   created_at timestamptz not null default now()
 );
 
-alter table items enable row level security;
+alter table orders enable row level security;
 
--- Politique de départ permissive (à restreindre selon tes besoins réels) :
-create policy "Allow service role full access" on items
+-- Accès réservé au service_role (le backend Express) — la clause `to service_role`
+-- est indispensable : sans elle, une policy Postgres s'applique à PUBLIC (donc
+-- `anon` et `authenticated` inclus), pas seulement au rôle nommé dans son libellé.
+create policy "Allow service role full access" on orders
   for all
+  to service_role
   using (true)
   with check (true);
 ```
@@ -56,4 +59,4 @@ create policy "Allow service role full access" on items
 Il sert de zone de référence/documentation (ce README) et convient si tu préfères ne pas
 utiliser la Supabase CLI et gérer tes migrations SQL manuellement (numérotées à la main,
 appliquées via l'éditeur SQL du dashboard Supabase). Dans ce cas, place tes fichiers
-`.sql` numérotés directement ici (`001_create_items.sql`, `002_...sql`, etc.).
+`.sql` numérotés directement ici (`001_create_orders.sql`, `002_...sql`, etc.).

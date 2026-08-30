@@ -17,6 +17,17 @@ import { errorHandler } from './middlewares/errorHandler.js'
  */
 export const app = express()
 
+// Railway place un reverse-proxy devant l'application : sans ce réglage,
+// req.ip vaut l'adresse du proxy (identique pour tout le monde), pas celle
+// du visiteur réel — casse le rate limiting par IP (apiLimiter ci-dessous)
+// en le faisant retomber sur un seul bucket partagé par toute l'application
+// (30/08/2026, audit de sécurité). "1" = un seul saut de proxy fait
+// confiance (l'edge Railway), pas "true" : évite qu'un client falsifie
+// X-Forwarded-For pour usurper une autre IP au-delà de ce premier saut.
+// Sans effet en local/tests (Supertest appelle l'app directement, en
+// process, sans en-tête X-Forwarded-For).
+app.set('trust proxy', 1)
+
 // Déploiement à service unique (Railway) : ce même processus Express sert à
 // la fois l'API (sous /api) et le build statique du frontend (frontend/dist),
 // d'où VITE_API_URL=/api en production. En développement, frontend/dist

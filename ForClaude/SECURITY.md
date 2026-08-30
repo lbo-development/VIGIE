@@ -41,6 +41,26 @@ Ces applications peuvent être utilisées sur des postes partagés — la décon
 - Si l'application peut être ouverte dans plusieurs onglets sur le même poste, synchroniser la détection d'inactivité et la déconnexion entre onglets (`BroadcastChannel` ou évènement `storage`) — un minuteur isolé par onglet ne suffit pas et laisse une session active dans un onglet oublié.
 - Ce mécanisme est un complément au RLS, jamais un substitut : pendant la fenêtre où la session reste active, le RLS (section 2) demeure la seule barrière empêchant un accès aux données d'un autre utilisateur. Réduire la fenêtre de risque côté configuration Supabase Auth (durée de vie du JWT) peut aussi être envisagé sur les projets où le contexte poste partagé est fréquent.
 
+### 1.2 Rate limiting de l'authentification (audit du 30/08/2026)
+
+`Login.tsx` appelle `supabase.auth.signInWithPassword(...)` **directement depuis le
+navigateur** (client `anon`) — cette requête part vers l'API Auth de Supabase, jamais vers
+Express. **`apiLimiter` (`middlewares/rateLimiter.ts`) ne protège donc pas le login** : la
+seule barrière anti-brute-force possible sur ce point d'entrée est la configuration
+**Dashboard Supabase → Authentication → Rate Limits**, hors du code de ce projet (aucune
+route backend ne fait proxy vers l'auth — vérifié : ni `supabase.auth.signIn*`, ni
+`supabase.auth.admin.*` n'apparaissent dans `backend/src`).
+
+**Configuration auditée le 30/08/2026** (valeurs alors en place, captées depuis le Dashboard) :
+
+| Limite | Valeur | Verdict |
+|---|---|---|
+| Sign-ups et sign-ins | 30 req / 5 min par IP (défaut Supabase, non modifié) | ✅ Adapté à l'usage interne de VIGIE — absorbe un pic de connexions depuis une même IP de bureau tout en restant très restrictif pour un brute-force. À revoir seulement si des lockouts collectifs sont constatés (plusieurs dizaines d'agents partageant la même IP de sortie, connexions simultanées). |
+| Token refreshes | 150 req / 5 min par IP | ✅ Généreux, sans risque de déconnexion intempestive d'utilisateurs actifs. |
+| IP Address Forwarding | Désactivé | ✅ Correct : ne sert que pour un appel serveur→Auth avec une clé secrète transmettant l'IP de l'utilisateur final ; le backend ne fait aucun appel de ce type (`requireAuth.ts` ne fait que `supabase.auth.getUser(token)`, hors du périmètre de cette limite), et le login navigateur→Supabase voit déjà la vraie IP nativement. |
+| **Emails (sign-up, recovery, invite) — 2/h, global au projet** | Trop bas dès qu'une poignée d'agents demande un email la même heure (invitation en masse, réinitialisation collective) | 🟠 **Reporté (décision du 30/08/2026)** — vient du service d'email intégré gratuit de Supabase. Correctif à appliquer plus tard : brancher un fournisseur SMTP personnalisé (Dashboard → Authentication → SMTP Settings), qui lève cette limite de 2/h au profit des seuils du fournisseur choisi. |
+| Anonymous sign-ins / Web3 sign-ups-sign-ins | 30/h resp. 30/5min par IP | Non utilisés par VIGIE (email + mot de passe uniquement) — statut des providers correspondants (activés/désactivés dans Authentication → Providers) pas encore vérifié ; à confirmer, désactiver plutôt que simplement limiter si inutilisés. |
+
 ## 2. Autorisation & Row Level Security (RLS)
 
 - **Row Level Security doit être activée sur toutes les tables Supabase sans exception**, y compris les tables qui semblent "internes" ou "non sensibles". Une table sans RLS explicite est considérée comme une faille.
@@ -325,6 +345,23 @@ du `pg_policies` réel).
 - Ne jamais faire confiance aux headers HTTP envoyés par le client pour des décisions de sécurité (ex. `X-Forwarded-For` sans validation du proxy, headers custom d'identité).
 - Toute route doit vérifier explicitement l'autorisation (pas seulement l'authentification) : un utilisateur connecté n'a pas automatiquement le droit d'accéder à n'importe quelle ressource.
 - Limiter la taille des payloads acceptés (`express.json({ limit: ... })`) pour éviter les abus de type déni de service applicatif.
+- **Toute nouvelle route monte `router.use(requireAuth)`, sans exception** — incident du
+  30/08/2026 : la ressource d'exemple `items` (`GET`/`POST /api/items`) était la seule route
+  de tout le backend sans authentification, exposée publiquement en lecture et écriture sur
+  l'API déployée (repository/service/controller/routes supprimés ; aucune table `items`
+  n'existait réellement sur l'instance Supabase, vérifié). Voir `docs/ARCHITECTURE.md`
+  ("Ajouter une nouvelle ressource") et `CLAUDE.md`, qui pointent désormais vers `cug` comme
+  modèle plutôt que vers `items`.
+- **`app.set('trust proxy', 1)` est obligatoire dans `app.ts`** derrière un déploiement à
+  reverse-proxy comme Railway — incident du 30/08/2026 : sans ce réglage, Express ignore
+  `X-Forwarded-For` et `req.ip` retombe sur l'adresse du proxy, identique pour tout le monde.
+  `apiLimiter` (`middlewares/rateLimiter.ts`), qui bucket par `req.ip` par défaut (pas de
+  `keyGenerator` personnalisé), se retrouvait donc avec **un seul bucket partagé par toute
+  l'application déployée** au lieu d'un par visiteur — un déni de service auto-infligé (un
+  agent actif peut mettre tout le monde en 429). Ne contredit pas la règle ci-dessus sur
+  `X-Forwarded-For` : `trust proxy: 1` fait confiance à **exactement un** saut de proxy (l'edge
+  Railway), pas à la chaîne entière — un client ne peut pas usurper une IP au-delà de ce
+  premier saut. Voir `backend/src/test/app.test.ts` pour le test de non-régression.
 
 ## 7. Gestion des secrets
 
@@ -333,6 +370,8 @@ du `pg_policies` réel).
 - Le fichier `.env` (et toute variante `.env.local`, `.env.production`, etc.) doit systématiquement figurer dans `.gitignore`. Vérifier cela avant tout commit qui touche à la configuration.
 - Ne jamais logguer un secret, un token JWT complet ou un mot de passe, même en `console.log` de debug — y compris temporairement.
 - Si un secret a été accidentellement committé dans l'historique Git, le signaler explicitement plutôt que de simplement le supprimer du fichier (il reste dans l'historique et doit être révoqué/régénéré).
+- **`supabase/.gitignore` doit exclure `.temp` et `.branches`** (convention standard du CLI Supabase, `supabase init`) — incident du 30/08/2026 : `supabase/.temp/` était committé, exposant `project-ref`, `organization_id` et l'URL du pooler Postgres (`linked-project.json`, `pooler-url`, `project-ref`). Aucun mot de passe dans ces fichiers, mais publier l'endpoint de connexion directe à la base réduit inutilement le coût de reconnaissance d'un attaquant. Retiré du suivi (`git rm -r --cached`), fichiers conservés sur disque (nécessaires au CLI local).
+- **Une clé Supabase manquante doit faire échouer le démarrage en production (`throw`), jamais un simple `console.warn` suivi d'un repli silencieux** — incident du 30/08/2026 : `config/env.ts` (backend) et `lib/supabaseClient.ts` (frontend) substituaient une valeur de repli syntaxiquement valide (`placeholder-anon-key`, `http://localhost:54321`) même quand `NODE_ENV`/`import.meta.env.PROD` valait production, transformant une erreur de configuration immédiate et visible en une cascade d'échecs réseau opaques. Le repli tolérant (avec avertissement) reste nécessaire en dev/test — voir `backend/src/test/env.test.ts` et `frontend/src/lib/supabaseClient.test.ts`.
 
 ## 8. Gestion des erreurs et des logs
 

@@ -1,0 +1,6 @@
+# Convention standard du CLI Supabase (généré par `supabase init`) — contient
+# des identifiants de projet (project-ref, organization_id, URL du pooler
+# Postgres) qui ne doivent jamais être commités (audit de sécurité du
+# 30/08/2026, voir ForClaude/SECURITY.md).
+.branches
+.temp

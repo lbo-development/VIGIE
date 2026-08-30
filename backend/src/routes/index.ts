@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import healthRoutes from './health.routes.js'
-import itemsRoutes from './items.routes.js'
 import meRoutes from './me.routes.js'
 import parametresRoutes from './parametres.routes.js'
 import siteRoutes from './site.routes.js'
@@ -19,7 +18,6 @@ import cugRoutes from './cug.routes.js'
 const router = Router()
 
 router.use('/health', healthRoutes)
-router.use('/items', itemsRoutes)
 router.use('/me', meRoutes)
 router.use('/parametres', parametresRoutes)
 router.use('/sites', siteRoutes)

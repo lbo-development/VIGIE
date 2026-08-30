@@ -62,12 +62,15 @@ Un controller n'appelle jamais un repository directement, un repository ne conti
 jamais de logique métier. Cette séparation permet de tester chaque couche isolément et
 de remplacer Supabase par autre chose plus tard sans toucher aux services/controllers.
 
-**Ajouter une nouvelle ressource** (ex: "orders"), en suivant le modèle de `items`
-(`backend/src/{repositories,services,controllers,routes}/items.*`) :
+**Ajouter une nouvelle ressource** (ex: "orders"), en suivant le modèle de `cug`
+(`backend/src/{repositories,services,controllers,routes}/cug.*`) :
 1. `repositories/orders.repository.ts` — requêtes Supabase pour la table `orders`
 2. `services/orders.service.ts` — validation et règles métier, appelle le repository
 3. `controllers/orders.controller.ts` — handlers Express, appelle le service, gère les erreurs via `next(err)`
-4. `routes/orders.routes.ts` — déclare les endpoints, monté dans `routes/index.ts`
+4. `routes/orders.routes.ts` — déclare les endpoints, monté dans `routes/index.ts` —
+   **`router.use(requireAuth)` en tête de fichier, sans exception** (30/08/2026 :
+   l'ancienne ressource d'exemple `items` a été supprimée après un audit de sécurité —
+   c'était la seule route de tout le backend sans authentification, exposée publiquement)
 5. Ajouter la migration correspondante (voir `database/migrations/README.md`)
 
 ## Erreurs
@@ -205,7 +208,7 @@ L'upsert (portée mutuellement exclusive, donc pas de cible `ON CONFLICT` unique
 exploitable directement par `supabase-js`) est de même porté par une fonction SQL,
 `finances.upsert_parametre_application(...)`, dans la même migration.
 
-### Couches (suit le modèle `items`)
+### Couches (suit le modèle `cug`)
 
 1. Migrations Supabase : `20260825100000_create_parametre_application.sql` (table, index
    uniques partiels, policies RLS — voir `ForClaude/SECURITY.md` §2.3),

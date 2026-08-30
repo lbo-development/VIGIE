@@ -7,9 +7,17 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY?.trim()
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn(
-    '[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY manquant(e) — copie .env.example vers .env.local et renseigne tes clés Supabase.',
-  )
+  const message =
+    '[supabase] VITE_SUPABASE_URL ou VITE_SUPABASE_ANON_KEY manquant(e) — copie .env.example vers .env.local et renseigne tes clés Supabase.'
+  // En production, une clé manquante ne doit jamais dégénérer en une cascade
+  // d'échecs réseau opaques (audit de sécurité du 30/08/2026, voir
+  // ForClaude/SECURITY.md) — on préfère un écran blanc + erreur console
+  // immédiate et explicite au chargement. En dev/test (import.meta.env.PROD
+  // vaut alors false), on garde le repli tolérant ci-dessous.
+  if (import.meta.env.PROD) {
+    throw new Error(message)
+  }
+  console.warn(message)
 }
 
 // Valeurs de repli syntaxiquement valides pour éviter que le client ne lève

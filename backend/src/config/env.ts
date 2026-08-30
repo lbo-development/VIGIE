@@ -23,7 +23,16 @@ export const env = {
 }
 
 if (!env.supabaseUrl || !env.supabaseServiceRoleKey) {
-  console.warn(
-    '[config] SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant(e) — copie .env.example vers .env et renseigne tes clés Supabase.',
-  )
+  const message =
+    '[config] SUPABASE_URL ou SUPABASE_SERVICE_ROLE_KEY manquant(e) — copie .env.example vers .env et renseigne tes clés Supabase.'
+  // En production, une clé manquante ne doit jamais dégénérer en une cascade
+  // d'échecs réseau opaques (audit de sécurité du 30/08/2026, voir
+  // ForClaude/SECURITY.md) — on préfère un crash immédiat et explicite au
+  // démarrage. En dev/test, on garde le repli tolérant (voir
+  // config/supabaseClient.ts) pour ne pas bloquer un poste pas encore
+  // configuré ou l'exécution des tests.
+  if (env.nodeEnv === 'production') {
+    throw new Error(message)
+  }
+  console.warn(message)
 }

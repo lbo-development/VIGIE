@@ -21,7 +21,10 @@ routes → controllers → services → repositories → Supabase
 
 Un controller n'appelle jamais un repository directement. Un repository ne contient
 jamais de logique métier — uniquement des requêtes Supabase. Toute nouvelle ressource
-suit le modèle de `items` (`backend/src/{repositories,services,controllers,routes}/items.*`).
+suit le modèle de `cug` (`backend/src/{repositories,services,controllers,routes}/cug.*`) :
+repository (requêtes Supabase), service (schéma Zod par opération d'écriture, règles
+métier), controller (traduction requête/réponse), routes (`router.use(requireAuth)` en
+tête — **toute nouvelle route doit monter `requireAuth`**, sans exception).
 
 ## Conventions frontend
 

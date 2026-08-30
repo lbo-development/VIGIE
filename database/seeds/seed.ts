@@ -19,20 +19,6 @@ if (!supabaseUrl || !supabaseServiceRoleKey) {
 
 const supabase = createClient(supabaseUrl, supabaseServiceRoleKey)
 
-async function seedItems() {
-  const sampleItems = [{ name: 'Premier élément' }, { name: 'Deuxième élément' }, { name: 'Troisième élément' }]
-
-  const { error } = await supabase.from('items').insert(sampleItems)
-
-  if (error) {
-    console.error('❌ Erreur lors du seed "items" :', error.message)
-    console.error('   Vérifie que la table "items" existe (voir database/migrations/README.md).')
-    process.exit(1)
-  }
-
-  console.log(`✅ ${sampleItems.length} lignes insérées dans "items".`)
-}
-
 async function seedParametresApplication() {
   // Valeur globale par défaut, alignée sur la constante actuellement en dur
   // dans frontend/src/components/shell/AppShell.tsx (INACTIVITY_TIMEOUT_MS =
@@ -60,7 +46,6 @@ async function seedParametresApplication() {
 }
 
 async function main() {
-  await seedItems()
   await seedParametresApplication()
 }
 
