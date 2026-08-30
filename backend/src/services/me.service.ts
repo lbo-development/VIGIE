@@ -11,6 +11,8 @@ export interface MeResponse {
   matricule: string | null
   nom: string | null
   prenom: string | null
+  /** Rattachement propre de l'acteur (ACTEUR.ID_CELLULE → CELLULE.ID_SERVICE), indépendant des rôles applicatifs — voir acteur.repository.ts. Permet à un Demandeur (sans rôle dédié) de connaître son propre service, ex. création de FOURNISSEUR (voir fournisseur.service.ts). */
+  idService: number | null
   roles: MeRole[]
 }
 
@@ -22,12 +24,13 @@ export interface MeResponse {
  */
 export async function getCurrentUser(matricule: string | null): Promise<MeResponse> {
   if (!matricule) {
-    return { matricule: null, nom: null, prenom: null, roles: [] }
+    return { matricule: null, nom: null, prenom: null, idService: null, roles: [] }
   }
 
-  const [acteur, roleRows] = await Promise.all([
+  const [acteur, roleRows, idService] = await Promise.all([
     acteurRepository.findByMatricule(matricule),
     roleAttributionRepository.findActiveByMatricule(matricule),
+    acteurRepository.findIdServiceByMatricule(matricule),
   ])
 
   const roles = await Promise.all(
@@ -38,5 +41,5 @@ export async function getCurrentUser(matricule: string | null): Promise<MeRespon
     })),
   )
 
-  return { matricule, nom: acteur?.nom ?? null, prenom: acteur?.prenom ?? null, roles }
+  return { matricule, nom: acteur?.nom ?? null, prenom: acteur?.prenom ?? null, idService, roles }
 }

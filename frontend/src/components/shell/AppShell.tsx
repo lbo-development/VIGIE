@@ -1,12 +1,20 @@
 import { useCallback } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useSidebarShell } from '../../hooks/useSidebarShell'
 import { useTheme } from '../../hooks/useTheme'
 import { useAuth } from '../../context/AuthContext'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { useInactivityLogout } from '../../hooks/useInactivityLogout'
 import { useParametre } from '../../hooks/useParametre'
-import { NAV_ITEMS, SIDEBAR_GROUPS, filterSidebarGroups } from '../../config/navigation'
+import {
+  NAV_ITEMS,
+  PARAMETRES_ITEMS,
+  MARCHES_SIDEBAR_ITEMS,
+  filterParametresItems,
+  filterNavItems,
+  isMarchesSection,
+  isParametresSection,
+} from '../../config/navigation'
 import { Header } from './Header'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
@@ -32,10 +40,29 @@ export function AppShell() {
   const sidebarShell = useSidebarShell()
   const { session, signOut } = useAuth()
   const { data: currentUser } = useCurrentUser()
+  const location = useLocation()
 
   const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
   const isAdminService = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_SERVICE') ?? false
-  const visibleSidebarGroups = filterSidebarGroups(SIDEBAR_GROUPS, { isAdminApp, isAdminService })
+  // Demandeur scopé à son service (voir filterNavItems) : vrai dès qu'un
+  // idService est résolu, rôle d'administration ou non.
+  const hasOwnService = currentUser?.idService != null
+  const visibleNavItems = filterNavItems(NAV_ITEMS, { isAdminApp, isAdminService, hasOwnService })
+
+  // Pages de "Paramètres" accessibles à l'utilisateur courant (ADMIN_APP/
+  // ADMIN_SERVICE) — sert à la fois de contenu de sidebar quand la section
+  // est active, et de cible du bouton fixe en pied de sidebar (décision du
+  // 30/08/2026 : plus de sous-menu dépliable, "Paramètres" n'est plus un
+  // onglet du header non plus).
+  const parametresItems = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp, isAdminService })
+  const parametresLink = parametresItems[0]?.to ?? null
+
+  // Contenu de la sidebar contextuel à la section active : "en lieu et place
+  // des options présentes", pas en plus (Marchés et Paramètres se remplacent
+  // mutuellement selon la route courante, jamais combinés).
+  const inMarchesSection = isMarchesSection(location.pathname)
+  const inParametresSection = isParametresSection(location.pathname)
+  const sidebarItems = inMarchesSection ? MARCHES_SIDEBAR_ITEMS : inParametresSection ? parametresItems : []
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',
@@ -60,7 +87,7 @@ export function AppShell() {
 
   return (
     <div className={sidebarShell.shellClassName}>
-      <Header items={NAV_ITEMS} />
+      <Header items={visibleNavItems} />
 
       <main className="app-main">
         <section className="content-area" aria-label="Contenu principal">
@@ -68,8 +95,8 @@ export function AppShell() {
         </section>
 
         <Sidebar
-          items={[]}
-          groups={visibleSidebarGroups}
+          items={sidebarItems}
+          parametresLink={parametresLink}
           hidden={sidebarShell.sidebarHidden}
           theme={theme}
           onToggleTheme={toggleTheme}

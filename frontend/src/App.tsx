@@ -12,6 +12,10 @@ import { Directions } from './pages/Directions'
 import { Services } from './pages/Services'
 import { Cellules } from './pages/Cellules'
 import { SeuilsValidationDs } from './pages/SeuilsValidationDs'
+import { Fournisseurs } from './pages/Fournisseurs'
+import { Cug } from './pages/Cug'
+import { Marches } from './pages/Marches'
+import { ImportMarches } from './pages/ImportMarches'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -41,6 +45,10 @@ function App() {
               <Route path="/parametres/services" element={<Services />} />
               <Route path="/parametres/cellules" element={<Cellules />} />
               <Route path="/parametres/seuils-validation-ds" element={<SeuilsValidationDs />} />
+              <Route path="/fournisseurs" element={<Fournisseurs />} />
+              <Route path="/parametres/cug" element={<Cug />} />
+              <Route path="/marches" element={<Marches />} />
+              <Route path="/marches/import" element={<ImportMarches />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

@@ -10,7 +10,7 @@ import { AppError } from '../middlewares/errorHandler.js'
 
 export async function getParametreKeys(_req: Request, res: Response, next: NextFunction) {
   try {
-    res.json(parametresService.listParametreKeys())
+    res.json(await parametresService.listParametreKeys())
   } catch (err) {
     next(err)
   }

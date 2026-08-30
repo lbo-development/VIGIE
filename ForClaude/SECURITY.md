@@ -158,6 +158,20 @@ cette table :
   peut écrire sur son propre service — voir §2.4 : ici la décision produit est que seul
   `ADMIN_APP` modifie `parametre_application`, quelle que soit la portée de la ligne
   visée).
+- Le typage de `valeur` (`jsonb`) n'est validé qu'applicativement (Zod, côté service) — la
+  RLS ne peut pas contraindre la forme d'un `jsonb`. Ne jamais faire confiance à une
+  écriture directe depuis le frontend même pour un compte `ADMIN_APP` authentifié :
+  l'écriture passe par le backend (`service_role`), qui applique le registre de schémas
+  avant d'exécuter la requête.
+
+**`finances.parametre_definition` (29/08/2026)** : catalogue des paramètres connus
+(libellé, description, valeur par défaut — une ligne par clé, référencée par
+`parametre_application.cle` via FK). Mêmes policies RLS que `parametre_application`
+ci-dessus (lecture `authenticated`, écriture `ADMIN_APP`) — voir
+`docs/ARCHITECTURE.md` ("Paramétrage applicatif", section "Catalogue des paramètres
+connus"). Le schéma de validation (type, bornes), lui, reste codé en dur
+(`PARAMETRE_SCHEMAS` dans `parametres.service.ts`) : la RLS de cette table ne protège que
+les métadonnées, jamais la validation d'une valeur.
 
 ### 2.4 Référentiels scopés par service (`finances.site`, `finances.secteur` et leurs sous-niveaux, `finances.seuil_validation_ds`)
 
@@ -176,11 +190,110 @@ cette table :
   restriction ADMIN_APP seul actée le 28/08/2026 — voir
   `ForClaude/CDC/mld-phases-1-2.md` §2.6). Migration RLS :
   `supabase/migrations/20260829120000_seuil_validation_ds_admin_service.sql`.
-- Le typage de `valeur` (`jsonb`) n'est validé qu'applicativement (Zod, côté service) — la
-  RLS ne peut pas contraindre la forme d'un `jsonb`. Ne jamais faire confiance à une
-  écriture directe depuis le frontend même pour un compte `ADMIN_APP` authentifié :
-  l'écriture passe par le backend (`service_role`), qui applique le registre de schémas
-  avant d'exécuter la requête.
+
+### 2.5 Fournisseurs et contacts (`finances.fournisseur`, `finances.contact`)
+
+Même modèle RLS que §2.4 pour l'écriture (`ADMIN_APP` transverse **ou** `ADMIN_SERVICE`
+sur le service concerné, vérification de rôle seulement — le scoping fin par service est
+appliqué côté Express via `assertManagesService`/`assertManagesFournisseur`). Quatre
+différences propres à cette table, à ne pas généraliser aux autres référentiels sans
+relire ce paragraphe :
+
+- **La CRÉATION d'un FOURNISSEUR est ouverte au-delà d'`ADMIN_APP`/`ADMIN_SERVICE`** —
+  décision du 29/08/2026 : un Demandeur (pas de rôle dédié) peut créer un fournisseur pour
+  son propre service (`fournisseur.service.ts#createFournisseur`, vérifié par
+  `assertManagesServiceOrIsOwnActor` — pas `assertManagesService`). La **modification**
+  d'un fournisseur existant reste réservée à `ADMIN_APP`/`ADMIN_SERVICE`
+  (`assertManagesFournisseur`, qui utilise bien `assertManagesService`). **La policy RLS
+  `INSERT` sur `finances.fournisseur` ne couvre pas ce cas** (elle ne vérifie que
+  `ADMIN_APP`/`ADMIN_SERVICE`, comme la policy `UPDATE`) — c'est un écart assumé, pas un
+  oubli : le backend utilise `service_role` (contourne le RLS), c'est
+  `assertManagesServiceOrIsOwnActor` qui autorise réellement un Demandeur en pratique. Ne
+  pas « corriger » la policy RLS pour y ajouter le cas Demandeur sans revalider ce choix —
+  ça nécessiterait une fonction RLS dérivant le service de l'acteur courant
+  (`ACTEUR.ID_CELLULE → SERVICE`), qui n'existe pas aujourd'hui.
+
+- **Lecture scopée par service pour tout le monde sauf `ADMIN_APP`** — contrairement à
+  SITE/SECTEUR/SEUIL_VALIDATION_DS (§2.4), où la lecture est ouverte à tout
+  `authenticated`. Décision du 29/08/2026 : un `ADMIN_SERVICE` **et** un Demandeur (pas de
+  rôle dédié, voir `ForClaude/CDC/mot-phases-1-2.md` l.15) ne voient que les fournisseurs
+  de leur propre service. Comme pour l'écriture, la policy RLS `SELECT` reste ouverte à
+  tout `authenticated` (`using (public.current_user_matricule() is not null)`) — le
+  scoping par service est appliqué côté Express, dans
+  `fournisseur.service.ts#resolveReadScope` : le service d'un `ADMIN_SERVICE` vient de son
+  attribution `role_attribution.id_service`, celui d'un Demandeur de son rattachement
+  `ACTEUR.ID_CELLULE → CELLULE.ID_SERVICE` (`acteur.repository.ts#findIdServiceByMatricule`,
+  indépendant de `role_attribution`). Ne jamais faire confiance à un `idService` passé en
+  query param pour cette restriction : seul `ADMIN_APP` peut l'utiliser pour filtrer sa
+  propre vue transverse, tout autre appelant est forcé sur son service résolu côté serveur.
+- **`finances.contact` n'a pas de policy `DELETE` scopée par ligne non plus** : comme pour
+  l'écriture, seule la vérification de rôle est faite en RLS ; le rattachement du contact
+  au bon fournisseur (et donc au bon service) est vérifié côté Express avant toute
+  suppression (`assertManagesFournisseur`, réutilisé par `contact.service.ts`).
+  `finances.contact` n'a pas de champ d'état et est réellement supprimable : aucune autre
+  table ne le référence.
+- **`finances.fournisseur` supporte une suppression physique conditionnelle depuis le
+  29/08/2026** — exception au principe général d'archivage (`ETATFOURNISSEUR`), réservée
+  à `ADMIN_APP`/`ADMIN_SERVICE` (`assertManagesFournisseur`, **pas**
+  `assertManagesServiceOrIsOwnActor` — un Demandeur peut créer un fournisseur mais pas le
+  supprimer). `fournisseur.service.ts#deleteFournisseur` vérifie qu'aucune ligne de
+  `finances.marche` (`id_fournisseur`), `finances.demande_achat`
+  (`id_fournisseur_retenu`) ni `finances.devis_consulte` (`id_fournisseur`, même une ligne
+  non retenue) ne référence encore le fournisseur, sinon `AppError 409`. La policy RLS
+  `fournisseur_delete_admin` (migration `20260829140000_...sql`) ne vérifie, comme
+  d'habitude, que le rôle — pas l'absence de référence : c'est un filet de sécurité
+  différent qui protège ici, les FK `marche_id_fournisseur_fkey`,
+  `demande_achat_id_fournisseur_retenu_fkey` et `devis_consulte_id_fournisseur_fkey`
+  n'ayant aucun `ON DELETE CASCADE` (`RESTRICT` par défaut) : Postgres refuserait de toute
+  façon la suppression en cas de bug dans la vérification applicative. Tous les CONTACT du
+  fournisseur sont supprimés d'abord (`contactRepository.removeByFournisseur`), le
+  fournisseur ensuite — deux appels distincts, `supabase-js` n'exposant pas de transaction
+  multi-instructions (limite déjà connue ailleurs dans ce backend).
+
+**`finances.fournisseur`/`finances.contact` existaient déjà physiquement avant le 29/08/2026**
+(schéma préexistant, transmis par l'utilisateur ce même jour) — la migration ci-dessous ne les
+crée pas, elle ajoute seulement GRANT/RLS/policies (`select * from pg_policies where
+schemaname='finances' and tablename in ('fournisseur','contact')` ne renvoyait aucune ligne
+avant cette migration). Deux écarts découverts à cette occasion et corrigés dans le code
+applicatif (pas dans la base, dont le schéma fait foi) : `NATUREFONCTION` suit la contrainte
+CHECK réelle — DIRIGEANT, JURIDIQUE, COMMERCIAL, RESPONSABLE D'AFFAIRE, RESPONSABLE TECHNIQUE,
+TECHNICIEN, RESPONSABLE FINANCIER/COMPTABILITE, pas une liste inventée — et `SIREN` (renommé
+depuis `SIRET` le 29/08/2026 — confusion de terminologie, voir `ForClaude/CDC/mld-phases-1-2.md`
+§2.2) est `NOT NULL` (obligatoire à la création, pas optionnel).
+
+Migrations RLS (pas de création de table) : `supabase/migrations/20260829130000_create_fournisseur_contact.sql`
+(sécurisation initiale), `20260829140000_fournisseur_delete_policy.sql` (policy `DELETE`
+pour la suppression conditionnelle) et `20260829150000_rename_fournisseur_siret_to_siren.sql`
+(renommage de colonne).
+
+### 2.6 CUG (`finances.cug`)
+
+Même modèle RLS que §2.4 pour l'écriture (`ADMIN_APP` transverse **ou** `ADMIN_SERVICE` sur
+le service concerné, vérification de rôle seulement — le scoping fin par service est
+appliqué côté Express via `assertManagesService`, `cug.service.ts`). Une différence
+importante par rapport à §2.4/§2.5, à ne pas manquer en cas de refactor commun :
+
+- **La LECTURE n'est pas ouverte à tout `authenticated`** — contrairement à
+  SITE/SECTEUR/SEUIL_VALIDATION_DS (§2.4) et à FOURNISSEUR (§2.5, où la lecture est ouverte
+  à tout le monde mais scopée par service). Ici, un appelant qui n'est ni `ADMIN_APP` ni
+  `ADMIN_SERVICE` (id_service non nul dans `role_attribution`) reçoit un `AppError 403`
+  directement dans `cug.service.ts#resolveReadScope` — **pas** une liste vide comme le
+  ferait un scoping permissif. Décision du 29/08/2026 : CUG n'a **aucun** périmètre
+  Demandeur, à la différence explicite de FOURNISSEUR. La policy RLS `cug_select_admin`
+  reflète la même restriction de rôle (elle ne vérifie, comme d'habitude, que le rôle, pas
+  le service — le scoping par service reste appliqué côté Express).
+- **Pas de suppression** : `finances.cug` n'a pas de policy `DELETE` ni de fonction
+  `deleteCug` — seul l'état `ACTIF` permet de désactiver un CUG (même principe d'archivage
+  que SITE/SECTEUR/FOURNISSEUR), jamais de suppression physique.
+- **`CODE_CUG` est directement la clé primaire** (clé naturelle, comme `CODE_SITE`/
+  `CODE_SECTEUR` — pas de clé technique séparée comme `ID_CELLULE`) : non modifiable après
+  création, la route `PUT /cug/:codeCug` n'accepte que `libelleCug`/`actif`.
+
+`finances.cug` existait déjà physiquement avant le 29/08/2026 (comme FOURNISSEUR/CONTACT,
+§2.5) mais sans GRANT/RLS/policies ni colonne `ACTIF` — migration
+`supabase/migrations/20260829160000_add_actif_cug_and_secure.sql` (ajout de `ACTIF` +
+sécurisation initiale, écrite avec `DROP POLICY IF EXISTS` par précaution avant vérification
+du `pg_policies` réel).
 
 ## 3. Validation et sanitization des données
 

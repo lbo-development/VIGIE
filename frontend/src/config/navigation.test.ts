@@ -1,30 +1,35 @@
 import { describe, it, expect } from 'vitest'
-import { filterSidebarGroups, SIDEBAR_GROUPS } from './navigation'
+import {
+  filterParametresItems,
+  filterNavItems,
+  isMarchesSection,
+  isParametresSection,
+  PARAMETRES_ITEMS,
+  NAV_ITEMS,
+} from './navigation'
 
-describe('filterSidebarGroups', () => {
-  it('retire entièrement "Paramètres" sans ADMIN_APP ni ADMIN_SERVICE', () => {
-    const result = filterSidebarGroups(SIDEBAR_GROUPS, { isAdminApp: false, isAdminService: false })
+describe('filterParametresItems', () => {
+  it("retourne une liste vide sans ADMIN_APP ni ADMIN_SERVICE (section masquée)", () => {
+    const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: false, isAdminService: false })
 
-    expect(result.find((g) => g.label === 'Paramètres')).toBeUndefined()
+    expect(result).toEqual([])
   })
 
-  it('ADMIN_SERVICE voit "Paramètres" (dont "Seuils de validation DS") mais pas "Réglages"', () => {
-    const result = filterSidebarGroups(SIDEBAR_GROUPS, { isAdminApp: false, isAdminService: true })
-    const parametres = result.find((g) => g.label === 'Paramètres')
+  it('ADMIN_SERVICE voit "Paramètres" (dont "Seuils de validation DS" et "CUG") mais pas "Réglages"', () => {
+    const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: false, isAdminService: true })
 
-    expect(parametres).toBeDefined()
-    expect(parametres!.items.map((i) => i.label)).toEqual([
+    expect(result.map((i) => i.label)).toEqual([
       'Gisement géographique',
       'Gisement technique',
       'Seuils de validation DS',
+      'CUG',
     ])
   })
 
-  it('ADMIN_APP voit "Paramètres" et toutes ses entrées (Réglages, Directions, Services, Cellules, Seuils de validation DS)', () => {
-    const result = filterSidebarGroups(SIDEBAR_GROUPS, { isAdminApp: true, isAdminService: false })
-    const parametres = result.find((g) => g.label === 'Paramètres')
+  it('ADMIN_APP voit toutes les entrées (Réglages, Directions, Services, Cellules, Seuils de validation DS, CUG)', () => {
+    const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: true, isAdminService: false })
 
-    expect(parametres!.items.map((i) => i.label)).toEqual([
+    expect(result.map((i) => i.label)).toEqual([
       'Gisement géographique',
       'Gisement technique',
       'Réglages',
@@ -32,6 +37,81 @@ describe('filterSidebarGroups', () => {
       'Services',
       'Cellules',
       'Seuils de validation DS',
+      'CUG',
     ])
+  })
+
+  it('"Fournisseurs" n\'apparaît pas dans "Paramètres" (déplacé dans l\'en-tête)', () => {
+    expect(PARAMETRES_ITEMS.map((i) => i.label)).not.toContain('Fournisseurs')
+  })
+})
+
+describe('filterNavItems', () => {
+  it('"Accueil" et "Marchés" sont toujours visibles', () => {
+    const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
+
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés'])
+  })
+
+  it("masque \"Fournisseurs\" pour un compte non rattaché à un ACTEUR (ni rôle d'administration, ni service propre)", () => {
+    const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
+
+    expect(result.map((i) => i.label)).not.toContain('Fournisseurs')
+  })
+
+  it('ADMIN_SERVICE voit "Marchés" puis "Fournisseurs"', () => {
+    const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: true, hasOwnService: false })
+
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+  })
+
+  it('ADMIN_APP voit "Marchés" puis "Fournisseurs"', () => {
+    const result = filterNavItems(NAV_ITEMS, { isAdminApp: true, isAdminService: false, hasOwnService: false })
+
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+  })
+
+  it('un Demandeur (sans rôle dédié, mais rattaché à un service) voit "Marchés" puis "Fournisseurs"', () => {
+    const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: true })
+
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+  })
+
+  it('"Paramètres" ne figure pas dans les onglets du header (point d\'entrée : pied de sidebar)', () => {
+    expect(NAV_ITEMS.map((i) => i.label)).not.toContain('Paramètres')
+  })
+})
+
+describe('isMarchesSection', () => {
+  it('reconnaît la racine de la section', () => {
+    expect(isMarchesSection('/marches')).toBe(true)
+  })
+
+  it('reconnaît une sous-page de la section', () => {
+    expect(isMarchesSection('/marches/import')).toBe(true)
+  })
+
+  it('ignore une route hors de la section', () => {
+    expect(isMarchesSection('/parametres/fournisseurs')).toBe(false)
+    expect(isMarchesSection('/')).toBe(false)
+  })
+})
+
+describe('isParametresSection', () => {
+  it('reconnaît la racine de la section', () => {
+    expect(isParametresSection('/parametres')).toBe(true)
+  })
+
+  it('reconnaît une sous-page de la section', () => {
+    expect(isParametresSection('/parametres/cug')).toBe(true)
+  })
+
+  it('ignore une route hors de la section', () => {
+    expect(isParametresSection('/marches')).toBe(false)
+    expect(isParametresSection('/')).toBe(false)
+  })
+
+  it('ignore "/fournisseurs" — sa sidebar doit rester vide, pas celle de "Paramètres" (régression 30/08/2026)', () => {
+    expect(isParametresSection('/fournisseurs')).toBe(false)
   })
 })

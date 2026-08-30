@@ -12,6 +12,8 @@ export interface MeResponse {
   matricule: string | null
   nom: string | null
   prenom: string | null
+  /** Rattachement propre de l'acteur (ACTEUR.ID_CELLULE → CELLULE.ID_SERVICE), indépendant des rôles — permet à un Demandeur (sans rôle dédié) de connaître son propre service. */
+  idService: number | null
   roles: MeRole[]
 }
 

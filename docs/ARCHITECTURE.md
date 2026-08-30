@@ -141,6 +141,40 @@ create unique index parametre_application_service_uk
   historisée par service) : ajouter `date_application` et passer d'`UPDATE` à `INSERT`
   versionné plutôt que de créer une table d'audit séparée.
 
+### Catalogue des paramètres connus (`finances.parametre_definition`)
+
+Décision (29/08/2026) : le **libellé** (et la description, et la valeur par défaut) d'un
+paramètre sont stockés en base plutôt qu'en dur dans le registre backend — une table
+séparée, `finances.parametre_definition` (**cle** PK, `libelle` NOT NULL, `description`,
+`valeur_defaut` jsonb NOT NULL), une ligne par clé. Volontairement **distincte** de
+`parametre_application` plutôt qu'une colonne `libelle` ajoutée dessus : une même clé a
+jusqu'à 3 lignes dans `parametre_application` (global/direction/service) — dupliquer le
+libellé sur chacune risquerait une divergence entre deux lignes de la même clé.
+`parametre_application.cle` référence `parametre_definition.cle` par FK
+(`parametre_application_cle_fkey`) : toute ligne de valeur doit correspondre à une clé
+répertoriée.
+
+Ce que la base pilote désormais vs. ce qui reste en dur :
+
+| | Base (`parametre_definition`) | Code (`parametres.service.ts`) |
+|---|---|---|
+| Libellé, description, valeur par défaut | ✅ | — |
+| Schéma de validation (type, bornes) | — | ✅ (`PARAMETRE_SCHEMAS`, `cle → schéma Zod`) |
+
+Le schéma de validation reste codé en dur : le valider entièrement depuis des données
+nécessiterait un mini-DSL (type simple + bornes en base plutôt qu'un schéma Zod explicite),
+jugé hors scope — décision du 29/08/2026, à revisiter seulement si le besoin se confirme.
+**Ajouter un paramètre** = ajouter une entrée dans `PARAMETRE_SCHEMAS` **et** une ligne dans
+`parametre_definition` (migration) — les deux doivent rester synchronisés ; une clé
+présente dans l'un sans l'autre est un bug (`getSchema()` renvoie une 500 explicite si le
+schéma manque pour une clé par ailleurs connue en base).
+
+Policies RLS : lecture ouverte à tout `authenticated` rattaché à un ACTEUR, écriture
+réservée `ADMIN_APP` — même modèle que `parametre_application` (voir
+`ForClaude/SECURITY.md` §2.3). Migration :
+`supabase/migrations/20260829170000_create_parametre_definition.sql` (table, seed de la
+ligne `auth.inactivite_delai_minutes`, ajout de la FK).
+
 ### Résolution en cascade (le plus spécifique gagne)
 
 Implémentée comme fonction SQL plutôt que reconstruite côté JS (logique proche de la
@@ -174,20 +208,25 @@ exploitable directement par `supabase-js`) est de même porté par une fonction 
 ### Couches (suit le modèle `items`)
 
 1. Migrations Supabase : `20260825100000_create_parametre_application.sql` (table, index
-   uniques partiels, policies RLS — voir `ForClaude/SECURITY.md` §2.3) et
+   uniques partiels, policies RLS — voir `ForClaude/SECURITY.md` §2.3),
    `20260825110000_add_parametre_application_functions.sql` (fonctions de résolution/upsert
-   ci-dessus).
-2. `repositories/parametres.repository.ts` — appelle les deux fonctions SQL via `.rpc()`.
+   ci-dessus) et `20260829170000_create_parametre_definition.sql` (catalogue libellé/
+   description/valeur par défaut, voir ci-dessus).
+2. `repositories/parametres.repository.ts` — appelle les deux fonctions SQL via `.rpc()`
+   sur `parametre_application`. `repositories/parametreDefinition.repository.ts` —
+   `findAll()`/`findByCle()` sur `parametre_definition` (`select` simple, pas de RPC).
    `repositories/acteur.repository.ts` — résout `id_service` d'un acteur
    (`acteur.id_cellule → cellule.id_service`, indépendant des rôles applicatifs) — fichier
    partagé avec `site.service.ts`/`sousSite.service.ts`, pas dupliqué par ressource.
    `repositories/auth.repository.ts` — résolution matricule ↔ compte Auth, vérification de
    rôle actif (`role_attribution`, sans la suppléance : d'après le MCD elle ne couvre que
    RC/CDS/DS, pas ADMIN_APP).
-3. `services/parametres.service.ts` — registre `cle → { schéma Zod, valeur par défaut }`,
-   une seule entrée à ce stade : `auth.inactivite_delai_minutes` (entier, 1-240, défaut 30 —
-   voir `ForClaude/SECURITY.md` §1.1). Valide `valeur` à l'écriture et à la lecture, rejette
-   une clé inconnue (404) ou une portée `idDirection`+`idService` simultanée (400).
+3. `services/parametres.service.ts` — registre `cle → schéma Zod` (`PARAMETRE_SCHEMAS`,
+   validation uniquement — libellé/description/valeur par défaut viennent de
+   `parametre_definition`), une seule entrée à ce stade : `auth.inactivite_delai_minutes`
+   (entier, 1-240 — voir `ForClaude/SECURITY.md` §1.1). Valide `valeur` à l'écriture et à la
+   lecture, rejette une clé inconnue (404, résolue via `parametre_definition`) ou une portée
+   `idDirection`+`idService` simultanée (400).
 4. `middlewares/requireAuth.ts` (vérifie le JWT Supabase, résout `req.matricule` —
    `types/express.d.ts` augmente `Express.Request`) et `middlewares/requireRole.ts` (factory
    `requireRole(typeRole)`) — première route protégée du backend, voir
