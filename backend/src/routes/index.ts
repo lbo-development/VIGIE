@@ -10,6 +10,8 @@ import cellulesRoutes from './cellules.routes.js'
 import seuilValidationDsRoutes from './seuilValidationDs.routes.js'
 import fournisseursRoutes from './fournisseur.routes.js'
 import cugRoutes from './cug.routes.js'
+import marcheRoutes from './marche.routes.js'
+import marcheImportRoutes from './marcheImport.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -28,5 +30,7 @@ router.use('/cellules', cellulesRoutes)
 router.use('/seuils-validation-ds', seuilValidationDsRoutes)
 router.use('/fournisseurs', fournisseursRoutes)
 router.use('/cug', cugRoutes)
+router.use('/marches', marcheRoutes)
+router.use('/marches/import', marcheImportRoutes)
 
 export default router

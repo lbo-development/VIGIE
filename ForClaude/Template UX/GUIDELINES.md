@@ -108,6 +108,7 @@ Tous documentés avec exemples HTML dans `gpmm-style-guide.html`. Liste non exha
 | Panneaux liés aux onglets principaux (header) | `[data-main-panel="xxx"]` associé à `[data-main-tab="xxx"]` | `initShell` |
 | Sélecteur segmenté | `.gp-seg` / `.gp-seg__item` | `initPageTabs` |
 | Badge | `.gp-badge` + `--info/--success/--warning/--danger` | — |
+| Barre de progression | `.gp-progress` / `.gp-progress__bar`, variante `.gp-progress--indeterminate` | — (déterminée : fixer `style="width:NN%"` en JS métier) |
 | Tableau (tri, redim., réordo., sélection) | voir section dédiée ci-dessous | `initTables` |
 | Tooltip | `.gp-tip[data-tip="texte"]` | CSS uniquement |
 | Popover | `.gp-popover` | à câbler au cas par cas |
@@ -144,6 +145,21 @@ gpmmToast({ type: 'success', title: 'Modifications enregistrées', text: 'La fic
 // type: 'info' | 'success' | 'warning' | 'danger'
 // info/success disparaissent seuls après 5s ; warning/danger restent jusqu'à fermeture manuelle
 ```
+
+### Afficher une progression
+
+Deux variantes, jamais de JS requis pour l'indéterminée :
+
+```html
+<!-- Déterminée : pourcentage connu, mis à jour en JS métier -->
+<div class="gp-progress"><div class="gp-progress__bar" style="width:42%"></div></div>
+
+<!-- Indéterminée : traitement serveur en cours sans avancement chiffré -->
+<div class="gp-progress gp-progress--indeterminate"><div class="gp-progress__bar"></div></div>
+```
+
+Prévoir un texte au-dessus décrivant l'action en cours (ex. `<p>Import en cours…</p>`) — la
+barre seule n'indique jamais ce qui se passe.
 
 ### Afficher un contenu différent par onglet principal (header)
 

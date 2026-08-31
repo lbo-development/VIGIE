@@ -1,0 +1,95 @@
+/* =====================================================================
+   Styles propres à la page Marchés (États des marchés / Import PGI) —
+   jamais dans gpmm.css, réutilisé tel quel par d'autres applications GPMM.
+
+   Règles :
+   - Toute classe ici est préfixée `.marche-` pour ne jamais entrer en
+     conflit avec l'espace de noms `.gp-*` du template partagé.
+   - Composer avec les classes `.gp-*` existantes (`.gp-panel`, `.gp-table`,
+     `.gp-badge`, `.stack`, `.row`, etc.) plutôt que les dupliquer ici —
+     ce fichier ne contient que ce qui est vraiment spécifique à cette page.
+   - Toutes les valeurs visuelles (couleur, rayon, ombre, espacement) passent
+     par les variables `--gp-*` définies dans gpmm.css, jamais de valeur en
+     dur, pour rester visuellement cohérent avec le reste de l'application
+     (thème clair/sombre inclus).
+   ===================================================================== */
+
+/* Liste des marchés (États des marchés) — une carte par marché. Défilement
+   interne borné (comme .gp-table-wrap pour Fournisseurs.tsx) : l'en-tête de
+   page et la ligne de filtres restent toujours visibles, seule la liste
+   défile. `calc` plutôt qu'un pixel fixe pour s'adapter à la hauteur réelle
+   de la fenêtre (les cartes sont plus hautes qu'une ligne de tableau). */
+.marche-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 340px);
+  min-height: 200px;
+  overflow-y: auto;
+}
+
+.marche-card {
+  background: var(--gp-surface);
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius-lg);
+  padding: 16px 18px;
+}
+
+/* Chaque pastille vit dans la ligne de texte qu'elle qualifie (titre ↔ ACTIF,
+   sous-titre ↔ COMPLETUDE) — alignement garanti par le flex de la ligne
+   elle-même plutôt que par un positionnement absolu séparé. */
+.marche-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.marche-dot--on {
+  background: var(--gp-success);
+}
+.marche-dot--off {
+  background: var(--gp-danger);
+}
+
+.marche-card__title {
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--gp-text);
+}
+.marche-card__subtitle {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: var(--gp-text-secondary);
+  margin: 2px 0 12px;
+}
+
+.marche-metric {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+.marche-metric__bar {
+  flex: 0 1 50%;
+  max-width: 50%;
+  background: var(--gp-table-hbg);
+  border: 1px solid var(--gp-border);
+}
+.marche-metric__label {
+  font-size: 12px;
+  color: var(--gp-text-secondary);
+  white-space: nowrap;
+  font-family: var(--gp-mono);
+}
+
+/* Portée par la ligne "Montant" (dernier `.marche-metric`) — poussées à droite,
+   centrées sur son axe horizontal grâce à `align-items:center` du parent. */
+.marche-card__actions {
+  margin-left: auto;
+}

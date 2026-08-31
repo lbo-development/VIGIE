@@ -491,6 +491,19 @@ describe('Fournisseurs', () => {
     expect(screen.getByText('Acme')).toBeInTheDocument()
   })
 
+  it('Demandeur (sans rôle, rattaché à un service) : direction et service se verrouillent aussi sur son propre périmètre (régression 30/08/2026 — seul ADMIN_SERVICE était couvert)', () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    render(<Fournisseurs />)
+
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+
+    const serviceTrigger = screen.getByRole('button', { name: 'Filtrer par service' })
+    fireEvent.click(serviceTrigger)
+    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    expect(within(serviceMenu).queryByText('Voyageurs')).not.toBeInTheDocument()
+  })
+
   it('ADMIN_APP voit tous les services de la direction choisie dans la combobox de filtre', () => {
     currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
     render(<Fournisseurs />)

@@ -26,9 +26,13 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     data: { session },
   } = await supabase.auth.getSession()
 
+  // FormData (upload de fichier) : ne jamais fixer Content-Type nous-mêmes,
+  // le navigateur doit générer l'en-tête multipart/form-data avec sa propre
+  // boundary — le fixer en dur casserait la requête.
+  const isFormData = options.body instanceof FormData
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
       ...options.headers,
     },
@@ -52,4 +56,6 @@ export const api = {
   put: <T>(path: string, data: unknown) =>
     request<T>(path, { method: 'PUT', body: JSON.stringify(data) }),
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** Upload de fichier (multipart/form-data) — voir la note sur isFormData dans request() ci-dessus. */
+  postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
 }

@@ -11,6 +11,7 @@ import {
   PARAMETRES_ITEMS,
   MARCHES_SIDEBAR_ITEMS,
   filterParametresItems,
+  filterMarchesSidebarItems,
   filterNavItems,
   isMarchesSection,
   isParametresSection,
@@ -44,6 +45,7 @@ export function AppShell() {
 
   const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
   const isAdminService = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_SERVICE') ?? false
+  const isCB = currentUser?.roles.some((r) => r.typeRole === 'CB') ?? false
   // Demandeur scopé à son service (voir filterNavItems) : vrai dès qu'un
   // idService est résolu, rôle d'administration ou non.
   const hasOwnService = currentUser?.idService != null
@@ -57,12 +59,16 @@ export function AppShell() {
   const parametresItems = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp, isAdminService })
   const parametresLink = parametresItems[0]?.to ?? null
 
+  // "Importation marchés PGI" réservée à ADMIN_APP/ADMIN_SERVICE/CB (décision
+  // du 30/08/2026) — "États des marchés" reste visible pour tous.
+  const marchesItems = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
+
   // Contenu de la sidebar contextuel à la section active : "en lieu et place
   // des options présentes", pas en plus (Marchés et Paramètres se remplacent
   // mutuellement selon la route courante, jamais combinés).
   const inMarchesSection = isMarchesSection(location.pathname)
   const inParametresSection = isParametresSection(location.pathname)
-  const sidebarItems = inMarchesSection ? MARCHES_SIDEBAR_ITEMS : inParametresSection ? parametresItems : []
+  const sidebarItems = inMarchesSection ? marchesItems : inParametresSection ? parametresItems : []
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',

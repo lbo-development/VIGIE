@@ -28,7 +28,11 @@ export interface Fournisseur {
   id_service: number
   raison_sociale_pgi: string | null
   raison_sociale_service: string
-  siren: string
+  // Nullable depuis le 30/08/2026 : un fournisseur auto-créé par l'import PGI
+  // des marchés (TYPE_CREATION='PGI') n'a pas de SIREN disponible dans le
+  // fichier source — reste obligatoire pour une création manuelle (formulaire
+  // ci-dessous), imposé côté backend, pas ici.
+  siren: string | null
   numpgi: string | null
   adr1: string | null
   adr2: string | null

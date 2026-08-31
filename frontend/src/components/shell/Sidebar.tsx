@@ -2,8 +2,15 @@ import { Link, useLocation } from 'react-router-dom'
 import type { NavItem } from '../../config/navigation'
 import type { Theme } from '../../hooks/useTheme'
 
+/**
+ * Correspondance EXACTE, contrairement à Header.tsx (préfixe, car un onglet y
+ * représente toute une section). Les items de la sidebar sont des pages
+ * précises (feuilles), pas des sections — un préfixe romprait dès que deux
+ * routes s'emboîtent littéralement (ex. "/marches" est un préfixe de
+ * "/marches/import" : les deux s'activaient en même temps, bug du 30/08/2026).
+ */
 function isItemActive(pathname: string, to: string) {
-  return to === '/' ? pathname === '/' : pathname.startsWith(to)
+  return pathname === to
 }
 
 interface SidebarProps {

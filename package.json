@@ -22,5 +22,10 @@
     "concurrently": "^8.2.2",
     "dotenv": "^16.4.5",
     "tsx": "^4.19.0"
+  },
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
   }
 }

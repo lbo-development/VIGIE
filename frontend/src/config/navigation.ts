@@ -56,6 +56,26 @@ export function isMarchesSection(pathname: string): boolean {
   return pathname === MARCHES_SECTION_PATH || pathname.startsWith(`${MARCHES_SECTION_PATH}/`)
 }
 
+/**
+ * Filtre les items de la section "Marchés" : "États des marchés" reste
+ * toujours visible (aucune règle d'accès encore définie pour la consultation
+ * elle-même). "Importation marchés PGI" est réservée à ADMIN_APP (transverse),
+ * ADMIN_SERVICE (scopé à son service) et CB (Contrôle Budgétaire, scopé à son
+ * service — décision du 30/08/2026, voir
+ * `ForClaude/Importation-marches/import-marches-pgi.md` §4) — pas de rôle
+ * ADMIN_APP/ADMIN_SERVICE nécessaire, mais un des trois. Purement une
+ * question d'affichage pour l'instant : aucun backend d'import n'existe
+ * encore pour appliquer cette règle côté serveur (pages Marches.tsx/
+ * ImportMarches.tsx encore des coquilles).
+ */
+export function filterMarchesSidebarItems(
+  items: NavItem[],
+  { isAdminApp, isAdminService, isCB }: { isAdminApp: boolean; isAdminService: boolean; isCB: boolean },
+): NavItem[] {
+  if (isAdminApp || isAdminService || isCB) return items
+  return items.filter((item) => item.label !== 'Importation marchés PGI')
+}
+
 /** Racine de la section "Paramètres" (voir `isParametresSection`). */
 export const PARAMETRES_SECTION_PATH = '/parametres'
 

@@ -17,6 +17,14 @@ import { AppError } from '../middlewares/errorHandler.js'
  */
 const PARAMETRE_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'auth.inactivite_delai_minutes': z.number().int().min(1).max(240),
+  // Date ISO (YYYY-MM-DD) de la dernière importation des marchés PGI pour un
+  // service, ou JSON null (jamais SQL NULL, la colonne valeur est NOT NULL —
+  // voir ForClaude/Importation-marches/import-marches-pgi.md §7) si ce
+  // service n'a encore jamais importé.
+  'last.import.marche.pgi': z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format attendu : YYYY-MM-DD)')
+    .nullable(),
 }
 
 function getSchema(cle: string): z.ZodTypeAny {

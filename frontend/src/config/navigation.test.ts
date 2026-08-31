@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest'
 import {
   filterParametresItems,
+  filterMarchesSidebarItems,
   filterNavItems,
   isMarchesSection,
   isParametresSection,
   PARAMETRES_ITEMS,
+  MARCHES_SIDEBAR_ITEMS,
   NAV_ITEMS,
 } from './navigation'
 
@@ -94,6 +96,48 @@ describe('isMarchesSection', () => {
   it('ignore une route hors de la section', () => {
     expect(isMarchesSection('/parametres/fournisseurs')).toBe(false)
     expect(isMarchesSection('/')).toBe(false)
+  })
+})
+
+describe('filterMarchesSidebarItems', () => {
+  it('masque "Importation marchés PGI" sans ADMIN_APP/ADMIN_SERVICE/CB, garde "États des marchés"', () => {
+    const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['États des marchés'])
+  })
+
+  it('ADMIN_APP voit les deux options', () => {
+    const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
+      isAdminApp: true,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
+  })
+
+  it('ADMIN_SERVICE voit les deux options', () => {
+    const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: true,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
+  })
+
+  it('CB voit les deux options', () => {
+    const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: true,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
   })
 })
 

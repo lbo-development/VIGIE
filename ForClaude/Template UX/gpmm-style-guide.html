@@ -245,6 +245,18 @@ body{margin:0;font-family:var(--gp-sans);background:var(--gp-page);color:var(--g
 /* ========================= BADGE ========================= */
 .gp-badge{font-size:11px;font-weight:500;padding:1px 7px;border-radius:9px;background:var(--gp-info-bg);color:var(--gp-info-text);}
 
+/* ========================= BARRE DE PROGRESSION ========================= */
+.gp-progress{position:relative;width:100%;height:8px;border-radius:999px;background:var(--gp-surface-sunken);overflow:hidden;}
+.gp-progress__bar{position:absolute;top:0;bottom:0;left:0;width:0;border-radius:999px;background:var(--gp-primary);transition:width .2s ease;}
+.gp-progress--indeterminate .gp-progress__bar{width:40%;animation:gp-progress-indeterminate 1.4s ease-in-out infinite;}
+@keyframes gp-progress-indeterminate{
+  0%{left:-40%;}
+  100%{left:100%;}
+}
+@media (prefers-reduced-motion:reduce){
+  .gp-progress--indeterminate .gp-progress__bar{animation-duration:2.8s;}
+}
+
 /* ========================= SLICERS ========================= */
 .gp-chipset{display:flex;flex-wrap:wrap;gap:7px;}
 .gp-chip{font-family:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--gp-border-strong);
@@ -885,6 +897,26 @@ table.gp-table{border-collapse:separate;border-spacing:0;width:100%;min-width:68
         <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="success">Succès</button>
         <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="warning">Alerte</button>
         <button class="gp-btn gp-btn--neutral gp-btn--sm" data-toast="danger">Erreur</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- BARRE DE PROGRESSION -->
+  <section class="doc-section">
+    <h2 class="doc-h">Barre de progression</h2>
+    <p class="doc-desc">Variante déterminée (largeur en %, pilotée en JS métier) et variante
+      indéterminée (bloc animé, aucun JS requis) — pour un traitement serveur sans avancement
+      chiffré. Toujours accompagnée d'un texte décrivant l'action en cours.</p>
+    <div class="specimen">
+      <div class="stack" style="max-width:360px;">
+        <div>
+          <p class="gp-help" style="margin:0 0 6px;">Import en cours… (déterminée, 42%)</p>
+          <div class="gp-progress"><div class="gp-progress__bar" style="width:42%"></div></div>
+        </div>
+        <div>
+          <p class="gp-help" style="margin:0 0 6px;">Import en cours… (indéterminée)</p>
+          <div class="gp-progress gp-progress--indeterminate"><div class="gp-progress__bar"></div></div>
+        </div>
       </div>
     </div>
   </section>

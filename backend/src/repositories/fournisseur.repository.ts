@@ -11,7 +11,13 @@ export interface Fournisseur {
   etatfournisseur: 'Actif' | 'Inactif'
   raison_sociale_pgi: string | null
   raison_sociale_service: string
-  siren: string
+  // Nullable depuis le 30/08/2026 (migration 20260830120000) — uniquement
+  // pour TYPE_CREATION='PGI' (contrainte CHECK fournisseur_siren_pgi_check) :
+  // le fichier d'import des marchés ne fournit aucun SIREN pour un
+  // fournisseur auto-créé (variante OP3.1). Reste obligatoire pour une
+  // création manuelle (TYPE_CREATION='SERVICE'), imposé applicativement
+  // par createFournisseurSchema, pas ici.
+  siren: string | null
   numpgi: string | null
   adr1: string | null
   adr2: string | null
@@ -42,6 +48,19 @@ export async function findById(idFournisseur: number): Promise<Fournisseur | nul
     .from('fournisseur')
     .select(SELECT_COLUMNS)
     .eq('id_fournisseur', idFournisseur)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+/** Résout le fournisseur PGI (NUMPGI = NUM_TITULAIRE) d'un service — voir OP3.1, « variante import marchés ». */
+export async function findByNumpgi(idService: number, numpgi: string): Promise<Fournisseur | null> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('fournisseur')
+    .select(SELECT_COLUMNS)
+    .eq('id_service', idService)
+    .eq('numpgi', numpgi)
     .maybeSingle()
   if (error) throw error
   return data

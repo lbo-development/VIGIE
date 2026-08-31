@@ -315,6 +315,66 @@ importante par rapport à §2.4/§2.5, à ne pas manquer en cas de refactor comm
 sécurisation initiale, écrite avec `DROP POLICY IF EXISTS` par précaution avant vérification
 du `pg_policies` réel).
 
+### 2.7 Audit RLS complet du 30/08/2026
+
+Un audit externe a signalé qu'au moins 15 des tables de `finances` (dont `acteur`,
+`role_attribution`, `suppleance`) n'avaient aucune policy dans ce dépôt, avec un risque
+présenté comme critique : un agent authentifié pourrait interroger PostgREST directement
+avec son propre JWT (`GET https://<projet>.supabase.co/rest/v1/role_attribution`), en
+contournant entièrement `assertManagesService` (qui protège l'API Express, pas la base) — et
+s'auto-attribuer `ADMIN_APP` en écrivant dans `role_attribution`.
+
+**Vérification en base (requêtes `pg_tables`/`pg_policies`/`information_schema.role_table_grants`,
+schéma `finances` en entier) : le risque ne se confirme pas.** Point clé, absent de l'audit
+initial : **la RLS est activée sur les 26 tables de `finances`, sans exception.** Or, quand la
+RLS est activée sur une table et qu'aucune policy n'existe, Postgres **refuse par défaut tout
+accès** à n'importe quel rôle (sauf `service_role`, qui contourne la RLS par construction) —
+le `GRANT` large au niveau table (`anon`/`authenticated` avaient `SELECT`/`INSERT`/`UPDATE`/
+`DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER` sur absolument tout, vraisemblablement un `GRANT
+ALL ... TO anon, authenticated` exécuté globalement à un moment non documenté) ne s'applique
+donc jamais : la RLS bloque en amont. Les tables sans policy explicite
+(`acteur`, `certificat_service_fait`, `demande_achat`, `devis_consulte`, `historique_statut`,
+`historique_statut_csf`, `marche`, `operation_investissement`, `piece_jointe`,
+`role_attribution`, `statut`, `statut_csf`, `suppleance` — `fournisseur`/`contact` en faisaient
+partie jusqu'à l'exécution des migrations du 29/08/2026) sont donc **inaccessibles en pratique
+à `anon` et `authenticated`**, pas ouvertes.
+
+Deux correctifs réels appliqués malgré tout, en défense en profondeur (le GRANT large restait
+un filet de sécurité fragile — une policy trop permissive ajoutée par erreur, ou une RLS
+désactivée par mégarde sur une table, l'aurait immédiatement rendu actif) :
+
+- **Durcissement des GRANT** (`supabase/migrations/20260830100000_harden_finances_grants.sql`) :
+  vérifié au préalable que **ni le frontend ni le backend n'appellent jamais Supabase
+  directement pour une table `finances.*`** (`grep supabase.from` dans `frontend/src` :
+  aucun résultat — le frontend ne fait que de l'auth, `supabase.auth.*` ; tout le reste passe
+  par `services/api.ts` → Express → `service_role`). `anon` et `authenticated` n'ont donc
+  aucun usage légitime sur ces tables : `anon` perd tout privilège partout ; `authenticated`
+  perd `TRUNCATE`/`REFERENCES`/`TRIGGER` partout (jamais utilisés via PostgREST, aucun verbe
+  REST n'y correspond) et perd aussi `SELECT`/`INSERT`/`UPDATE`/`DELETE` sur les 13 tables
+  listées ci-dessus (sans policy = accès direct jamais voulu, réservé à `service_role`).
+- **`secteur`/`sous_secteur` alignées sur `site`/`sous_site`**
+  (`supabase/migrations/20260830110000_secteur_sous_secteur_admin_policies.sql`) : ces deux
+  dernières avaient déjà, en base, des policies `INSERT`/`UPDATE` (`ADMIN_APP` transverse ou
+  `ADMIN_SERVICE` scopé — pour `SOUS_SITE`, résolu par jointure sur `SITE` via `code_site`,
+  `SOUS_SITE` n'ayant pas de colonne `id_service` propre) que `SECTEUR`/`SOUS_SECTEUR`
+  n'avaient pas (seulement `SELECT`), une asymétrie sans rapport avec le modèle documenté.
+
+**Point de vigilance distinct, non corrigé ici** : `public.profiles` (table partagée avec
+d'autres applications GPMM, ex. `escales` — voir Contexte du projet) a la RLS activée et une
+policy saine (`profiles_select_self`, lecture de sa propre ligne uniquement), donc pas de
+risque pratique aujourd'hui — mais porte le même GRANT excessif (`anon` inclus, avec
+`TRUNCATE`). Ne pas y toucher unilatéralement : contrairement à `finances.*`, cette table
+n'appartient pas qu'à VIGIE, un durcissement y nécessite une coordination avec qui gère
+`escales`.
+
+**Constat annexe, hors du périmètre de cet audit** : plusieurs policies déjà en place en base
+(`site_insert_admin`, `site_update_admin`, `sous_site_insert_admin`, `sous_site_update_admin`,
+et les policies `SELECT`/`INSERT`/`UPDATE` de `direction`/`service`/`cellule`) n'ont jamais été
+capturées dans une migration suivie par ce dépôt — pas un risque de sécurité en soi, mais un
+problème de reproductibilité (une reconstruction du projet Supabase depuis les migrations
+seules ne les recréerait pas). À traiter un jour via une migration de rattrapage, sans
+urgence.
+
 ## 3. Validation et sanitization des données
 
 - Toute donnée entrante (body, query params, headers, params d'URL) côté Express doit être validée avec un schéma explicite (ex. `zod` ou `yup`) avant traitement — jamais utilisée brute.
@@ -390,6 +450,13 @@ du `pg_policies` réel).
 - Valider le type MIME réel du fichier (pas seulement l'extension) et sa taille avant tout traitement ou stockage (Supabase Storage).
 - Ne jamais utiliser un nom de fichier fourni par l'utilisateur tel quel pour le stockage — générer un identifiant/nom neutre côté serveur.
 - Appliquer des règles RLS/policies sur les buckets Supabase Storage, au même titre que sur les tables.
+
+**Cas concret : import PGI des marchés (30/08/2026, `backend/src/routes/marcheImport.routes.ts`).**
+Le fichier Excel déposé (`multer`, `memoryStorage`) n'est **jamais persisté sur disque ni dans
+Supabase Storage** — parsé en mémoire (`exceljs`), puis rejeté. Une limite de taille est fixée
+(`limits: { fileSize: ... }`). Aucune confiance dans le nom/l'extension : la structure réelle
+du contenu est validée (cellules attendues, en-têtes de colonnes, format de date) avant tout
+traitement des données — voir `ForClaude/Importation-marches/import-marches-pgi.md` §6.
 
 ## 11. Checklist rapide avant de livrer du code
 

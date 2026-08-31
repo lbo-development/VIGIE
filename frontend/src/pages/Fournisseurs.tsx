@@ -120,24 +120,23 @@ export function Fournisseurs() {
   const adminServiceIds = (currentUser?.roles ?? [])
     .filter((r) => r.typeRole === 'ADMIN_SERVICE' && r.idService !== null)
     .map((r) => r.idService as number)
-  const isRestrictedToOwnService = !isAdminApp && adminServiceIds.length > 0
+  // Service propre à verrouiller (filtre ET création) — celui du rôle
+  // ADMIN_SERVICE s'il existe, sinon celui de l'ACTEUR (Demandeur, sans rôle
+  // dédié, résolu via /api/me#idService — ACTEUR.ID_CELLULE → SERVICE, voir
+  // useCurrentUser.ts). Correction du 30/08/2026 : seul ADMIN_SERVICE était
+  // couvert jusqu'ici — un Demandeur voyait le sélecteur Direction/Service
+  // complet (bug d'affichage uniquement : la lecture reste déjà scopée à son
+  // service côté backend, voir fournisseur.service.ts#resolveReadScope, qui
+  // ignore de toute façon tout idService transmis par un non-ADMIN_APP).
+  const ownIdService = adminServiceIds[0] ?? currentUser?.idService ?? null
+  const isRestrictedToOwnService = !isAdminApp && ownIdService != null
   const visibleServices = isRestrictedToOwnService
-    ? services.filter((s) => adminServiceIds.includes(s.id_service))
+    ? services.filter((s) => s.id_service === ownIdService)
     : services
 
-  // Demandeur : connecté, mais sans rôle ADMIN_APP/ADMIN_SERVICE — peut tout
-  // de même créer un fournisseur pour son propre service (décision du
-  // 29/08/2026, voir assertManagesServiceOrIsOwnActor côté backend). Son
-  // service propre vient de /api/me (ACTEUR.ID_CELLULE → SERVICE), pas d'un
-  // rôle : voir useCurrentUser.ts.
-  const isPlainActor = !isAdminApp && !isRestrictedToOwnService
   // Service sur lequel verrouiller la création (ADMIN_SERVICE ou Demandeur) —
   // null pour ADMIN_APP, qui garde le sélecteur Direction → Service complet.
-  const ownIdServiceForCreate = isRestrictedToOwnService
-    ? (adminServiceIds[0] ?? null)
-    : isPlainActor
-      ? (currentUser?.idService ?? null)
-      : null
+  const ownIdServiceForCreate = isRestrictedToOwnService ? ownIdService : null
 
   const [filterIdDirection, setFilterIdDirection] = useState<string | null>(null)
   const [filterIdService, setFilterIdService] = useState<string | null>(null)
@@ -156,10 +155,10 @@ export function Fournisseurs() {
     // verrouillé, car il s'exécute avec le filterIdDirection encore null de
     // ce même rendu).
     if (isRestrictedToOwnService && filterIdDirection === null) {
-      const ownService = services.find((s) => s.id_service === adminServiceIds[0])
+      const ownService = services.find((s) => s.id_service === ownIdService)
       if (ownService) {
         setFilterIdDirection(String(ownService.id_direction))
-        setFilterIdService(String(adminServiceIds[0]))
+        setFilterIdService(String(ownIdService))
       }
       return
     }
@@ -171,7 +170,7 @@ export function Fournisseurs() {
     const stillValid = servicesForFilter.some((s) => s.id_service === Number(filterIdService))
     if (!stillValid) setFilterIdService(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRestrictedToOwnService, adminServiceIds.join(','), services, filterIdDirection])
+  }, [isRestrictedToOwnService, ownIdService, services, filterIdDirection])
 
   const serviceOptions = servicesForFilter.map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
   const serviceLabel = (idService: number) => services.find((s) => s.id_service === idService)?.libelle_service ?? '—'
@@ -277,7 +276,7 @@ export function Fournisseurs() {
             {displayedFournisseurs.map((fournisseur) => (
               <tr key={fournisseur.id_fournisseur}>
                 <td>{fournisseur.raison_sociale_service}</td>
-                <td className="mono">{fournisseur.siren}</td>
+                <td className="mono">{fournisseur.siren ?? '—'}</td>
                 <td>{fournisseur.ville ?? '—'}</td>
                 <td>{serviceLabel(fournisseur.id_service)}</td>
                 <td>

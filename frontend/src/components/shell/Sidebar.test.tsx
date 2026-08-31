@@ -38,6 +38,22 @@ describe('Sidebar — liste plate contextuelle (pas de sous-menu)', () => {
     expect(nav.getByRole('link', { name: 'Réglages' })).toHaveClass('is-active')
     expect(nav.getByRole('link', { name: 'Gisement géographique' })).not.toHaveClass('is-active')
   })
+
+  it("ne marque pas actif un item dont la route n'est qu'un préfixe littéral de la page courante (régression 30/08/2026 — ex. \"/marches\" vs \"/marches/import\")", () => {
+    const items: NavItem[] = [
+      { to: '/marches', label: 'États des marchés', icon: '' },
+      { to: '/marches/import', label: 'Importation marchés PGI', icon: '' },
+    ]
+    render(
+      <MemoryRouter initialEntries={['/marches/import']}>
+        <Sidebar items={items} parametresLink={null} hidden={false} theme="light" onToggleTheme={() => {}} />
+      </MemoryRouter>,
+    )
+    const nav = within(screen.getByRole('navigation'))
+
+    expect(nav.getByRole('link', { name: 'Importation marchés PGI' })).toHaveClass('is-active')
+    expect(nav.getByRole('link', { name: 'États des marchés' })).not.toHaveClass('is-active')
+  })
 })
 
 describe('Sidebar — bouton "Paramètres" du pied de sidebar', () => {

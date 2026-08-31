@@ -44,7 +44,7 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 
 - **CUG** (**CODE_CUG**, LIBELLE_CUG, #ID_SERVICE → SERVICE, **ACTIF** *(booléen, défaut true — ajout 29/08/2026, archivage par flag comme SITE/SECTEUR/FOURNISSEUR)*)
 - **OPERATION_INVESTISSEMENT** (**NUMERO_OPERATION**, LIBELLE, MT_AP1, MT_AP8, MT_CP1, MT_CP8, DATE_CREATION, MT_INITIAL)
-- **FOURNISSEUR** (**ID_FOURNISSEUR**, #ID_SERVICE → SERVICE, **ETATFOURNISSEUR** *(Actif | Inactif — ajout arbitrage 4)*, RAISON_SOCIALE_PGI, RAISON_SOCIALE_SERVICE, SIREN, NUMPGI, ADR1, ADR2, CP, VILLE, CEDEX, TYPE_CREATION) — colonne renommée SIRET → SIREN le 29/08/2026 (voir note ci-dessous)
+- **FOURNISSEUR** (**ID_FOURNISSEUR**, #ID_SERVICE → SERVICE, **ETATFOURNISSEUR** *(Actif | Inactif — ajout arbitrage 4)*, RAISON_SOCIALE_PGI, RAISON_SOCIALE_SERVICE, SIREN *(nullable si TYPE_CREATION='PGI', NOT NULL sinon — ajout 30/08/2026, voir note ci-dessous)*, NUMPGI, ADR1, ADR2, CP, VILLE, CEDEX, TYPE_CREATION) — colonne renommée SIRET → SIREN le 29/08/2026 (voir note ci-dessous)
 - **CONTACT** (**ID_CONTACT**, #ID_FOURNISSEUR → FOURNISSEUR, NOM, PRENOM, MAIL, TELFIXE, TELMOBILE, FONCTION, NATUREFONCTION)
 - **MARCHE** (**NUMMARCHE**, **ACTIF** *(booléen, remplace ETATMARCHE — renommage 30/08/2026, voir note)*, TYPE_CREATION, TYPEPROC, TYPEDECOMPOPRIX, NATUREPRESTA, LIBPGI, LIBELLE_SERVICE, TITULAIRE, NUM_TITULAIRE, TITULAIRE_SERVICE, AGENTGESTION, #CODE_CUG → CUG *(CUGGestion)*, DTENOTIF, DTEVALID, DTEDEBUT, DTEFINMAX, MTMINI, MTMAXI, ALERTEMT, ALERTEDATE, LASTMTREALISE, LASTMTENGAGE, DTELASTSOLDE, **DTELASTIMPORT** *(ajout 29/08/2026, voir note ci-dessous)*, PLANPREVENTIONACTIF, **COMPLETUDE** *(booléen, ajout 30/08/2026)*, **UTILISABLE** *(booléen calculé = ACTIF ET COMPLETUDE, ajout 30/08/2026)*, #(N)ID_FOURNISSEUR → FOURNISSEUR)
 
@@ -252,3 +252,12 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
   même que le renommage `ETATMARCHE → ACTIF` dans OP3.1/contrôle croisé du MCT. Migration
   proposée : `supabase/migrations/20260830090000_marche_actif_completude_utilisable.sql`.
   Détail complet : `ForClaude/Importation-marches/import-marches-pgi.md`.
+- 30/08/2026 (construction de l'import + SIREN nullable) : import PGI des marchés construit
+  de bout en bout (backend + frontend), avec revirement sur l'étape de confirmation (une
+  vraie pause bloquante, plus de détail dans `import-marches-pgi.md` §5 — divergence assumée
+  avec OP3.1 du MCT, signalée, MCT non modifié). `FOURNISSEUR.SIREN` devient **nullable pour
+  `TYPE_CREATION='PGI'`** (contrainte `CHECK` plutôt qu'un simple retrait du `NOT NULL` — reste
+  obligatoire pour une création manuelle) : le fichier d'import des marchés ne fournit aucun
+  SIREN pour un fournisseur auto-créé (variante OP3.1). Migration :
+  `supabase/migrations/20260830120000_marche_import_prerequisites.sql` (ajoute aussi
+  `DTELASTIMPORT` et le catalogue `last.import.marche.pgi`, jusqu'ici non écrits).
