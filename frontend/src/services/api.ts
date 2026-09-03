@@ -49,6 +49,23 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>
 }
 
+/** Téléchargement binaire (PDF...) — mêmes en-têtes d'auth que request(), mais body Blob plutôt que JSON. */
+async function requestBlob(path: string): Promise<Blob> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new ApiError(body.message ?? `Erreur API (${res.status})`, res.status)
+  }
+
+  return res.blob()
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path, { method: 'GET' }),
   post: <T>(path: string, data: unknown) =>
@@ -58,4 +75,5 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   /** Upload de fichier (multipart/form-data) — voir la note sur isFormData dans request() ci-dessus. */
   postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
+  getBlob: (path: string) => requestBlob(path),
 }

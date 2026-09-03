@@ -293,7 +293,7 @@ function CelluleFormModal({ mode, cellule, directions, services, onClose, onSave
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             {mode === 'create' && (
               <div className="gp-field">

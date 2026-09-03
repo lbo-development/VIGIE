@@ -6,11 +6,19 @@ export interface Marche {
   actif: boolean
   completude: boolean
   utilisable: boolean
+  typeproc: string
+  typedecompoprix: string | null
+  naturepresta: string | null
   libpgi: string | null
   libelle_service: string | null
   titulaire: string | null
   /** FOURNISSEUR.RAISON_SOCIALE_SERVICE via MARCHE.ID_FOURNISSEUR, résolu côté backend — pas MARCHE.TITULAIRE_SERVICE (figé à la création). */
   fournisseur_raison_sociale: string | null
+  agentgestion: string | null
+  planpreventionactif: string | null
+  code_cug: string | null
+  dtevalid: string | null
+  dtenotif: string | null
   dtedebut: string | null
   dtefinmax: string | null
   mtmaxi: number | null
@@ -20,7 +28,7 @@ export interface Marche {
 }
 
 /**
- * Liste des marchés (États des marchés, voir Marches.tsx), filtrable par
+ * Liste des marchés (États des marchés, voir MarchesPGI.tsx), filtrable par
  * service. Le périmètre réel (ADMIN_APP transverse, tout autre acteur scopé à
  * sa propre cellule) est appliqué côté backend, pas ici — voir
  * backend/src/services/marche.service.ts. Statut (actif/archivé) et

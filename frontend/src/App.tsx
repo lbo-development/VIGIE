@@ -14,8 +14,10 @@ import { Cellules } from './pages/Cellules'
 import { SeuilsValidationDs } from './pages/SeuilsValidationDs'
 import { Fournisseurs } from './pages/Fournisseurs'
 import { Cug } from './pages/Cug'
-import { Marches } from './pages/Marches'
+import { MarchesPGI } from './pages/MarchesPGI'
 import { ImportMarches } from './pages/ImportMarches'
+import { MarchesTiers } from './pages/MarchesTiers'
+import { MarchesTdb } from './pages/MarchesTdb'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -47,8 +49,10 @@ function App() {
               <Route path="/parametres/seuils-validation-ds" element={<SeuilsValidationDs />} />
               <Route path="/fournisseurs" element={<Fournisseurs />} />
               <Route path="/parametres/cug" element={<Cug />} />
-              <Route path="/marches" element={<Marches />} />
+              <Route path="/marches" element={<MarchesPGI />} />
               <Route path="/marches/import" element={<ImportMarches />} />
+              <Route path="/marches/tiers" element={<MarchesTiers />} />
+              <Route path="/marches/tdb" element={<MarchesTdb />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

@@ -89,7 +89,7 @@ vi.mock('../services/api', async () => {
 function selectComboboxOption(ariaLabel: string, optionText: string) {
   const trigger = screen.getByRole('button', { name: ariaLabel })
   fireEvent.click(trigger)
-  const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+  const menu = document.querySelector('.gp-menu') as HTMLElement
   fireEvent.click(within(menu).getByText(optionText))
 }
 
@@ -113,7 +113,7 @@ describe('GisementGeographique', () => {
 
     const directionTrigger = screen.getByRole('button', { name: 'Filtrer par direction' })
     fireEvent.click(directionTrigger)
-    const directionMenu = directionTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const directionMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(directionMenu).queryByText(/toutes les directions/i)).not.toBeInTheDocument()
   })
 
@@ -170,7 +170,7 @@ describe('GisementGeographique', () => {
 
     const serviceTrigger = screen.getByRole('button', { name: 'Filtrer par service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(serviceMenu).getByText('Voyageurs')).toBeInTheDocument()
     expect(within(serviceMenu).queryByText(/tous les services/i)).not.toBeInTheDocument()
@@ -197,7 +197,7 @@ describe('GisementGeographique', () => {
 
     const trigger = within(dialog).getByRole('button', { name: 'Service' })
     fireEvent.click(trigger)
-    const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const menu = document.querySelector('.gp-menu') as HTMLElement
     fireEvent.click(within(menu).getByText('Maintenance'))
 
     expect(within(dialog).getByText('Direction : Direction Générale')).toBeInTheDocument()
@@ -282,7 +282,7 @@ describe('GisementGeographique', () => {
 
     const trigger = screen.getByRole('button', { name: 'Filtrer par service' })
     fireEvent.click(trigger)
-    const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const menu = document.querySelector('.gp-menu') as HTMLElement
 
     expect(within(menu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(menu).queryByText('Voyageurs')).not.toBeInTheDocument()
@@ -296,7 +296,7 @@ describe('GisementGeographique', () => {
 
     const trigger = screen.getByRole('button', { name: 'Filtrer par service' })
     fireEvent.click(trigger)
-    const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const menu = document.querySelector('.gp-menu') as HTMLElement
 
     expect(within(menu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(menu).getByText('Voyageurs')).toBeInTheDocument()

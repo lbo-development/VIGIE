@@ -574,7 +574,7 @@ function FournisseurFormModal({
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             {(mode === 'edit' || (mode === 'create' && lockedToOwnService)) && (
               <p className="gp-help">
@@ -1027,7 +1027,7 @@ function ContactFormModal({ mode, idFournisseur, contact, onClose, onSaved }: Co
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             <div className="gp-field">
               <label className="gp-label" htmlFor="contact-nom">

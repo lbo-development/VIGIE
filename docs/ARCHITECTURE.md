@@ -245,6 +245,117 @@ Ce point technique touche des entités du MCD (DIRECTION/SERVICE) sans y figurer
 entité métier arbitrée — à faire valider/intégrer formellement au MCD/MLD si le
 paramétrage doit devenir une entité de premier rang du modèle de données.
 
+## Module Marchés
+
+Trois entités liées, toutes dans le schéma `finances`, réparties sur deux registres de
+marchés distincts et une table de pièces jointes commune aux deux. Vue technique
+uniquement (schéma, couches, routes) — l'historique complet des décisions (pourquoi,
+quand, par qui) vit dans `ForClaude/Importation-marches/import-marches-pgi.md` et le CDC
+(`ForClaude/CDC/{mcd,mct,mld}-phases-1-2.md`), à lire avant toute modification de ce
+module.
+
+### Entités et relations
+
+```
+finances.marche            marché du service courant (import PGI ou création manuelle),
+                            clé naturelle NUMMARCHE
+  ├─ CODE_CUG    → finances.cug            (résolution du service : nullable depuis le
+  │                                          01/09/2026, cf. code_cug_nullable.sql)
+  └─ ID_FOURNISSEUR → finances.fournisseur (repli si CODE_CUG absent)
+
+finances.marche_tiers       marché d'un AUTRE service, ressaisi manuellement pour être
+                            cité dans une demande d'achat — registre de référence, aucun
+                            suivi de consommation (pas de CODE_CUG/ALERTEMT/COMPLETUDE)
+  ├─ ID_SERVICE      → finances.service    (propriétaire direct, pas de résolution CUG)
+  └─ ID_FOURNISSEUR  → finances.fournisseur
+                            clé métier : (ID_SERVICE, NUMMARCHE) — deux services peuvent
+                            enregistrer le même NUMMARCHE indépendamment
+
+finances.marche_piece       pièces documentaires (CCAP/CCTP/AE/AVENANT/BPU/AUTRE),
+                            rattachées à un numéro d'avenant, fichier dans le bucket
+                            Storage `marche-pieces`
+  ├─ TYPE_MARCHE (SERVICE|TIERS) discrimine NUMMARCHE vs ID_MARCHE_TIERS
+  │  (exactement l'un des deux, CHECK) — indépendante de finances.piece_jointe
+  │  (réservée DEMANDE_ACHAT/CERTIFICAT_SERVICE_FAIT, CDC MLD §2.4/§4)
+  └─ ID_SERVICE → finances.service (stampé une fois à l'insertion, jamais réécrit —
+     migration 20260902130000, scoping RLS uniquement, voir ci-dessous)
+
+finances.demande_achat
+  └─ NUMMARCHE (→ marche) et ID_MARCHE_TIERS (→ marche_tiers) mutuellement exclusifs
+     (demande_achat_marche_exclusif_check) — une DA référence l'un ou l'autre, jamais
+     les deux
+```
+
+`finances.marche.UTILISABLE` (colonne générée `ACTIF AND COMPLETUDE`, jamais écrite
+directement) conditionne la sélection d'un marché à la création d'une demande d'achat
+(CDC MCT, OP1.1) — `finances.marche_tiers` n'a pas cet attribut, aucune notion de
+« complétude » n'y a de sens (registre de référence, pas de suivi de consommation).
+
+### Résolution du service propriétaire et droits
+
+Pas de colonne `ID_SERVICE` propre sur `finances.marche` (héritage du schéma PGI) : le
+service se résout via `CODE_CUG → CUG.ID_SERVICE`, ou `ID_FOURNISSEUR →
+FOURNISSEUR.ID_SERVICE` si le premier est absent (marché créé manuellement, sans CUG).
+Cette double résolution est dupliquée dans chaque service qui en a besoin
+(`marche.service.ts#resolveMarcheIdService`, `marchePiece.service.ts
+#resolveMarcheServiceIdService`) plutôt que factorisée, pour garder chaque ressource
+autonome — même principe que `resolveReadScope`, redéfini par service dans ce backend.
+`finances.marche_tiers` porte directement `ID_SERVICE`, pas de résolution nécessaire.
+`finances.marche_piece` calcule la même résolution à l'écriture (`resolveTargetIdService`)
+et la **stocke** dans sa propre colonne `ID_SERVICE` — sans risque de dérive : le service
+d'un marché ou d'un marché tiers est immuable une fois la ligne créée (ni `CODE_CUG`/
+`ID_FOURNISSEUR` d'un marché, ni `ID_SERVICE` d'un marché tiers, ne sont modifiables après
+coup). `uploadPiece` refuse (404) tout dépôt dont le service serait irrésolvable, plutôt que
+d'écrire `NULL` dans cette colonne `NOT NULL`.
+
+**Lecture** : `finances.marche_tiers`/`finances.marche_piece` ont chacune une policy RLS
+`SELECT` scopée par service (`id_service = finances.current_user_id_service() OR
+current_user_has_role('ADMIN_APP')` — migrations `20260902130000` pour `marche_piece`,
+`20260902140000` pour `marche_tiers` ; `finances.current_user_id_service()` résout le
+service de l'utilisateur courant via `ACTEUR.ID_CELLULE → CELLULE.ID_SERVICE`, une seule
+fonction partagée par les deux policies).
+Contrairement au modèle SITE/SECTEUR/FOURNISSEUR (§2.4/§2.5 de `SECURITY.md`, lecture
+ouverte à tout `authenticated` et scoping fin laissé à Express), ces deux tables portent
+donc leur scoping directement en RLS — décision du 02/09/2026, ces pièces/marchés tiers
+étant jugés plus sensibles (documents contractuels, montants) qu'un référentiel
+géographique. `finances.marche` reste sans policy `SELECT` du tout (RLS activée, GRANT
+révoqué pour `authenticated` — `20260830100000_harden_finances_grants.sql`) : le frontend
+ne l'interroge jamais directement, seul Express (`service_role`) y accède.
+
+Écriture (création/modification/suppression, dépôt de pièce) réservée
+`assertManagesServiceOrHasRoleCb` — ADMIN_APP (transverse), ADMIN_SERVICE (son service) ou
+CB (son service) — `authorization.service.ts`, traduite en policies RLS identiques sur les
+trois tables.
+
+### Couches (backend)
+
+| Ressource | repository | service | controller | routes montées sur |
+|---|---|---|---|---|
+| Marché (service) | `marche.repository.ts` | `marche.service.ts` | `marche.controller.ts` | `/marches` |
+| Import PGI marchés | — (réutilise `marche.repository.ts`) | `marcheImport.service.ts` | `marcheImport.controller.ts` | `/marches/import` |
+| Marché tiers | `marcheTiers.repository.ts` | `marcheTiers.service.ts` | `marcheTiers.controller.ts` | `/marches/tiers` |
+| Pièces de marché | `marchePiece.repository.ts` | `marchePiece.service.ts` | `marchePiece.controller.ts` | `/marches/pieces` |
+
+`requireAuth` en tête de chaque fichier de routes, sans exception (règle générale du
+projet). Upload de pièce via `multer` en `memoryStorage` — le fichier ne touche jamais le
+disque avant l'envoi au bucket Supabase Storage.
+
+### Frontend
+
+| Page | Hook(s) | Route |
+|---|---|---|
+| `MarchesPGI.tsx` | `useMarches`, `useMarcheLastImport`, `useMarcheOptions` | `/marches` |
+| `ImportMarches.tsx` | `useMarcheImport` | `/marches/import` |
+| `MarchesTiers.tsx` | `useMarcheTiers` | `/marches/tiers` |
+| `MarchesTdb.tsx` (tableau de bord, aucun endpoint propre — réutilise `useMarches`/`useMarcheTiers`) | — | `/marches/tdb` |
+
+Composants dédiés aux pièces (utilisés depuis `MarchesPGI.tsx` et `MarchesTiers.tsx`, via
+le hook `usePiecesMarche.ts`) : `PiecesMarcheModal.tsx` (consultation/édition/suppression),
+`AddPieceMarcheModal.tsx` (dépôt), `FileDropzone.tsx` (glisser-déposer, composant nouveau
+sans équivalent dans le design system GPMM — voir `ForClaude/INSTRUCTIONS_UX.md`). Styles
+dans `styles/marche.css` (classes `.marche-*`) et `styles/tableauDeBord.css` (indicateurs
+chiffrés, réutilisable par de futurs tableaux de bord).
+
 ## Authentification & sécurité
 
 - Le frontend utilise le client Supabase avec la clé `anon` (exposable publiquement,

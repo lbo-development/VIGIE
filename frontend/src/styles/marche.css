@@ -32,20 +32,36 @@
   background: var(--gp-surface);
   border: 1px solid var(--gp-border);
   border-radius: var(--gp-radius-lg);
-  padding: 16px 18px;
+  padding: 14px 18px;
 }
 
-/* Chaque pastille vit dans la ligne de texte qu'elle qualifie (titre ↔ ACTIF,
-   sous-titre ↔ COMPLETUDE) — alignement garanti par le flex de la ligne
-   elle-même plutôt que par un positionnement absolu séparé. */
+/* En-tête de carte : titre/sous-titre à gauche, les deux pastilles de statut
+   groupées en colonne à droite (maquette utilisateur, 01/09/2026) — plus
+   d'inline avec le texte (ancienne disposition, une pastille par ligne). */
+.marche-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.marche-card__heading {
+  min-width: 0;
+}
+.marche-card__dots {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding-top: 3px;
+}
+
 .marche-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex: none;
   display: inline-block;
-  margin-right: 8px;
-  vertical-align: middle;
 }
 .marche-dot--on {
   background: var(--gp-success);
@@ -55,18 +71,14 @@
 }
 
 .marche-card__title {
-  display: flex;
-  align-items: center;
   font-size: 15px;
   font-weight: 500;
   color: var(--gp-text);
 }
 .marche-card__subtitle {
-  display: flex;
-  align-items: center;
   font-size: 13px;
   color: var(--gp-text-secondary);
-  margin: 2px 0 12px;
+  margin: 2px 0 8px;
 }
 
 .marche-metric {
@@ -88,8 +100,87 @@
   font-family: var(--gp-mono);
 }
 
-/* Portée par la ligne "Montant" (dernier `.marche-metric`) — poussées à droite,
-   centrées sur son axe horizontal grâce à `align-items:center` du parent. */
+/* Alignées sur l'axe de la barre "Montant" (décision utilisateur, 01/09/2026)
+   — repli sur l'axe "Durée" puis sur `.marche-metric--actions-only` si
+   aucune des deux barres n'existe (voir MarchesPGI.tsx). Le parent est
+   toujours `.marche-metric` (flex, align-items:center) : `margin-left:auto`
+   pousse donc systématiquement la rangée d'actions à droite, y compris seule
+   sur `.marche-metric--actions-only`. */
 .marche-card__actions {
   margin-left: auto;
+}
+.marche-metric--actions-only {
+  min-height: 24px;
+}
+
+/* Titre de groupe de champs (modale « Visualiser », croquis utilisateur du
+   02/09/2026) — plus marqué que `.gp-label` (champ), pour distinguer les
+   groupes "Identification"/"Caractéristiques"/"Dates significatives"/
+   "Gestion du marché". */
+.marche-view__section {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gp-text);
+  margin: 0;
+}
+
+/* Zone de dépôt de fichier (FileDropzone.tsx, « Ajouter une pièce ») — motif
+   nouveau, absent de gpmm-style-guide.html (voir ForClaude/INSTRUCTIONS_UX.md) :
+   contrairement au précédent ad-hoc de ImportMarches.tsx, aucune couleur de
+   repli codée en dur, uniquement les variables --gp-* déjà définies. */
+.marche-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 28px;
+  text-align: center;
+  border: 2px dashed var(--gp-border);
+  border-radius: var(--gp-radius-lg);
+  background: var(--gp-surface);
+  cursor: pointer;
+}
+.marche-dropzone.is-dragging {
+  border-color: var(--gp-accent);
+  background: var(--gp-table-hbg);
+}
+.marche-dropzone.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.marche-dropzone__icon {
+  width: 28px;
+  height: 28px;
+  color: var(--gp-text-secondary);
+}
+.marche-dropzone__file {
+  font-weight: 500;
+  color: var(--gp-text);
+}
+
+/* Ligne de pièce (PiecesMarcheModal.tsx) — un fichier par ligne, infos à
+   gauche, actions (télécharger/modifier/supprimer) à droite comme
+   .marche-card__actions. */
+.marche-piece-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius);
+}
+.marche-piece-row__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.marche-piece-row__filename {
+  color: var(--gp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
 }

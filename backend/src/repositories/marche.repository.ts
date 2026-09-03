@@ -22,7 +22,8 @@ export interface Marche {
   num_titulaire: string | null
   titulaire_service: string | null
   agentgestion: string | null
-  code_cug: string
+  /** Nullable depuis le 01/09/2026 (héritage de la création manuelle, retirée le même jour — voir import-marches-pgi.md). */
+  code_cug: string | null
   dtenotif: string | null
   dtevalid: string | null
   dtedebut: string | null
@@ -62,6 +63,20 @@ export type MarcheUpdateInput = Pick<
   | 'id_fournisseur'
 > & { actif: true }
 
+/**
+ * Champs modifiables via « Modifier » (icône carte, MarchesPGI.tsx, décision
+ * du 01/09/2026 — réservé ADMIN_APP/ADMIN_SERVICE/CB) : jamais NUMMARCHE, le
+ * fournisseur, le CUG ni les dates/montants (qui restent réécrits uniquement
+ * par l'import, colonnes A-M ci-dessus) — **ni `TYPEPROC`** (retiré le
+ * 01/09/2026 : renseigné à l'import, jamais modifiable ensuite). `completude`
+ * fait partie de l'entrée (recalculée côté service, pas ici) — voir
+ * marche.service.ts#updateMarcheManagedFields.
+ */
+export type MarcheManagedFieldsInput = Pick<
+  Marche,
+  'typedecompoprix' | 'naturepresta' | 'libelle_service' | 'agentgestion' | 'alertedate' | 'alertemt' | 'planpreventionactif' | 'completude'
+>
+
 const SELECT_COLUMNS =
   'nummarche, actif, type_creation, typeproc, typedecompoprix, naturepresta, libpgi, libelle_service, titulaire, num_titulaire, titulaire_service, agentgestion, code_cug, dtenotif, dtevalid, dtedebut, dtefinmax, mtmini, mtmaxi, alertemt, alertedate, lastmtrealise, lastmtengage, dtelastsolde, dtelastimport, planpreventionactif, completude, id_fournisseur, mt_solde, utilisable'
 
@@ -96,18 +111,46 @@ export async function findByCugCodes(cugCodes: string[]): Promise<Marche[]> {
   return data ?? []
 }
 
-export async function create(input: Omit<Marche, 'completude' | 'mt_solde' | 'utilisable'>): Promise<Marche> {
+/**
+ * Tous les marchés (actifs ou non) dont ID_FOURNISSEUR appartient à l'un des
+ * identifiants donnés — secours de `findByCugCodes` pour retrouver, dans
+ * listMarches, les marchés sans CUG (CODE_CUG nullable depuis le 01/09/2026 —
+ * héritage de la création manuelle, retirée le même jour, voir
+ * import-marches-pgi.md) : leur service ne se déduit alors que par leur
+ * fournisseur, toujours renseigné.
+ */
+export async function findByFournisseurIds(fournisseurIds: number[]): Promise<Marche[]> {
+  if (fournisseurIds.length === 0) return []
   const { data, error } = await supabase
     .schema('finances')
     .from('marche')
-    .insert({ ...input, completude: false })
+    .select(SELECT_COLUMNS)
+    .in('id_fournisseur', fournisseurIds)
+  if (error) throw error
+  return data ?? []
+}
+
+/** `completude` fait partie de l'entrée (pas figée à `false`) : le calcul diffère selon l'appelant — voir marcheImport.service.ts (toujours false) et marche.service.ts#createMarche (calculée à la création manuelle). */
+export async function create(input: Omit<Marche, 'mt_solde' | 'utilisable'>): Promise<Marche> {
+  const { data, error } = await supabase.schema('finances').from('marche').insert(input).select(SELECT_COLUMNS).single()
+  if (error) throw error
+  return data
+}
+
+export async function update(nummarche: string, input: MarcheUpdateInput): Promise<Marche> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('marche')
+    .update(input)
+    .eq('nummarche', nummarche)
     .select(SELECT_COLUMNS)
     .single()
   if (error) throw error
   return data
 }
 
-export async function update(nummarche: string, input: MarcheUpdateInput): Promise<Marche> {
+/** Écriture depuis « Modifier » (ADMIN_APP/ADMIN_SERVICE/CB) — voir MarcheManagedFieldsInput ci-dessus. */
+export async function updateManagedFields(nummarche: string, input: MarcheManagedFieldsInput): Promise<Marche> {
   const { data, error } = await supabase
     .schema('finances')
     .from('marche')

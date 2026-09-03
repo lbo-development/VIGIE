@@ -87,3 +87,7 @@ service hérite implicitement de sa direction) — géré exclusivement par le r
 `ADMIN_APP`. Décision et schéma détaillés dans `docs/ARCHITECTURE.md` (section
 « Paramétrage applicatif »), policies RLS dans `ForClaude/SECURITY.md` §2.3. Ne pas
 réinventer un autre mécanisme de configuration dynamique sans repartir de cette décision.
+
+## langue d'echange
+
+Tout des raisonment et tes questions seront formulées en français

@@ -40,7 +40,7 @@ vi.mock('../services/api', async () => {
 function selectComboboxOption(ariaLabel: string, optionText: string) {
   const trigger = screen.getByRole('button', { name: ariaLabel })
   fireEvent.click(trigger)
-  const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+  const menu = document.querySelector('.gp-menu') as HTMLElement
   fireEvent.click(within(menu).getByText(optionText))
 }
 
@@ -53,7 +53,7 @@ describe('Cellules', () => {
 
     const directionTrigger = screen.getByRole('button', { name: 'Filtrer par direction' })
     fireEvent.click(directionTrigger)
-    const directionMenu = directionTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const directionMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(directionMenu).queryByText(/toutes les directions/i)).not.toBeInTheDocument()
   })
 
@@ -70,7 +70,7 @@ describe('Cellules', () => {
 
     const serviceTrigger = screen.getByRole('button', { name: 'Filtrer par service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).queryByText(/tous les services/i)).not.toBeInTheDocument()
     fireEvent.click(within(serviceMenu).getByText('Maintenance'))
 
@@ -109,7 +109,7 @@ describe('Cellules', () => {
 
     const serviceTrigger = screen.getByRole('button', { name: 'Filtrer par service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).getByText('Comptabilité')).toBeInTheDocument()
     expect(within(serviceMenu).queryByText('Maintenance')).not.toBeInTheDocument()
     fireEvent.click(within(serviceMenu).getByText('Comptabilité'))
@@ -150,13 +150,13 @@ describe('Cellules', () => {
     // Direction choisie : la combo Service apparaît, restreinte à cette direction.
     const directionTrigger = within(dialog).getByRole('button', { name: 'Direction' })
     fireEvent.click(directionTrigger)
-    const directionMenu = directionTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const directionMenu = document.querySelector('.gp-menu') as HTMLElement
     fireEvent.click(within(directionMenu).getByText('Direction Générale'))
 
     const serviceTrigger = within(dialog).getByRole('button', { name: 'Service' })
     expect(serviceTrigger).toBeInTheDocument()
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(serviceMenu).queryByText('Comptabilité')).not.toBeInTheDocument()
   })

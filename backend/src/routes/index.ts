@@ -12,6 +12,8 @@ import fournisseursRoutes from './fournisseur.routes.js'
 import cugRoutes from './cug.routes.js'
 import marcheRoutes from './marche.routes.js'
 import marcheImportRoutes from './marcheImport.routes.js'
+import marcheTiersRoutes from './marcheTiers.routes.js'
+import marchePieceRoutes from './marchePiece.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -32,5 +34,7 @@ router.use('/fournisseurs', fournisseursRoutes)
 router.use('/cug', cugRoutes)
 router.use('/marches', marcheRoutes)
 router.use('/marches/import', marcheImportRoutes)
+router.use('/marches/tiers', marcheTiersRoutes)
+router.use('/marches/pieces', marchePieceRoutes)
 
 export default router

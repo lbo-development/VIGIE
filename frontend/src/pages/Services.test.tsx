@@ -29,7 +29,7 @@ vi.mock('../services/api', async () => {
 function selectComboboxOption(ariaLabel: string, optionText: string) {
   const trigger = screen.getByRole('button', { name: ariaLabel })
   fireEvent.click(trigger)
-  const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+  const menu = document.querySelector('.gp-menu') as HTMLElement
   fireEvent.click(within(menu).getByText(optionText))
 }
 
@@ -42,7 +42,7 @@ describe('Services', () => {
 
     const trigger = screen.getByRole('button', { name: 'Filtrer par direction' })
     fireEvent.click(trigger)
-    const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const menu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(menu).queryByText(/toutes les directions/i)).not.toBeInTheDocument()
   })
 

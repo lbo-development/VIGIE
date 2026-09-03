@@ -175,7 +175,7 @@ function DirectionFormModal({ mode, direction, onClose, onSaved }: DirectionForm
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             <div className="gp-field">
               <label className="gp-label" htmlFor="direction-code">

@@ -204,7 +204,7 @@ function SeuilFormModal({ service, directions, seuil, onClose, onSaved }: SeuilF
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             <p className="gp-help">
               Direction : {direction?.libelle_direction ?? '—'}

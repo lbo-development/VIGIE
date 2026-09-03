@@ -21,7 +21,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 
 ## OP1.1 — Créer la demande d'achat
 - **Événement** : « Besoin d'achat exprimé » (externe, Demandeur).
-- **Synchronisation** : —
+- **Synchronisation** : si PROCEDURE_ACHAT = MARCHE, sélection restreinte aux marchés UTILISABLE (ACTIF ET COMPLETUDE — voir MCD, entité MARCHE ; décision du 30/08/2026, `ForClaude/Importation-marches/import-marches-pgi.md` Historique).
 - **Actions** : saisie objet, description, montant demandé, procédure (marché/hors marché), imputation, dépôt des devis/pièces.
 - **Règles d'émission** : demande complète soumise au RC.
 - **Résultat** : **DA_ENREGISTREE**.
@@ -145,7 +145,7 @@ Chaque opération dispose des données requises dans le MCD consolidé :
 - OP1.5b : PIECE_JOINTE.ORIGINE (SYSTEME) + TYPE_PIECE (FICHE_FAD) — support de la fiche générée ✔
 - OP2.1 : rattachement FAD + rédacteur (ACTEUR) + PIECE_JOINTE (justificatif) ✔
 - OP2.3 (alerte R2) : MONTANT_CSF (cumul) vs MONTANT_COMMANDE ✔
-- OP3.1 : ETATMARCHE/ETATFOURNISSEUR, TYPE_CREATION, clés de rapprochement ✔
+- OP3.1 : ACTIF (MARCHE, ex-ETATMARCHE)/ETATFOURNISSEUR, TYPE_CREATION, clés de rapprochement ✔
 Aucune donnée manquante identifiée à ce stade.
 
 # Points à valider
@@ -156,3 +156,4 @@ Aucune donnée manquante identifiée à ce stade.
 # Historique
 - 23/08/2026 : premier jet du MCT Phases 1 & 2, après validation du découpage (3 processus), de l'inventaire évènementiel (retours PGI en événements externes ; création CSF = entrée du P2) et du mode d'import (opération unique automatique).
 - 28/08/2026 (simplification SEUIL_VALIDATION_DS) : OP1.4 mise à jour — la synchronisation ne lit plus un seuil "en vigueur à la date" (l'historisation est abandonnée, voir MCD/MLD) mais directement SEUIL_FONCTIONNEMENT/SEUIL_INVESTISSEMENT du service, avec un service sans ligne traité comme seuil 0 pour les deux imputations.
+- 02/09/2026 (répercussion différée — renommage ETATMARCHE → ACTIF, règle UTILISABLE) : OP1.1 précisée — si PROCEDURE_ACHAT = MARCHE, seuls les marchés UTILISABLE (ACTIF ET COMPLETUDE) sont proposables à la sélection. Contrôle croisé MCD (OP3.1) mis à jour : ETATMARCHE → ACTIF. Décisions prises le 30/08/2026 (voir `ForClaude/Importation-marches/import-marches-pgi.md`, Historique), signalées comme dette explicite dans le MLD (§2.2) et restées non répercutées ici jusqu'à ce jour.

@@ -184,6 +184,7 @@ describe('preview — étape 2 (éligibilité)', () => {
   })
 
   it('accepte la cellule D1 même quand le PGI insère une espace insécable avant les ":"', async () => {
+    // eslint-disable-next-line no-irregular-whitespace -- U+00A0 volontaire, reproduit un export PGI réel
     // Constaté sur un export réel : "Edité le : 10-08-2026" (typographie française).
     findAllRowsParametre.mockResolvedValue([
       { id_parametre: 1, cle: 'last.import.marche.pgi', valeur: '2026-08-10', id_direction: null, id_service: ID_SERVICE, description: null, date_maj: '', matricule_maj: null },

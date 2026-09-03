@@ -54,7 +54,7 @@ vi.mock('../hooks/useLastImportMarchePgi', () => ({
 function selectComboboxOption(ariaLabel: string, optionText: string) {
   const trigger = screen.getByRole('button', { name: ariaLabel })
   fireEvent.click(trigger)
-  const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+  const menu = document.querySelector('.gp-menu') as HTMLElement
   fireEvent.click(within(menu).getByText(optionText))
 }
 
@@ -84,7 +84,7 @@ describe('ImportMarches', () => {
     selectComboboxOption('Direction', 'Direction Générale')
     const serviceTrigger = screen.getByRole('button', { name: 'Service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(serviceMenu).queryByText('Comptabilité')).not.toBeInTheDocument()
     fireEvent.click(within(serviceMenu).getByText('Maintenance'))
@@ -111,7 +111,7 @@ describe('ImportMarches', () => {
     selectComboboxOption('Direction', 'Direction Finances')
     const serviceTrigger = screen.getByRole('button', { name: 'Service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).queryByText('Maintenance')).not.toBeInTheDocument()
 
     expect(screen.getByText('Sélectionne une direction et un service pour pouvoir importer un fichier.')).toBeInTheDocument()
@@ -157,7 +157,7 @@ describe('ImportMarches', () => {
     selectComboboxOption('Direction', 'Direction Générale')
     const serviceTrigger = screen.getByRole('button', { name: 'Service' })
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     fireEvent.click(within(serviceMenu).getByText('Maintenance'))
 
     expect(screen.getByText('Dernier import : 10/08/2026')).toBeInTheDocument()

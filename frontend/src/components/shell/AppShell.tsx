@@ -59,8 +59,9 @@ export function AppShell() {
   const parametresItems = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp, isAdminService })
   const parametresLink = parametresItems[0]?.to ?? null
 
-  // "Importation marchés PGI" réservée à ADMIN_APP/ADMIN_SERVICE/CB (décision
-  // du 30/08/2026) — "États des marchés" reste visible pour tous.
+  // "Importation marchés service" (renommé le 01/09/2026) réservée à
+  // ADMIN_APP/ADMIN_SERVICE/CB (décision du 30/08/2026) — "États des marchés
+  // du service" et "Marchés d'un service tiers" restent visibles pour tous.
   const marchesItems = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
 
   // Contenu de la sidebar contextuel à la section active : "en lieu et place

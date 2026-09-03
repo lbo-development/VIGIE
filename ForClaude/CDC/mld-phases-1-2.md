@@ -73,9 +73,9 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > **ACTIF / COMPLETUDE / UTILISABLE (30/08/2026).** `ETATMARCHE` (texte) est remplacé par
 > `ACTIF` (booléen, `TRUE` par défaut), aligné sur le reste du référentiel organisationnel
 > (`DIRECTION`/`SERVICE`/`CELLULE`/`SITE`/`SECTEUR`/`CUG` — seul `FOURNISSEUR.ETATFOURNISSEUR`
-> reste en texte, décision propre à cette table, non remise en cause). **⚠️ Ce renommage doit
-> être répercuté dans le MCT** (OP3.1 et le contrôle croisé MCD qui citent `ETATMARCHE` par
-> son ancien nom), non fait à ce stade. Un marché absent du fichier importé n'est désactivé
+> reste en texte, décision propre à cette table, non remise en cause). Ce renommage a été
+> répercuté dans le MCT (OP3.1 et le contrôle croisé MCD, qui citaient `ETATMARCHE` par son
+> ancien nom) le 02/09/2026. Un marché absent du fichier importé n'est désactivé
 > (`ACTIF = FALSE`) que s'il est `TYPE_CREATION = PGI` — **une création manuelle de marché est
 > prévue** (écran pas encore construit), auquel cas `TYPE_CREATION` prendra une seconde
 > valeur non encore nommée (par analogie avec `FOURNISSEUR.TYPE_CREATION = 'SERVICE'`) ;
@@ -88,8 +88,8 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
 > implémentation). `UTILISABLE` est une **colonne générée Postgres**
 > (`GENERATED ALWAYS AS (actif AND completude) STORED`), jamais écrite directement. **Seuls
 > les marchés `UTILISABLE = TRUE` sont proposés à la création d'une demande d'achat (OP1.1)**
-> — règle qui touche aussi le MCT (OP1.1) et le MCD (association DEMANDE_ACHAT — s'appuie
-> sur — MARCHE), **à répercuter séparément, non fait à ce stade**. Migration proposée :
+> — règle répercutée le 02/09/2026 dans le MCT (OP1.1) et le MCD (association DEMANDE_ACHAT —
+> s'appuie sur — MARCHE). Migration proposée :
 > `supabase/migrations/20260830090000_marche_actif_completude_utilisable.sql`.
 > **FOURNISSEUR/CONTACT — CRUD manuel et droits d'écriture (29/08/2026, corrigé le 29/08/2026 après transmission du schéma physique réel).** `finances.fournisseur`/`finances.contact` **existaient déjà** physiquement avant ce chantier — pas de création de table, seulement sécurisation (GRANT/RLS/policies, absents jusqu'ici) via `supabase/migrations/20260829130000_create_fournisseur_contact.sql` (une première version du fichier contenait par erreur un `CREATE TABLE`, corrigée). Un fournisseur créé manuellement (écran, pas import PGI) a `TYPE_CREATION = SERVICE`, avec `RAISON_SOCIALE_PGI`/`NUMPGI` laissés `NULL` (renseignés uniquement par l'import PGI, non implémenté à ce stade — voir MCT OP3.1). `SIREN` (colonne renommée depuis `SIRET` le 29/08/2026 — confusion de terminologie corrigée : SIRET identifie un établissement sur 14 chiffres, SIREN l'entreprise sur 9, c'est bien ce second identifiant qui était visé ici ; migration `20260829150000_rename_fournisseur_siret_to_siren.sql`, simple renommage, aucune donnée modifiée, type toujours `text` sans contrainte de longueur) est **NOT NULL** sur la table réelle (obligatoire à la création, contrairement à une première implémentation qui le rendait optionnel). FOURNISSEUR (`ETATFOURNISSEUR`, référencé par DEMANDE_ACHAT/DEVIS_CONSULTE/MARCHE — ces trois tables existent elles aussi déjà physiquement) supporte, depuis le 29/08/2026, une **suppression physique conditionnelle** — exception au principe général d'archivage de ce champ : autorisée pour ADMIN_APP/ADMIN_SERVICE (`assertManagesFournisseur`, pas la règle plus large de la création) uniquement si aucun MARCHE (`id_fournisseur`), DEMANDE_ACHAT (`id_fournisseur_retenu`) ni DEVIS_CONSULTE (`id_fournisseur`, même une ligne non retenue) ne le référence encore (`fournisseur.service.ts#deleteFournisseur`) — sinon 409, message invitant à passer en Inactif à la place. Supprime aussi tous les CONTACT du fournisseur (jamais l'inverse : CONTACT seul reste également supprimable indépendamment, pas de champ d'état, aucune autre table ne le référence). Filet de sécurité : les FK marche/demande_achat/devis_consulte → fournisseur n'ont pas d'`ON DELETE CASCADE` (RESTRICT par défaut), Postgres refuserait de toute façon la suppression en cas de bug dans la vérification applicative — voir migration `20260829140000_fournisseur_delete_policy.sql`. Modification (mise à jour, ACTIF) ouverte à ADMIN_APP (transverse) ou ADMIN_SERVICE scopé à son service (même règle que SITE/SECTEUR/SEUIL_VALIDATION_DS, voir `assertManagesService`). **Création** plus ouverte : un Demandeur (sans rôle dédié) peut aussi créer un FOURNISSEUR pour son propre service (`assertManagesServiceOrIsOwnActor`, distinct d'`assertManagesService`) — la modale de création n'affiche alors ni Direction ni Service, le fournisseur hérite directement du service de l'acteur connecté (résolu via `ACTEUR.ID_CELLULE → SERVICE`, ou via l'attribution ADMIN_SERVICE le cas échéant, exposé par `/api/me#idService`). Lecture scopée au service de l'acteur pour tout le monde sauf ADMIN_APP, y compris ce même Demandeur (voir `ForClaude/CDC/mot-phases-1-2.md` l.68 et `ForClaude/SECURITY.md` §2.5). `NATUREFONCTION` (CONTACT) : liste fermée — **valeurs de la contrainte CHECK réelle, déjà en place sur la table préexistante** : DIRIGEANT, JURIDIQUE, COMMERCIAL, RESPONSABLE D'AFFAIRE, RESPONSABLE TECHNIQUE, TECHNICIEN, RESPONSABLE FINANCIER/COMPTABILITE (pas la liste "Dirigeant/Commercial/Juridique/Administratif/Chargé d'affaire/Technicien" un temps documentée ici par erreur, avant transmission du schéma réel) ; conservée distincte de `FONCTION` (texte libre), tranchant le point résiduel noté au MCD §7. **Champs obligatoires CONTACT (décision du 29/08/2026)** : NOM, PRENOM et NATUREFONCTION obligatoires ; au moins un des deux numéros de téléphone (TELFIXE ou TELMOBILE) doit être renseigné — règle appliquée identiquement à la création et à la modification (`contact.service.ts`, schéma Zod partagé avec `.refine()`), pour ne pas laisser un contact redevenir incomplet après une modification. MAIL et FONCTION restent optionnels.
 
@@ -248,10 +248,11 @@ Ajout Phase 2 : entités **CERTIFICAT_SERVICE_FAIT**, **STATUT_CSF**, **HISTORIQ
   AGENTGESTION/TITULAIRE_SERVICE/PLANPREVENTIONACTIF/ALERTEMT/ALERTEDATE sont tous
   renseignés — MTMINI exclu du calcul, à confirmer) et **UTILISABLE** (colonne générée
   Postgres, `ACTIF ET COMPLETUDE`). Seuls les marchés `UTILISABLE` seront proposés à la
-  création d'une DA (OP1.1) — à répercuter dans le MCT et le MCD (non fait à ce stade), de
-  même que le renommage `ETATMARCHE → ACTIF` dans OP3.1/contrôle croisé du MCT. Migration
-  proposée : `supabase/migrations/20260830090000_marche_actif_completude_utilisable.sql`.
-  Détail complet : `ForClaude/Importation-marches/import-marches-pgi.md`.
+  création d'une DA (OP1.1) — répercuté dans le MCT (OP1.1, contrôle croisé OP3.1) et le MCD
+  (entité MARCHE, association DEMANDE_ACHAT/MARCHE) le 02/09/2026, de même que le renommage
+  `ETATMARCHE → ACTIF` dans OP3.1/contrôle croisé du MCT. Migration proposée :
+  `supabase/migrations/20260830090000_marche_actif_completude_utilisable.sql`. Détail
+  complet : `ForClaude/Importation-marches/import-marches-pgi.md`.
 - 30/08/2026 (construction de l'import + SIREN nullable) : import PGI des marchés construit
   de bout en bout (backend + frontend), avec revirement sur l'étape de confirmation (une
   vraie pause bloquante, plus de détail dans `import-marches-pgi.md` §5 — divergence assumée

@@ -49,7 +49,7 @@ vi.mock('../services/api', async () => {
 function selectComboboxOption(ariaLabel: string, optionText: string) {
   const trigger = screen.getByRole('button', { name: ariaLabel })
   fireEvent.click(trigger)
-  const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+  const menu = document.querySelector('.gp-menu') as HTMLElement
   fireEvent.click(within(menu).getByText(optionText))
 }
 
@@ -129,13 +129,13 @@ describe('Cug', () => {
 
     const directionTrigger = within(dialog).getByRole('button', { name: 'Direction' })
     fireEvent.click(directionTrigger)
-    const directionMenu = directionTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const directionMenu = document.querySelector('.gp-menu') as HTMLElement
     fireEvent.click(within(directionMenu).getByText('Direction Générale'))
 
     const serviceTrigger = within(dialog).getByRole('button', { name: 'Service' })
     expect(serviceTrigger).toBeInTheDocument()
     fireEvent.click(serviceTrigger)
-    const serviceMenu = serviceTrigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+    const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     expect(within(serviceMenu).getByText('Maintenance')).toBeInTheDocument()
     expect(within(serviceMenu).queryByText('Comptabilité')).not.toBeInTheDocument()
   })

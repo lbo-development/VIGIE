@@ -82,6 +82,7 @@ interface RawRow {
  * comparaisons structurelles (préfixe D1, en-têtes) restent fiables.
  */
 function normalizeSpaces(text: string): string {
+  // eslint-disable-next-line no-irregular-whitespace -- U+00A0 volontaire, voir commentaire ci-dessus
   return text.replace(/ /g, ' ')
 }
 
@@ -182,8 +183,12 @@ function readDataRows(worksheet: ExcelJS.Worksheet): RawRow[] {
   return rows
 }
 
-/** Préfixe P → MAPA, M/S → MARCHE — voir import-marches-pgi.md §3. `null` = préfixe non reconnu (anomalie). */
-function deriveTypeProc(nummarche: string): string | null {
+/**
+ * Préfixe P → MAPA, M/S → MARCHE — voir import-marches-pgi.md §3. `null` = préfixe non reconnu
+ * (anomalie, ou 400 côté marcheTiers.service.ts#createMarcheTiers, qui réutilise cette même
+ * fonction — exportée pour ça, décision du 01/09/2026).
+ */
+export function deriveTypeProc(nummarche: string): string | null {
   if (nummarche.startsWith('P')) return 'MAPA'
   if (nummarche.startsWith('M') || nummarche.startsWith('S')) return 'MARCHE'
   return null
@@ -211,13 +216,25 @@ export interface LastImportInfo {
 }
 
 /**
+ * Message standard quand `last.import.marche.pgi` n'a pas de ligne pour le
+ * service — utilisé ici pour bloquer l'import (400) et, à l'identique, par
+ * marche.service.ts#getLastImportStatus pour l'alerte affichée sur
+ * MarchesPGI.tsx (décision utilisateur du 01/09/2026) : même texte des deux
+ * côtés, un seul message à faire évoluer.
+ */
+export const PARAMETRE_NON_INITIALISE = 'Paramètre "last.import.marche.pgi" non initialisé.'
+
+/**
  * Lit le paramètre last.import.marche.pgi pour un service donné, portée
  * SERVICE strictement (pas d'héritage direction/global, contrairement à
  * finances.parametre_effectif) : on cherche explicitement une ligne
  * id_service = idService, distinguant son absence (`exists: false`) d'une
- * valeur vide (`exists: true, valeur: null`, JSON `null` — voir §7).
+ * valeur vide (`exists: true, valeur: null`, JSON `null` — voir §7). Exportée
+ * pour être réutilisée par marche.service.ts#getLastImportStatus (MarchesPGI.tsx,
+ * page de consultation ouverte à tous — contrairement à getLastImportInfo
+ * ci-dessous, réservé à ADMIN_APP/ADMIN_SERVICE/CB comme le reste de l'import).
  */
-async function findLastImportRow(idService: number): Promise<LastImportInfo> {
+export async function findLastImportRow(idService: number): Promise<LastImportInfo> {
   const rows = await parametresRepository.findAllRows('last.import.marche.pgi')
   const row = rows.find((r) => r.id_service === idService)
   if (!row) return { exists: false, valeur: null }
@@ -228,7 +245,7 @@ async function findLastImportRow(idService: number): Promise<LastImportInfo> {
 async function checkLastImportParametre(idService: number, dateFichier: string): Promise<string | null> {
   const { exists, valeur } = await findLastImportRow(idService)
   if (!exists) {
-    return 'Le paramètre "last.import.marche.pgi" n\'existe pas pour ce service — un ADMIN_APP doit le créer (écran Réglages) avant le premier import.'
+    return PARAMETRE_NON_INITIALISE
   }
   if (valeur !== null && dateFichier < valeur) {
     return `Le fichier (généré le ${dateFichier}) est antérieur à la dernière importation enregistrée pour ce service (${valeur}).`
@@ -398,9 +415,10 @@ export async function confirm(matricule: string | null, idService: number, buffe
         actif: true,
       })
     } else {
-      const nouveauMarche: Omit<Marche, 'completude' | 'mt_solde' | 'utilisable'> = {
+      const nouveauMarche: Omit<Marche, 'mt_solde' | 'utilisable'> = {
         nummarche: row.nummarche,
         actif: true,
+        completude: false,
         type_creation: 'PGI',
         typeproc: row.typeProc,
         typedecompoprix: null,

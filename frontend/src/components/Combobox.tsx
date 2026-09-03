@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
+import { useFloatingPosition } from '../hooks/useFloatingPosition'
 
 export interface ComboboxOption {
   value: string
@@ -26,14 +28,24 @@ interface ComboboxProps {
  * Sélecteur simple (une seule valeur), réimplémentation React du composant
  * .gp-combobox du template GPMM (app.js gère normalement ce toggle, non
  * chargé ici — voir la mémoire projet "UX React integration").
+ *
+ * Le panneau d'options (`.gp-menu`) est rendu via un portail dans `document.body`
+ * plutôt qu'en position absolue dans `.gp-combobox` : un ancêtre en `overflow`
+ * non visible (ex. le corps scrollable d'une modale) le rognerait sinon dès
+ * qu'il dépasse — voir `useFloatingPosition` et `ForClaude/INSTRUCTIONS_UX.md`.
  */
 export function Combobox({ options, value, onChange, placeholder, clearLabel, ariaLabel, style }: ComboboxProps) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const position = useFloatingPosition(open, rootRef)
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false)
+      const target = event.target as Node
+      if (rootRef.current?.contains(target)) return
+      if (panelRef.current?.contains(target)) return
+      setOpen(false)
     }
     document.addEventListener('click', handleClickOutside)
     return () => document.removeEventListener('click', handleClickOutside)
@@ -71,20 +83,38 @@ export function Combobox({ options, value, onChange, placeholder, clearLabel, ar
           <use href="#i-chevron-down" />
         </svg>
       </div>
-      {open && (
-        <div className="gp-menu">
-          {clearLabel && (
-            <div className="gp-opt" onClick={() => select(null)}>
-              {clearLabel}
-            </div>
-          )}
-          {options.map((option) => (
-            <div key={option.value} className="gp-opt" onClick={() => select(option.value)}>
-              {option.label}
-            </div>
-          ))}
-        </div>
-      )}
+      {open &&
+        position &&
+        createPortal(
+          <div
+            className="gp-menu gp-scroll"
+            ref={panelRef}
+            style={{
+              position: 'fixed',
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              right: 'auto',
+              marginTop: 0,
+              zIndex: 100,
+              display: 'block',
+              maxHeight: position.maxHeight,
+              overflowY: 'auto',
+            }}
+          >
+            {clearLabel && (
+              <div className="gp-opt" onClick={() => select(null)}>
+                {clearLabel}
+              </div>
+            )}
+            {options.map((option) => (
+              <div key={option.value} className="gp-opt" onClick={() => select(option.value)}>
+                {option.label}
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }

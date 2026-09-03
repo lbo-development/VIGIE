@@ -1,0 +1,11 @@
+-- finances.marche.code_cug était NOT NULL (contrainte préexistante, héritée du
+-- schéma PGI). Décision du 01/09/2026 : la modale de création manuelle de
+-- marché (CreateMarcheModal, Marches.tsx) n'a plus de champ CUG — code_cug
+-- doit donc pouvoir rester vide pour ce flux (voir marche.service.ts#createMarche).
+--
+-- Effet de bord traité côté application : marche.service.ts#listMarches
+-- résolvait jusqu'ici le service d'un marché uniquement via CODE_CUG →
+-- CUG.ID_SERVICE ; un marché sans CUG resterait invisible dans "États des
+-- marchés" sans le secours ajouté (résolution aussi via ID_FOURNISSEUR →
+-- FOURNISSEUR.ID_SERVICE, toujours renseigné dans ce flux).
+alter table finances.marche alter column code_cug drop not null;

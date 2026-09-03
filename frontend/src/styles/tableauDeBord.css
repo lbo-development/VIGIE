@@ -1,0 +1,55 @@
+/* =====================================================================
+   Styles propres aux pages "Tableau de bord" (première : Marchés,
+   02/09/2026 — d'autres suivront ailleurs dans l'application).
+
+   Base volontairement réduite : la structure "carte indicateur" existe déjà
+   dans le gabarit partagé (`gpmm.css` : `.metrics-grid`/`.metric-card`/
+   `.metric-label`/`.metric-value`/`.metric-meta`, visible dans
+   `ForClaude/Template UX/exemple-erp-voyageurs.html`) et ne doit surtout pas
+   être dupliquée ici (règle `ForClaude/INSTRUCTIONS_UX.md` : ne jamais copier
+   gpmm.css localement). Un tableau de bord se construit donc avec
+   `.gp-panel`/`.panel-header`/`.eyebrow` (regroupement par thème) et
+   `.metrics-grid`/`.metric-card` (les indicateurs eux-mêmes), tous déjà
+   disponibles partout dans l'app.
+
+   Ce fichier ne contient que ce qui manque réellement au gabarit pour un
+   indicateur chiffré : la mise en évidence visuelle d'un compteur d'alerte,
+   qui n'existe dans gpmm.css que pour le texte `.metric-meta` (petite ligne
+   sous le chiffre), jamais pour `.metric-value` (le chiffre lui-même).
+   Comme pour `marche.css`, toutes les valeurs visuelles passent par les
+   variables `--gp-*` de gpmm.css — jamais de couleur en dur.
+   ===================================================================== */
+
+/* Teinte le chiffre d'une carte indicateur — même principe que
+   `.metric-meta.warning`/`.metric-meta.success` déjà dans gpmm.css, mais
+   appliqué à `.metric-value` (le gros chiffre), pas à la légende. */
+.metric-value.warning {
+  color: var(--gp-warning-text);
+}
+.metric-value.danger {
+  color: var(--gp-danger);
+}
+
+/* Légère élévation au survol d'une carte indicateur — touche "tableau de
+   bord" qui n'a pas d'équivalent dans gpmm.css (la carte y est statique).
+   Décision du 02/09/2026 : pas de pastille d'icône (retirée sur retour
+   utilisateur, pas adaptée à une simple étiquette chiffrée) — seul cet effet
+   de survol reste. */
+.metric-card {
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+.metric-card:hover {
+  box-shadow: var(--gp-shadow-float);
+  transform: translateY(-2px);
+}
+
+/* Sous-groupe de cartes au sein d'un `.gp-panel` (ex. "Vue d'ensemble" /
+   "Type de procédure" / "Alertes") — un `.eyebrow` (déjà dans gpmm.css)
+   au-dessus d'une grille, avec un espacement propre entre sous-groupes. */
+.tdb-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

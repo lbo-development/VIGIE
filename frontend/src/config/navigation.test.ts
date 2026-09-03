@@ -100,44 +100,59 @@ describe('isMarchesSection', () => {
 })
 
 describe('filterMarchesSidebarItems', () => {
-  it('masque "Importation marchés PGI" sans ADMIN_APP/ADMIN_SERVICE/CB, garde "États des marchés"', () => {
+  it("masque \"Importation marchés service\" sans ADMIN_APP/ADMIN_SERVICE/CB, garde \"États des marchés du service\", \"Marchés d'un service tiers\" et \"Tableau de bord\"", () => {
     const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
       isAdminApp: false,
       isAdminService: false,
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['États des marchés'])
+    expect(result.map((i) => i.label)).toEqual(['États des marchés du service', "Marchés d'un service tiers", 'Tableau de bord'])
   })
 
-  it('ADMIN_APP voit les deux options', () => {
+  it('ADMIN_APP voit les quatre options', () => {
     const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
       isAdminApp: true,
       isAdminService: false,
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
+    expect(result.map((i) => i.label)).toEqual([
+      'États des marchés du service',
+      'Importation marchés service',
+      "Marchés d'un service tiers",
+      'Tableau de bord',
+    ])
   })
 
-  it('ADMIN_SERVICE voit les deux options', () => {
+  it('ADMIN_SERVICE voit les quatre options', () => {
     const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
       isAdminApp: false,
       isAdminService: true,
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
+    expect(result.map((i) => i.label)).toEqual([
+      'États des marchés du service',
+      'Importation marchés service',
+      "Marchés d'un service tiers",
+      'Tableau de bord',
+    ])
   })
 
-  it('CB voit les deux options', () => {
+  it('CB voit les quatre options', () => {
     const result = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, {
       isAdminApp: false,
       isAdminService: false,
       isCB: true,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['États des marchés', 'Importation marchés PGI'])
+    expect(result.map((i) => i.label)).toEqual([
+      'États des marchés du service',
+      'Importation marchés service',
+      "Marchés d'un service tiers",
+      'Tableau de bord',
+    ])
   })
 })
 

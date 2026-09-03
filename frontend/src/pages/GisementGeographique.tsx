@@ -361,7 +361,7 @@ function SiteFormModal({ mode, site, services, directions, defaultIdService, onC
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             {mode === 'edit' && (
               <p className="gp-help">
@@ -743,7 +743,7 @@ function SousSiteFormModal({ mode, codeSite, sousSite, onClose, onSaved }: SousS
             </svg>
           </button>
         </div>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
             {mode === 'create' && (
               <div className="gp-field">

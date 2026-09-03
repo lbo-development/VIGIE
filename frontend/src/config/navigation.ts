@@ -47,8 +47,10 @@ export const MARCHES_SECTION_PATH = '/marches'
  * des options présentes", pas en plus) — liste plate, pas de sous-menu.
  */
 export const MARCHES_SIDEBAR_ITEMS: NavItem[] = [
-  { to: '/marches', label: 'États des marchés', icon: '' },
-  { to: '/marches/import', label: 'Importation marchés PGI', icon: '' },
+  { to: '/marches', label: 'États des marchés du service', icon: '' },
+  { to: '/marches/import', label: 'Importation marchés service', icon: '' },
+  { to: '/marches/tiers', label: "Marchés d'un service tiers", icon: '' },
+  { to: '/marches/tdb', label: 'Tableau de bord', icon: '' },
 ]
 
 /** Vrai si la route courante appartient à la section "Marchés" (voir AppShell.tsx). */
@@ -57,23 +59,28 @@ export function isMarchesSection(pathname: string): boolean {
 }
 
 /**
- * Filtre les items de la section "Marchés" : "États des marchés" reste
- * toujours visible (aucune règle d'accès encore définie pour la consultation
- * elle-même). "Importation marchés PGI" est réservée à ADMIN_APP (transverse),
- * ADMIN_SERVICE (scopé à son service) et CB (Contrôle Budgétaire, scopé à son
- * service — décision du 30/08/2026, voir
+ * Filtre les items de la section "Marchés" : "États des marchés du service",
+ * "Marchés d'un service tiers" (nommé ainsi le 01/09/2026 — anciennement
+ * "Marchés externes", coquille sans définition métier) et "Tableau de bord"
+ * (ajouté le 02/09/2026, lecture agrégée des deux entités ci-dessus) restent
+ * toujours visibles : la lecture y est ouverte à tout utilisateur authentifié
+ * (voir marcheTiers.service.ts#listMarcheTiers, même principe que
+ * marche.service.ts#listMarches — seules la création et la modification d'un
+ * marché tiers y sont réservées ADMIN_APP/ADMIN_SERVICE/CB, appliqué dans
+ * MarchesTiers.tsx via `canManage`, pas au niveau de cette entrée de menu).
+ * "Importation marchés service" (renommé le 01/09/2026, anciennement
+ * "Importation marchés PGI") est réservée à ADMIN_APP (transverse),
+ * ADMIN_SERVICE (scopé à son service) et CB (Contrôle Budgétaire, scopé à
+ * son service — décision du 30/08/2026, voir
  * `ForClaude/Importation-marches/import-marches-pgi.md` §4) — pas de rôle
- * ADMIN_APP/ADMIN_SERVICE nécessaire, mais un des trois. Purement une
- * question d'affichage pour l'instant : aucun backend d'import n'existe
- * encore pour appliquer cette règle côté serveur (pages Marches.tsx/
- * ImportMarches.tsx encore des coquilles).
+ * ADMIN_APP/ADMIN_SERVICE nécessaire, mais un des trois.
  */
 export function filterMarchesSidebarItems(
   items: NavItem[],
   { isAdminApp, isAdminService, isCB }: { isAdminApp: boolean; isAdminService: boolean; isCB: boolean },
 ): NavItem[] {
   if (isAdminApp || isAdminService || isCB) return items
-  return items.filter((item) => item.label !== 'Importation marchés PGI')
+  return items.filter((item) => item.label !== 'Importation marchés service')
 }
 
 /** Racine de la section "Paramètres" (voir `isParametresSection`). */

@@ -34,7 +34,7 @@ describe('Directions', () => {
     const selectStatus = (label: string) => {
       const trigger = screen.getByRole('button', { name: 'Filtrer les directions par statut' })
       fireEvent.click(trigger)
-      const menu = trigger.closest('.gp-combobox')!.querySelector('.gp-menu') as HTMLElement
+      const menu = document.querySelector('.gp-menu') as HTMLElement
       fireEvent.click(within(menu).getByText(label))
     }
 
