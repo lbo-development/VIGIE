@@ -25,6 +25,20 @@ const PARAMETRE_SCHEMAS: Record<string, z.ZodTypeAny> = {
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format attendu : YYYY-MM-DD)')
     .nullable(),
+  // Même mécanique que last.import.marche.pgi, pour l'import des commandes PGI — voir
+  // commandePgiImport.service.ts.
+  'last.import.commande.pgi': z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format attendu : YYYY-MM-DD)')
+    .nullable(),
+  // Même mécanique déclarative, pour l'import des opérations d'investissement PGI — mais
+  // purement informative (bandeau écran) : le fichier PGI ne porte aucune date de génération
+  // fiable, cette valeur ne sert jamais de garde bloquante (voir
+  // investissementImport.service.ts et ForClaude/importation-investissementsPGI/).
+  'last.import.investissement.pgi': z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Date invalide (format attendu : YYYY-MM-DD)')
+    .nullable(),
 }
 
 function getSchema(cle: string): z.ZodTypeAny {

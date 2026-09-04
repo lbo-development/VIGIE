@@ -125,20 +125,33 @@ describe('ImportMarches', () => {
     expect(screen.getByText(/glisse-dépose/i)).toBeInTheDocument()
   })
 
-  it("affiche la date du dernier import à côté du service (paramètre existant, valeur renseignée)", () => {
+  it("affiche la date de la dernière importation dans l'entête (paramètre existant, valeur renseignée, récente)", () => {
     currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
-    lastImportInfoMock.value = { exists: true, valeur: '2026-08-10' }
+    const recentDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10)
+    const [y, m, d] = recentDate.split('-')
+    lastImportInfoMock.value = { exists: true, valeur: recentDate }
     render(<ImportMarches />)
 
-    expect(screen.getByText('Dernier import : 10/08/2026')).toBeInTheDocument()
+    expect(screen.getByText(`Dernière importation le ${d}/${m}/${y}`)).toBeInTheDocument()
+    expect(screen.queryByText('Pensez à importer les marchés récents')).not.toBeInTheDocument()
   })
 
-  it("affiche un message dédié si aucun import n'a encore été enregistré (paramètre existant, valeur vide)", () => {
+  it("affiche l'alerte de rappel si la dernière importation date de plus de 15 jours", () => {
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    const staleDate = new Date(Date.now() - 20 * 86_400_000).toISOString().slice(0, 10)
+    lastImportInfoMock.value = { exists: true, valeur: staleDate }
+    render(<ImportMarches />)
+
+    expect(screen.getByText('Pensez à importer les marchés récents')).toBeInTheDocument()
+  })
+
+  it("affiche un message dédié et l'alerte de rappel si aucun import n'a encore été enregistré (paramètre existant, valeur vide)", () => {
     currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
     lastImportInfoMock.value = { exists: true, valeur: null }
     render(<ImportMarches />)
 
-    expect(screen.getByText('Dernier import : aucun import enregistré.')).toBeInTheDocument()
+    expect(screen.getByText('Dernière importation — aucun import effectué')).toBeInTheDocument()
+    expect(screen.getByText('Pensez à importer les marchés récents')).toBeInTheDocument()
   })
 
   it("affiche un message dédié si le paramètre n'existe pas encore pour ce service", () => {
@@ -146,12 +159,14 @@ describe('ImportMarches', () => {
     lastImportInfoMock.value = { exists: false, valeur: null }
     render(<ImportMarches />)
 
-    expect(screen.getByText('Dernier import : paramètre non configuré pour ce service.')).toBeInTheDocument()
+    expect(screen.getByText('Paramètre "last.import.marche.pgi" non initialisé.')).toBeInTheDocument()
   })
 
-  it('ADMIN_APP : affiche la date du dernier import une fois direction et service choisis', () => {
+  it('ADMIN_APP : affiche la date de la dernière importation une fois direction et service choisis', () => {
     currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
-    lastImportInfoMock.value = { exists: true, valeur: '2026-08-10' }
+    const recentDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10)
+    const [y, m, d] = recentDate.split('-')
+    lastImportInfoMock.value = { exists: true, valeur: recentDate }
     render(<ImportMarches />)
 
     selectComboboxOption('Direction', 'Direction Générale')
@@ -160,7 +175,7 @@ describe('ImportMarches', () => {
     const serviceMenu = document.querySelector('.gp-menu') as HTMLElement
     fireEvent.click(within(serviceMenu).getByText('Maintenance'))
 
-    expect(screen.getByText('Dernier import : 10/08/2026')).toBeInTheDocument()
+    expect(screen.getByText(`Dernière importation le ${d}/${m}/${y}`)).toBeInTheDocument()
   })
 
   it('le dépôt (ou la sélection) du fichier déclenche preview()', () => {

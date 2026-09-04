@@ -154,6 +154,22 @@ describe('Fournisseurs', () => {
     expect(screen.getByText('Bemat')).toBeInTheDocument()
   })
 
+  it('la recherche filtre par raison sociale, ville ou SIREN', () => {
+    render(<Fournisseurs />)
+
+    selectDirectionAndService()
+
+    const search = screen.getByLabelText('Recherche')
+    fireEvent.change(search, { target: { value: 'aix' } })
+
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument()
+    expect(screen.getByText('Bemat')).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: '732829320' } })
+    expect(screen.getByText('Acme')).toBeInTheDocument()
+    expect(screen.queryByText('Bemat')).not.toBeInTheDocument()
+  })
+
   it('ADMIN_APP : le formulaire de création garde Direction → Service en cascade', () => {
     currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
     render(<Fournisseurs />)

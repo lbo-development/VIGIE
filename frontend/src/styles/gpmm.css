@@ -452,6 +452,18 @@ html::-webkit-scrollbar-thumb:hover{background:var(--gp-sb-thumb-h);}
 .gp-pm::before{content:"";position:absolute;top:50%;left:0;right:0;height:1.6px;background:currentColor;transform:translateY(-50%);}
 .gp-pm--plus::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:1.6px;background:currentColor;transform:translateX(-50%);}
 
+/* ========================= ZONE DE DÉPÔT DE FICHIER ========================= */
+/* FileDropzone.tsx — motif nouveau, absent de gpmm-style-guide.html (voir
+   ForClaude/INSTRUCTIONS_UX.md) ; classes ici (et non dans une feuille par
+   page) car le composant est partagé entre plusieurs pages (marchés,
+   investissements, ...), sur le modèle de .gp-combobox/.gp-spin. */
+.gp-dropzone{display:flex;flex-direction:column;align-items:center;gap:8px;padding:28px;text-align:center;
+  border:2px dashed var(--gp-border);border-radius:var(--gp-radius-lg);background:var(--gp-surface);cursor:pointer;}
+.gp-dropzone.is-dragging{border-color:var(--gp-accent);background:var(--gp-table-hbg);}
+.gp-dropzone.is-disabled{cursor:not-allowed;opacity:.6;}
+.gp-dropzone__icon{width:28px;height:28px;color:var(--gp-text-secondary);}
+.gp-dropzone__file{font-weight:500;color:var(--gp-text);}
+
 /* ========================= TABLEAU ========================= */
 .gp-table-wrap{border:1px solid var(--gp-border);border-radius:8px;overflow:auto;max-height:360px;}
 table.gp-table{border-collapse:separate;border-spacing:0;width:100%;min-width:680px;font-size:13px;}

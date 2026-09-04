@@ -1,15 +1,8 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
 import { INACTIVITY_CHANNEL_NAME } from '../hooks/useInactivityLogout'
-
-interface AuthContextValue {
-  session: Session | null
-  loading: boolean
-  signOut: () => Promise<void>
-}
-
-const AuthContext = createContext<AuthContextValue | undefined>(undefined)
+import { AuthContext } from '../hooks/useAuth'
 
 /**
  * Fournit l'état d'authentification Supabase à toute l'application via Context API.
@@ -50,10 +43,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({ session, loading, signOut }), [session, loading, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-export function useAuth() {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth doit être utilisé à l\'intérieur de <AuthProvider>')
-  return ctx
 }

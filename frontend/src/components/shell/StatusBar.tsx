@@ -1,4 +1,4 @@
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 
 const APP_NAME = 'VIGIE'
 const APP_VERSION = 'v0.1.0'

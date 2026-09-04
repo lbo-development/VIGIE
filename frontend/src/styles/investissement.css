@@ -1,0 +1,222 @@
+/* =====================================================================
+   Styles propres à la page Investissements (État des investissements PGI) —
+   jamais dans gpmm.css, même convention que styles/marche.css : classes
+   préfixées `.investissement-`, composent avec les classes `.gp-*`
+   existantes, toutes les valeurs visuelles passent par les variables
+   `--gp-*` de gpmm.css.
+   ===================================================================== */
+
+/* Liste des opérations — une carte par opération, défilement interne borné
+   (en-tête de page et ligne de filtres toujours visibles), même principe que
+   .marche-list. */
+.investissement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 340px);
+  min-height: 200px;
+  overflow-y: auto;
+}
+
+.investissement-card {
+  /* Largeur réduite de 30% (décision utilisateur, 04/09/2026) — les cartes ne remplissent plus
+     .investissement-list en pleine largeur. */
+  width: 70%;
+  background: var(--gp-surface);
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius-lg);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.investissement-card__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Badge Statut (A/F) — plus marqué que le texte courant, premier élément lu sur la carte. */
+.investissement-card__statut {
+  flex: none;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gp-text);
+}
+
+.investissement-card__numop {
+  flex: none;
+  font-family: var(--gp-mono);
+  font-size: 13px;
+  color: var(--gp-text);
+  background: var(--gp-table-hbg);
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius);
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+/* Libellé propre au service (LIB_SERVICE) — couleur distincte pour signaler que c'est le champ
+   modifiable localement, différent du LIBELLE PGI utilisé en repli tant qu'il n'est pas renseigné
+   (voir InvestissementsPGI.tsx). Affichage seul pour l'instant — édition dans un chantier séparé. */
+.investissement-card__libservice {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gp-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+
+/* Point(s) de statut (Actif, Utilisable) groupés en ligne à droite de l'en-tête — même principe que .marche-card__dots (marche.css), en ligne plutôt qu'en colonne. */
+.investissement-card__dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding-top: 4px;
+}
+
+.investissement-card__dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+.investissement-card__dot--on {
+  background: var(--gp-success);
+}
+.investissement-card__dot--off {
+  background: var(--gp-danger);
+}
+
+.investissement-card__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.investissement-card__montants {
+  display: flex;
+  gap: 16px;
+  flex: none;
+}
+
+.investissement-card__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.investissement-card__field-label {
+  font-size: 12px;
+  color: var(--gp-text-secondary);
+}
+.investissement-card__field-value {
+  font-family: var(--gp-mono);
+  font-size: 13px;
+  color: var(--gp-text);
+  background: var(--gp-table-hbg);
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius);
+  padding: 4px 10px;
+  min-width: 110px;
+  text-align: right;
+}
+
+/* Tableau "Montant disponible" (AP/CP x .1/.8) — table compacte dédiée, pas .gp-table (pensée
+   pour une liste de lignes, pas un mini-tableau 2x2 dans une carte). Largeur au contenu (pas
+   flex:1/min-width) : le titre "Montant disponible" doit se centrer sur la largeur réelle du
+   tableau (lui-même à largeur fixe, voir .investissement-disponible-table), pas sur tout
+   l'espace disponible du corps de carte. */
+.investissement-card__disponible {
+  flex: none;
+  width: fit-content;
+}
+
+/* Icônes d'action (Visualiser/Modifier) — poussées à l'extrémité droite du corps de carte et
+   calées en bas de la carte, même principe que .marche-card__actions (marche.css). L'espace
+   laissé libre à droite du tableau "Montant disponible" est volontaire : c'est cette zone qui
+   les accueille. */
+.investissement-card__actions {
+  margin-left: auto;
+  align-self: flex-end;
+}
+.investissement-card__disponible-title {
+  font-size: 12px;
+  color: var(--gp-text-secondary);
+  margin: 0 0 4px;
+  text-align: center;
+}
+.investissement-disponible-table {
+  /* Largeur au contenu (pas 100%) : les largeurs de colonnes ci-dessous sont explicites pour les
+     3 colonnes, un width:100% ferait regonfler .1/.8 pour combler l'espace du conteneur. */
+  width: auto;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.investissement-disponible-table th,
+.investissement-disponible-table td {
+  border: 1px solid var(--gp-border);
+  padding: 4px 10px;
+  text-align: center;
+}
+/* Colonne AP/CP à largeur fixe (table-layout: fixed). */
+.investissement-disponible-table th:first-child,
+.investissement-disponible-table td:first-child {
+  width: 44px;
+}
+/* Colonnes .1/.8 à largeur fixe, dimensionnée pour "10 000 000 €" (12 caractères en
+   --gp-mono 13px) sans jamais passer à la ligne. */
+.investissement-disponible-table th:not(:first-child),
+.investissement-disponible-table td:not(:first-child) {
+  width: 120px;
+  white-space: nowrap;
+}
+.investissement-disponible-table th {
+  background: var(--gp-table-hbg);
+  color: var(--gp-text-secondary);
+  font-weight: 600;
+}
+.investissement-disponible-table td.investissement-disponible-table__row-label {
+  background: var(--gp-table-hbg);
+  color: var(--gp-text-secondary);
+  font-weight: 600;
+  text-align: right;
+}
+.investissement-disponible-table td {
+  font-family: var(--gp-mono);
+  color: var(--gp-text);
+  text-align: right;
+}
+
+/* Ligne de pièce (PiecesInvestissementModal.tsx) — même principe que
+   .marche-piece-row (marche.css) : infos à gauche, actions à droite. */
+.investissement-piece-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius);
+}
+.investissement-piece-row__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+.investissement-piece-row__filename {
+  color: var(--gp-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 280px;
+}

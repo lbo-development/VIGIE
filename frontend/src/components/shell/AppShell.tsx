@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useSidebarShell } from '../../hooks/useSidebarShell'
 import { useTheme } from '../../hooks/useTheme'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth } from '../../hooks/useAuth'
 import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { useInactivityLogout } from '../../hooks/useInactivityLogout'
 import { useParametre } from '../../hooks/useParametre'
@@ -10,10 +10,16 @@ import {
   NAV_ITEMS,
   PARAMETRES_ITEMS,
   MARCHES_SIDEBAR_ITEMS,
+  COMMANDES_SIDEBAR_ITEMS,
+  INVESTISSEMENTS_SIDEBAR_ITEMS,
   filterParametresItems,
   filterMarchesSidebarItems,
+  filterCommandesSidebarItems,
+  filterInvestissementsSidebarItems,
   filterNavItems,
   isMarchesSection,
+  isCommandesSection,
+  isInvestissementsSection,
   isParametresSection,
 } from '../../config/navigation'
 import { Header } from './Header'
@@ -64,12 +70,35 @@ export function AppShell() {
   // du service" et "Marchés d'un service tiers" restent visibles pour tous.
   const marchesItems = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
 
+  // "Importation commandes PGI" (unique entrée de la section) réservée
+  // ADMIN_APP/ADMIN_SERVICE/CB — même triplet que l'import marchés.
+  const commandesItems = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
+
+  // "Importation investissements PGI" (unique entrée de la section) réservée
+  // ADMIN_APP/ADMIN_SERVICE/CB — même triplet que l'import commandes/marchés.
+  const investissementsItems = filterInvestissementsSidebarItems(INVESTISSEMENTS_SIDEBAR_ITEMS, {
+    isAdminApp,
+    isAdminService,
+    isCB,
+  })
+
   // Contenu de la sidebar contextuel à la section active : "en lieu et place
-  // des options présentes", pas en plus (Marchés et Paramètres se remplacent
-  // mutuellement selon la route courante, jamais combinés).
+  // des options présentes", pas en plus (Marchés, Commandes, Investissements
+  // et Paramètres se remplacent mutuellement selon la route courante, jamais
+  // combinés).
   const inMarchesSection = isMarchesSection(location.pathname)
+  const inCommandesSection = isCommandesSection(location.pathname)
+  const inInvestissementsSection = isInvestissementsSection(location.pathname)
   const inParametresSection = isParametresSection(location.pathname)
-  const sidebarItems = inMarchesSection ? marchesItems : inParametresSection ? parametresItems : []
+  const sidebarItems = inMarchesSection
+    ? marchesItems
+    : inCommandesSection
+      ? commandesItems
+      : inInvestissementsSection
+        ? investissementsItems
+        : inParametresSection
+          ? parametresItems
+          : []
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',

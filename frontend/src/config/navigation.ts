@@ -31,6 +31,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', icon: 'i-home' },
   { to: '/marches', label: 'Marchés', icon: '' },
+  { to: '/commandes', label: 'Commandes', icon: '' },
+  { to: '/investissements', label: 'Investissements', icon: '' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: '' },
 ]
 
@@ -81,6 +83,83 @@ export function filterMarchesSidebarItems(
 ): NavItem[] {
   if (isAdminApp || isAdminService || isCB) return items
   return items.filter((item) => item.label !== 'Importation marchés service')
+}
+
+/**
+ * Racine de la section "Commandes" — sert à la fois de route par défaut
+ * (page de consultation "État des commandes PGI du service", voir App.tsx)
+ * et de préfixe pour détecter que cette section est active (voir
+ * `isCommandesSection`), même mécanique que MARCHES_SECTION_PATH.
+ */
+export const COMMANDES_SECTION_PATH = '/commandes'
+
+/**
+ * "État des commandes PGI du service" (03/09/2026, CommandesPGI.tsx) reste
+ * toujours visible — lecture ouverte à tout utilisateur authentifié, même
+ * principe que "États des marchés du service". "Importation commandes PGI"
+ * est réservée ADMIN_APP/ADMIN_SERVICE/CB (voir filterCommandesSidebarItems).
+ */
+export const COMMANDES_SIDEBAR_ITEMS: NavItem[] = [
+  { to: '/commandes', label: 'État des commandes PGI du service', icon: '' },
+  { to: '/commandes/import', label: 'Importation commandes PGI', icon: '' },
+]
+
+/** Vrai si la route courante appartient à la section "Commandes" (voir AppShell.tsx). */
+export function isCommandesSection(pathname: string): boolean {
+  return pathname === COMMANDES_SECTION_PATH || pathname.startsWith(`${COMMANDES_SECTION_PATH}/`)
+}
+
+/**
+ * "État des commandes PGI du service" reste toujours visible (lecture ouverte
+ * à tous, voir commandePgi.service.ts#listCommandesPgi). "Importation
+ * commandes PGI" est réservée à ADMIN_APP (transverse), ADMIN_SERVICE et CB
+ * (scopés à leur service) — même triplet que "Importation marchés service"
+ * (filterMarchesSidebarItems).
+ */
+export function filterCommandesSidebarItems(
+  items: NavItem[],
+  { isAdminApp, isAdminService, isCB }: { isAdminApp: boolean; isAdminService: boolean; isCB: boolean },
+): NavItem[] {
+  if (isAdminApp || isAdminService || isCB) return items
+  return items.filter((item) => item.label !== 'Importation commandes PGI')
+}
+
+/**
+ * Racine de la section "Investissements" — sert à la fois de route par défaut (page de
+ * consultation "État des investissements PGI du service", voir App.tsx) et de préfixe pour
+ * détecter que cette section est active (voir `isInvestissementsSection`), même mécanique que
+ * COMMANDES_SECTION_PATH.
+ */
+export const INVESTISSEMENTS_SECTION_PATH = '/investissements'
+
+/**
+ * "État des investissements PGI du service" (InvestissementsPGI.tsx) reste toujours visible —
+ * lecture ouverte à tout utilisateur authentifié, même principe que "État des commandes PGI du
+ * service". "Importation investissements PGI" est réservée ADMIN_APP/ADMIN_SERVICE/CB (voir
+ * filterInvestissementsSidebarItems).
+ */
+export const INVESTISSEMENTS_SIDEBAR_ITEMS: NavItem[] = [
+  { to: '/investissements', label: 'État des investissements PGI du service', icon: '' },
+  { to: '/investissements/import', label: 'Importation investissements PGI', icon: '' },
+]
+
+/** Vrai si la route courante appartient à la section "Investissements" (voir AppShell.tsx). */
+export function isInvestissementsSection(pathname: string): boolean {
+  return pathname === INVESTISSEMENTS_SECTION_PATH || pathname.startsWith(`${INVESTISSEMENTS_SECTION_PATH}/`)
+}
+
+/**
+ * "État des investissements PGI du service" reste toujours visible (lecture ouverte à tous, voir
+ * investissement.service.ts#listInvestissements). "Importation investissements PGI" est réservée
+ * à ADMIN_APP (transverse), ADMIN_SERVICE et CB (scopés à leur service) — même triplet que
+ * "Importation commandes PGI" (filterCommandesSidebarItems).
+ */
+export function filterInvestissementsSidebarItems(
+  items: NavItem[],
+  { isAdminApp, isAdminService, isCB }: { isAdminApp: boolean; isAdminService: boolean; isCB: boolean },
+): NavItem[] {
+  if (isAdminApp || isAdminService || isCB) return items
+  return items.filter((item) => item.label !== 'Importation investissements PGI')
 }
 
 /** Racine de la section "Paramètres" (voir `isParametresSection`). */

@@ -14,6 +14,11 @@ import marcheRoutes from './marche.routes.js'
 import marcheImportRoutes from './marcheImport.routes.js'
 import marcheTiersRoutes from './marcheTiers.routes.js'
 import marchePieceRoutes from './marchePiece.routes.js'
+import commandePgiRoutes from './commandePgi.routes.js'
+import commandePgiImportRoutes from './commandePgiImport.routes.js'
+import investissementRoutes from './investissement.routes.js'
+import investissementImportRoutes from './investissementImport.routes.js'
+import investissementPieceRoutes from './investissementPiece.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -36,5 +41,10 @@ router.use('/marches', marcheRoutes)
 router.use('/marches/import', marcheImportRoutes)
 router.use('/marches/tiers', marcheTiersRoutes)
 router.use('/marches/pieces', marchePieceRoutes)
+router.use('/commandes', commandePgiRoutes)
+router.use('/commandes/import', commandePgiImportRoutes)
+router.use('/investissements', investissementRoutes)
+router.use('/investissements/import', investissementImportRoutes)
+router.use('/investissements/pieces', investissementPieceRoutes)
 
 export default router

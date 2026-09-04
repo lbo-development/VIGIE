@@ -4,7 +4,7 @@ import { StatusBar } from './StatusBar'
 
 const signOut = vi.fn()
 
-vi.mock('../../context/AuthContext', () => ({
+vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({
     session: { user: { email: 'test@gpmm.fr' } },
     loading: false,

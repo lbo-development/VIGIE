@@ -18,6 +18,10 @@ import { MarchesPGI } from './pages/MarchesPGI'
 import { ImportMarches } from './pages/ImportMarches'
 import { MarchesTiers } from './pages/MarchesTiers'
 import { MarchesTdb } from './pages/MarchesTdb'
+import { CommandesPGI } from './pages/CommandesPGI'
+import { ImportCommandes } from './pages/ImportCommandes'
+import { InvestissementsPGI } from './pages/InvestissementsPGI'
+import { ImportInvestissements } from './pages/ImportInvestissements'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -53,6 +57,10 @@ function App() {
               <Route path="/marches/import" element={<ImportMarches />} />
               <Route path="/marches/tiers" element={<MarchesTiers />} />
               <Route path="/marches/tdb" element={<MarchesTdb />} />
+              <Route path="/commandes" element={<CommandesPGI />} />
+              <Route path="/commandes/import" element={<ImportCommandes />} />
+              <Route path="/investissements" element={<InvestissementsPGI />} />
+              <Route path="/investissements/import" element={<ImportInvestissements />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

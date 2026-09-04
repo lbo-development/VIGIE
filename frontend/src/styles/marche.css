@@ -124,39 +124,9 @@
   margin: 0;
 }
 
-/* Zone de dépôt de fichier (FileDropzone.tsx, « Ajouter une pièce ») — motif
-   nouveau, absent de gpmm-style-guide.html (voir ForClaude/INSTRUCTIONS_UX.md) :
-   contrairement au précédent ad-hoc de ImportMarches.tsx, aucune couleur de
-   repli codée en dur, uniquement les variables --gp-* déjà définies. */
-.marche-dropzone {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 28px;
-  text-align: center;
-  border: 2px dashed var(--gp-border);
-  border-radius: var(--gp-radius-lg);
-  background: var(--gp-surface);
-  cursor: pointer;
-}
-.marche-dropzone.is-dragging {
-  border-color: var(--gp-accent);
-  background: var(--gp-table-hbg);
-}
-.marche-dropzone.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-.marche-dropzone__icon {
-  width: 28px;
-  height: 28px;
-  color: var(--gp-text-secondary);
-}
-.marche-dropzone__file {
-  font-weight: 500;
-  color: var(--gp-text);
-}
+/* Zone de dépôt de fichier (FileDropzone.tsx) : classes .gp-dropzone* déplacées
+   dans styles/gpmm.css (composant partagé entre plusieurs pages, au même
+   titre que .gp-combobox/.gp-spin). */
 
 /* Ligne de pièce (PiecesMarcheModal.tsx) — un fichier par ligne, infos à
    gauche, actions (télécharger/modifier/supprimer) à droite comme

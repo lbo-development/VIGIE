@@ -19,9 +19,10 @@ function formatTaille(octets: number): string {
  * Zone de dépôt de fichier (drag & drop + clic), composant dédié requis par
  * ForClaude/INSTRUCTIONS_UX.md (aucun composant équivalent dans
  * gpmm-style-guide.html — motif nouveau, à valider visuellement). Toutes les
- * valeurs visuelles passent par les variables --gp-* (styles/marche.css,
- * classes .marche-dropzone*), contrairement au précédent ad-hoc de
- * ImportMarches.tsx qui codait des couleurs de repli en dur.
+ * valeurs visuelles passent par les variables --gp-* (styles/gpmm.css,
+ * classes .gp-dropzone* — composant partagé entre plusieurs pages),
+ * contrairement au précédent ad-hoc de ImportMarches.tsx qui codait des
+ * couleurs de repli en dur.
  */
 export function FileDropzone({ accept, maxSizeOctets, file, onFileSelected, disabled }: FileDropzoneProps) {
   const [dragActive, setDragActive] = useState(false)
@@ -46,7 +47,7 @@ export function FileDropzone({ accept, maxSizeOctets, file, onFileSelected, disa
   return (
     <div className="stack" style={{ gap: 8 }}>
       <div
-        className={`marche-dropzone${dragActive ? ' is-dragging' : ''}${disabled ? ' is-disabled' : ''}`}
+        className={`gp-dropzone${dragActive ? ' is-dragging' : ''}${disabled ? ' is-disabled' : ''}`}
         role="button"
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled}
@@ -68,11 +69,11 @@ export function FileDropzone({ accept, maxSizeOctets, file, onFileSelected, disa
           }
         }}
       >
-        <svg className="ti marche-dropzone__icon">
+        <svg className="ti gp-dropzone__icon">
           <use href="#i-cloud" />
         </svg>
         {file ? (
-          <p className="marche-dropzone__file">
+          <p className="gp-dropzone__file">
             {file.name} <span className="gp-help">({formatTaille(file.size)})</span>
           </p>
         ) : (

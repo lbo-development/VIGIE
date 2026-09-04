@@ -78,6 +78,16 @@ function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
   return filter === 'active' ? actif : !actif
 }
 
+function matchesSearch(fournisseur: Fournisseur, search: string): boolean {
+  if (!search.trim()) return true
+  const needle = search.trim().toLowerCase()
+  return (
+    fournisseur.raison_sociale_service.toLowerCase().includes(needle) ||
+    (fournisseur.ville?.toLowerCase().includes(needle) ?? false) ||
+    (fournisseur.siren?.toLowerCase().includes(needle) ?? false)
+  )
+}
+
 /**
  * Administration de finances.fournisseur/finances.contact, montée sur
  * /fournisseurs (renommé depuis /parametres/fournisseurs le 30/08/2026 —
@@ -176,10 +186,11 @@ export function Fournisseurs() {
   const serviceLabel = (idService: number) => services.find((s) => s.id_service === idService)?.libelle_service ?? '—'
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const displayedFournisseurs =
     filterIdDirection === null || filterIdService === null
       ? []
-      : fournisseurs.filter((f) => matchesStatusFilter(f.actif, statusFilter))
+      : fournisseurs.filter((f) => matchesStatusFilter(f.actif, statusFilter) && matchesSearch(f, search))
 
   const [fournisseurModal, setFournisseurModal] = useState<{ mode: 'create' | 'edit'; fournisseur: Fournisseur | null } | null>(
     null,
@@ -244,9 +255,24 @@ export function Fournisseurs() {
             ariaLabel="Filtrer les fournisseurs par statut"
           />
         </div>
+        {filterIdDirection !== null && filterIdService !== null && (
+          <div className="gp-field" style={{ flex: 1, minWidth: 220 }}>
+            <label className="gp-label" htmlFor="fournisseurs-search">
+              Recherche
+            </label>
+            <input
+              id="fournisseurs-search"
+              className="gp-input"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Raison sociale, ville, SIREN…"
+            />
+          </div>
+        )}
       </div>
 
-      <div className="gp-table-wrap gp-scroll">
+      {/* max-height du gabarit (360px, gpmm.css) trop faible pour cette liste, souvent longue — agrandi localement comme sur CommandesPGI.tsx (même valeur), sans toucher au gabarit partagé. */}
+      <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 'calc(70vh - 70px)' }}>
         <table className="gp-table">
           <thead>
             <tr>

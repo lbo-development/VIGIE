@@ -2,11 +2,17 @@ import { describe, it, expect } from 'vitest'
 import {
   filterParametresItems,
   filterMarchesSidebarItems,
+  filterCommandesSidebarItems,
+  filterInvestissementsSidebarItems,
   filterNavItems,
   isMarchesSection,
+  isCommandesSection,
+  isInvestissementsSection,
   isParametresSection,
   PARAMETRES_ITEMS,
   MARCHES_SIDEBAR_ITEMS,
+  COMMANDES_SIDEBAR_ITEMS,
+  INVESTISSEMENTS_SIDEBAR_ITEMS,
   NAV_ITEMS,
 } from './navigation'
 
@@ -49,10 +55,10 @@ describe('filterParametresItems', () => {
 })
 
 describe('filterNavItems', () => {
-  it('"Accueil" et "Marchés" sont toujours visibles', () => {
+  it('"Accueil", "Marchés", "Commandes" et "Investissements" sont toujours visibles', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements'])
   })
 
   it("masque \"Fournisseurs\" pour un compte non rattaché à un ACTEUR (ni rôle d'administration, ni service propre)", () => {
@@ -61,22 +67,22 @@ describe('filterNavItems', () => {
     expect(result.map((i) => i.label)).not.toContain('Fournisseurs')
   })
 
-  it('ADMIN_SERVICE voit "Marchés" puis "Fournisseurs"', () => {
+  it('ADMIN_SERVICE voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: true, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
   })
 
-  it('ADMIN_APP voit "Marchés" puis "Fournisseurs"', () => {
+  it('ADMIN_APP voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: true, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
   })
 
-  it('un Demandeur (sans rôle dédié, mais rattaché à un service) voit "Marchés" puis "Fournisseurs"', () => {
+  it('un Demandeur (sans rôle dédié, mais rattaché à un service) voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: true })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
   })
 
   it('"Paramètres" ne figure pas dans les onglets du header (point d\'entrée : pied de sidebar)', () => {
@@ -153,6 +159,120 @@ describe('filterMarchesSidebarItems', () => {
       "Marchés d'un service tiers",
       'Tableau de bord',
     ])
+  })
+})
+
+describe('isCommandesSection', () => {
+  it('reconnaît la racine de la section', () => {
+    expect(isCommandesSection('/commandes')).toBe(true)
+  })
+
+  it('reconnaît une sous-page de la section', () => {
+    expect(isCommandesSection('/commandes/import')).toBe(true)
+  })
+
+  it('ignore une route hors de la section', () => {
+    expect(isCommandesSection('/marches')).toBe(false)
+    expect(isCommandesSection('/')).toBe(false)
+  })
+})
+
+describe('filterCommandesSidebarItems', () => {
+  it('"État des commandes PGI du service" reste visible sans ADMIN_APP/ADMIN_SERVICE/CB, "Importation commandes PGI" masquée', () => {
+    const result = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service'])
+  })
+
+  it('ADMIN_APP voit les deux options', () => {
+    const result = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, {
+      isAdminApp: true,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+  })
+
+  it('ADMIN_SERVICE voit les deux options', () => {
+    const result = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: true,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+  })
+
+  it('CB voit les deux options', () => {
+    const result = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: true,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+  })
+})
+
+describe('isInvestissementsSection', () => {
+  it('reconnaît la racine de la section', () => {
+    expect(isInvestissementsSection('/investissements')).toBe(true)
+  })
+
+  it('reconnaît une sous-page de la section', () => {
+    expect(isInvestissementsSection('/investissements/import')).toBe(true)
+  })
+
+  it('ignore une route hors de la section', () => {
+    expect(isInvestissementsSection('/commandes')).toBe(false)
+    expect(isInvestissementsSection('/')).toBe(false)
+  })
+})
+
+describe('filterInvestissementsSidebarItems', () => {
+  it('"État des investissements PGI du service" reste visible sans ADMIN_APP/ADMIN_SERVICE/CB, "Importation investissements PGI" masquée', () => {
+    const result = filterInvestissementsSidebarItems(INVESTISSEMENTS_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des investissements PGI du service'])
+  })
+
+  it('ADMIN_APP voit les deux options', () => {
+    const result = filterInvestissementsSidebarItems(INVESTISSEMENTS_SIDEBAR_ITEMS, {
+      isAdminApp: true,
+      isAdminService: false,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des investissements PGI du service', 'Importation investissements PGI'])
+  })
+
+  it('ADMIN_SERVICE voit les deux options', () => {
+    const result = filterInvestissementsSidebarItems(INVESTISSEMENTS_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: true,
+      isCB: false,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des investissements PGI du service', 'Importation investissements PGI'])
+  })
+
+  it('CB voit les deux options', () => {
+    const result = filterInvestissementsSidebarItems(INVESTISSEMENTS_SIDEBAR_ITEMS, {
+      isAdminApp: false,
+      isAdminService: false,
+      isCB: true,
+    })
+
+    expect(result.map((i) => i.label)).toEqual(['État des investissements PGI du service', 'Importation investissements PGI'])
   })
 })
 

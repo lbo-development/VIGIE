@@ -12,12 +12,15 @@ function formatDateFr(iso: string): string {
   return `${d}/${m}/${y}`
 }
 
-function lastImportLabel(info: ReturnType<typeof useLastImportMarchePgi>): string | null {
-  if (info === null) return null
-  if (!info.exists) return 'Dernier import : paramètre non configuré pour ce service.'
-  if (info.valeur === null) return 'Dernier import : aucun import enregistré.'
-  return `Dernier import : ${formatDateFr(info.valeur)}`
+function daysBetween(from: Date, to: Date): number {
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000)
 }
+
+/** Même seuil que MarchesPGI.tsx#IMPORT_STALE_JOURS — les conditions d'alerte sont partagées. */
+const IMPORT_STALE_JOURS = 15
+
+/** Même texte que backend/src/services/marcheImport.service.ts#PARAMETRE_NON_INITIALISE. */
+const PARAMETRE_NON_INITIALISE = 'Paramètre "last.import.marche.pgi" non initialisé.'
 
 /**
  * Importation des marchés PGI, montée sur /marches/import (voir
@@ -88,6 +91,12 @@ export function ImportMarches() {
   const idService = filterIdService !== null ? Number(filterIdService) : null
 
   const lastImportInfo = useLastImportMarchePgi(idService)
+  const isParametreNonInitialise = lastImportInfo !== null && !lastImportInfo.exists
+  const isImportStale =
+    lastImportInfo !== null &&
+    lastImportInfo.exists &&
+    (lastImportInfo.valeur === null || daysBetween(new Date(lastImportInfo.valeur), new Date()) >= IMPORT_STALE_JOURS)
+
   const { state, preview, confirm, reset } = useMarcheImport(idService)
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -154,7 +163,34 @@ export function ImportMarches() {
       <div className="page-heading">
         <div>
           <h1>Importation marchés PGI</h1>
-          <p>Import du référentiel des marchés depuis un export Excel du PGI.</p>
+          {idService === null ? (
+            <p>Import du référentiel des marchés depuis un export Excel du PGI.</p>
+          ) : isParametreNonInitialise ? (
+            <p className="gp-errmsg" style={{ color: 'var(--gp-warning-text)' }}>
+              <svg className="ti">
+                <use href="#i-alert-triangle" />
+              </svg>
+              {PARAMETRE_NON_INITIALISE}
+            </p>
+          ) : (
+            lastImportInfo?.exists && (
+              <div className="row" style={{ gap: 16 }}>
+                <p className="gp-help">
+                  {lastImportInfo.valeur
+                    ? `Dernière importation le ${formatDateFr(lastImportInfo.valeur)}`
+                    : 'Dernière importation — aucun import effectué'}
+                </p>
+                {isImportStale && (
+                  <p className="gp-errmsg" style={{ color: 'var(--gp-warning-text)' }}>
+                    <svg className="ti">
+                      <use href="#i-alert-triangle" />
+                    </svg>
+                    Pensez à importer les marchés récents
+                  </p>
+                )}
+              </div>
+            )
+          )}
         </div>
       </div>
 
@@ -185,11 +221,6 @@ export function ImportMarches() {
               style={{ maxWidth: 'none' }}
             />
           </div>
-        )}
-        {lastImportLabel(lastImportInfo) && (
-          <p className="gp-help" style={{ marginTop: 26 }}>
-            {lastImportLabel(lastImportInfo)}
-          </p>
         )}
       </div>
 
