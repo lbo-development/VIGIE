@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabaseClient'
-import logo from '../assets/logo-gpmm.png'
+import logo from '../assets/logo-app.png'
 import './Login.css'
 
 /**

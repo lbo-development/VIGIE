@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import logo from '../../assets/logo-gpmm.png'
+import logo from '../../assets/logo-app.png'
 import type { NavItem } from '../../config/navigation'
 
 const APP_NAME = 'VIGIE'

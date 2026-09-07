@@ -137,5 +137,5 @@ style sur tout nouveau `<form>` placé de cette manière dans une modale.
 
 Dupliquer `ForClaude/Template UX/starter-vierge.html` comme point de départ du fichier
 principal de cette application (adapter les chemins vers `gpmm.css`, `app.js`,
-`icons.svg` et `logo-gpmm.png` selon l'emplacement réel du fichier de destination),
+`icons.svg` et `logo-app.png` selon l'emplacement réel du fichier de destination),
 puis suivre `ForClaude/Template UX/GUIDELINES.md`.

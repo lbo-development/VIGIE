@@ -21,12 +21,12 @@ gpmm-template/
 ├── app.js                      Socle JS commun — shell + comportement de tous les composants
 ├── starter-vierge.html         Point de départ pour une nouvelle application
 ├── exemple-erp-voyageurs.html  Exemple d'application complète, tous composants en situation
-├── logo-gpmm.png                Logo — référencé à la racine (src="logo-gpmm.png")
+├── logo-app.png                Logo — référencé à la racine (src="logo-app.png")
 └── GUIDELINES.md                Ce document
 ```
 
-**Logo :** les deux fichiers HTML référencent `logo-gpmm.png` à la racine du projet
-(`src="logo-gpmm.png"`), pas dans un sous-dossier `assets/`. Si le projet cible préfère
+**Logo :** les deux fichiers HTML référencent `logo-app.png` à la racine du projet
+(`src="logo-app.png"`), pas dans un sous-dossier `assets/`. Si le projet cible préfère
 un dossier `assets/`, adapter le chemin dans le HTML — mais garder un chemin **relatif
 simple**, à un seul niveau, pour que l'image reste visible même si le fichier HTML est
 prévisualisé isolément (sans le reste de l'arborescence à côté).
@@ -38,8 +38,8 @@ ressemble un composant avant de l'utiliser, mais **jamais à copier son CSS/JS**
 
 ## Démarrage d'une nouvelle application
 
-1. Copier `gpmm.css`, `icons.svg` (ou le sprite inline), `app.js`, `logo-gpmm.png` /
-   `assets/logo-gpmm.png` tels quels dans le nouveau projet — **sans aucune modification**.
+1. Copier `gpmm.css`, `icons.svg` (ou le sprite inline), `app.js`, `logo-app.png` /
+   `assets/logo-app.png` tels quels dans le nouveau projet — **sans aucune modification**.
 2. Dupliquer `starter-vierge.html` comme point de départ du fichier principal de la
    nouvelle application.
 3. Remplacer les textes entre crochets (`[Nom de l'application]`), adapter les onglets
