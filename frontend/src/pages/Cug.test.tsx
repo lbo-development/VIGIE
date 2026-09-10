@@ -99,6 +99,18 @@ describe('Cug', () => {
     expect(screen.queryByText('Prestations voyageurs')).not.toBeInTheDocument()
   })
 
+  it('affiche "X CUG sélectionnés sur X CUG enregistrés", narrowed by the status filter', () => {
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    render(<Cug />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Générale')
+    selectComboboxOption('Filtrer par service', 'Voyageurs')
+    expect(screen.getByText('1 CUG sélectionnés sur 1 CUG enregistrés.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les CUG par statut', 'Actif')
+    expect(screen.getByText('0 CUG sélectionnés sur 1 CUG enregistrés.')).toBeInTheDocument()
+  })
+
   it('ADMIN_SERVICE : direction et service se positionnent automatiquement sur son propre périmètre', () => {
     currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
     render(<Cug />)

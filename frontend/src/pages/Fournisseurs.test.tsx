@@ -154,6 +154,16 @@ describe('Fournisseurs', () => {
     expect(screen.getByText('Bemat')).toBeInTheDocument()
   })
 
+  it('affiche "X fournisseurs sélectionnés sur X fournisseurs enregistrés", narrowed by the status filter', () => {
+    render(<Fournisseurs />)
+
+    selectDirectionAndService()
+    expect(screen.getByText('2 fournisseurs sélectionnés sur 2 fournisseurs enregistrés.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les fournisseurs par statut', 'Actifs')
+    expect(screen.getByText('1 fournisseurs sélectionnés sur 2 fournisseurs enregistrés.')).toBeInTheDocument()
+  })
+
   it('la recherche filtre par raison sociale, ville ou SIREN', () => {
     render(<Fournisseurs />)
 

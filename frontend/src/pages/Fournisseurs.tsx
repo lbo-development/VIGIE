@@ -187,10 +187,10 @@ export function Fournisseurs() {
 
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [search, setSearch] = useState('')
-  const displayedFournisseurs =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : fournisseurs.filter((f) => matchesStatusFilter(f.actif, statusFilter) && matchesSearch(f, search))
+  const fournisseursEnregistres = filterIdDirection === null || filterIdService === null ? [] : fournisseurs
+  const displayedFournisseurs = fournisseursEnregistres.filter(
+    (f) => matchesStatusFilter(f.actif, statusFilter) && matchesSearch(f, search),
+  )
 
   const [fournisseurModal, setFournisseurModal] = useState<{ mode: 'create' | 'edit'; fournisseur: Fournisseur | null } | null>(
     null,
@@ -270,6 +270,12 @@ export function Fournisseurs() {
           </div>
         )}
       </div>
+
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {displayedFournisseurs.length} fournisseurs sélectionnés sur {fournisseursEnregistres.length} fournisseurs enregistrés.
+        </p>
+      )}
 
       {/* max-height du gabarit (360px, gpmm.css) trop faible pour cette liste, souvent longue — agrandi localement comme sur CommandesPGI.tsx (même valeur), sans toucher au gabarit partagé. */}
       <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 'calc(70vh - 70px)' }}>
@@ -730,6 +736,7 @@ function FournisseurFormModal({
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

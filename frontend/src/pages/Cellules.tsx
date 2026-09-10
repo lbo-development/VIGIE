@@ -74,12 +74,9 @@ export function Cellules() {
   // Direction ET service obligatoires pour afficher la liste (décision
   // utilisateur, comme SeuilsValidationDs.tsx) : pas d'option "Toutes les
   // directions" ni "Tous les services".
-  const displayedCellules =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : cellules
-          .filter((c) => c.id_service === Number(filterIdService))
-          .filter((c) => matchesStatusFilter(c.actif, statusFilter))
+  const cellulesEnregistrees =
+    filterIdDirection === null || filterIdService === null ? [] : cellules.filter((c) => c.id_service === Number(filterIdService))
+  const displayedCellules = cellulesEnregistrees.filter((c) => matchesStatusFilter(c.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -136,6 +133,12 @@ export function Cellules() {
           />
         </div>
       </div>
+
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {displayedCellules.length} cellules sélectionnées sur {cellulesEnregistrees.length} cellules enregistrées.
+        </p>
+      )}
 
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
@@ -354,6 +357,7 @@ function CelluleFormModal({ mode, cellule, directions, services, onClose, onSave
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

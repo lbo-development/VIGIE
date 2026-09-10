@@ -10,6 +10,7 @@ import { DatePicker } from '../components/DatePicker'
 import { SpinButton } from '../components/SpinButton'
 import { PiecesMarcheModal } from '../components/PiecesMarcheModal'
 import { AddPieceMarcheModal } from '../components/AddPieceMarcheModal'
+import { PieceCountBadge } from '../components/PieceCountBadge'
 import { api, ApiError } from '../services/api'
 import '../styles/marche.css'
 
@@ -272,7 +273,12 @@ export function MarchesTiers() {
           marcheRef={{ typeMarche: 'TIERS', idMarcheTiers: piecesModalMarcheTiers.id_marche_tiers }}
           label={piecesModalMarcheTiers.nummarche}
           canManage={canManage}
-          onClose={() => setPiecesModalMarcheTiers(null)}
+          onClose={() => {
+            setPiecesModalMarcheTiers(null)
+            // Rafraîchit NOMBRE_PIECES (pastille de l'icône) — l'ajout/la suppression d'une pièce
+            // dans la modale ne met à jour que sa propre liste, jamais la liste des marchés tiers.
+            void refetch()
+          }}
         />
       )}
 
@@ -281,7 +287,10 @@ export function MarchesTiers() {
           marcheRef={{ typeMarche: 'TIERS', idMarcheTiers: addPieceModalMarcheTiers.id_marche_tiers }}
           label={addPieceModalMarcheTiers.nummarche}
           onClose={() => setAddPieceModalMarcheTiers(null)}
-          onSaved={() => setAddPieceModalMarcheTiers(null)}
+          onSaved={() => {
+            setAddPieceModalMarcheTiers(null)
+            void refetch()
+          }}
         />
       )}
     </div>
@@ -350,11 +359,17 @@ function MarcheTiersCard({
         </span>
       )}
       <span className="gp-tip" data-tip="Visualiser les pièces">
-        <button aria-label="Visualiser les pièces" onClick={onPieces}>
+        <button
+          aria-label={
+            marcheTiers.nombre_pieces > 0 ? `Visualiser les pièces (${marcheTiers.nombre_pieces})` : 'Visualiser les pièces'
+          }
+          onClick={onPieces}
+        >
           <svg className="ti">
             <use href="#i-folder" />
           </svg>
         </button>
+        <PieceCountBadge count={marcheTiers.nombre_pieces} />
       </span>
       {canManage && (
         <span className="gp-tip" data-tip="Ajouter une pièce">
@@ -378,10 +393,10 @@ function MarcheTiersCard({
           <div className="marche-card__subtitle">{marcheTiers.libelle_service}</div>
         </div>
         <div className="marche-card__dots">
-          <span
-            className={`marche-dot ${marcheTiers.actif ? 'marche-dot--on' : 'marche-dot--off'}`}
-            title={marcheTiers.actif ? 'Actif' : 'Inactif'}
-          />
+          <span className="marche-card__dot-row">
+            <span className="marche-card__dot-label">{marcheTiers.actif ? 'Actif' : 'Inactif'}</span>
+            <span className={`marche-dot ${marcheTiers.actif ? 'marche-dot--on' : 'marche-dot--off'}`} />
+          </span>
         </div>
       </div>
 

@@ -17,6 +17,7 @@ const findByIdFournisseur = vi.fn()
 const findIdServiceByMatricule = vi.fn()
 const findActiveByMatricule = vi.fn()
 const assertManagesServiceOrHasRoleCb = vi.fn()
+const findAllByDomaine = vi.fn()
 
 vi.mock('../repositories/marchePiece.repository.js', () => ({
   findAllByService: (...args: unknown[]) => findAllByService(...args),
@@ -49,6 +50,9 @@ vi.mock('../repositories/roleAttribution.repository.js', () => ({
 }))
 vi.mock('../services/authorization.service.js', () => ({
   assertManagesServiceOrHasRoleCb: (...args: unknown[]) => assertManagesServiceOrHasRoleCb(...args),
+}))
+vi.mock('../repositories/libelleReferentiel.repository.js', () => ({
+  findAllByDomaine: (...args: unknown[]) => findAllByDomaine(...args),
 }))
 
 const { listPieces, uploadPiece, updatePieceMetadata, deletePiece, downloadPiece } = await import(
@@ -106,6 +110,11 @@ beforeEach(() => {
   findIdServiceByMatricule.mockReset().mockResolvedValue(ID_SERVICE)
   findActiveByMatricule.mockReset().mockResolvedValue([])
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
+  findAllByDomaine.mockReset().mockResolvedValue([
+    { domaine: 'TYPE_PIECE_MARCHE', code: 'CCAP', libelle: 'CCAP', ordre: 1, actif: true },
+    { domaine: 'TYPE_PIECE_MARCHE', code: 'AE', libelle: 'AE', ordre: 3, actif: true },
+    { domaine: 'TYPE_PIECE_MARCHE', code: 'AUTRE', libelle: 'Autre', ordre: 6, actif: true },
+  ])
 })
 
 describe('listPieces', () => {
@@ -146,6 +155,11 @@ describe('uploadPiece', () => {
 
   it('rejette sans fichier', async () => {
     await expect(uploadPiece(MATRICULE, input, undefined)).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('rejette un type_piece hors référentiel (TYPE_PIECE_MARCHE)', async () => {
+    await expect(uploadPiece(MATRICULE, { ...input, typePiece: 'INCONNU' }, validFile())).rejects.toMatchObject({ status: 400 })
+    expect(uploadFile).not.toHaveBeenCalled()
   })
 
   it('vérifie les droits (assertManagesServiceOrHasRoleCb) avant tout upload', async () => {

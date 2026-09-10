@@ -1,30 +1,8 @@
 import { useState } from 'react'
 import { usePiecesInvestissement, type InvestissementPiece, type TypePiece } from '../hooks/usePiecesInvestissement'
+import { useLibelleReferentiel } from '../hooks/useLibelleReferentiel'
 import { Combobox } from './Combobox'
 import { SpinButton } from './SpinButton'
-
-const TYPE_PIECE_OPTIONS: { value: TypePiece; label: string }[] = [
-  { value: 'RAPPORT_CODIR', label: 'Rapport CODIR' },
-  { value: 'RAPPORT_CODIR_VALIDE', label: 'Rapport CODIR validé' },
-  { value: 'RAPPORT_CODIR_ANNEXES', label: 'Rapport CODIR — Annexes' },
-  { value: 'RAPPORT_CODIR_PLANS', label: 'Rapport CODIR — Plans' },
-  { value: 'DECISION_DIRECTOIRE', label: 'Décision Directoire' },
-  { value: 'DECISION_DIRECTOIRE_ANNEXES', label: 'Décision Directoire — Annexes' },
-  { value: 'DECISION_DIRECTOIRE_PLANS', label: 'Décision Directoire — Plans' },
-  { value: 'RAPPORT_CS', label: 'Rapport CS' },
-  { value: 'RAPPORT_CS_VALIDE', label: 'Rapport CS validé' },
-  { value: 'RAPPORT_CS_DOE', label: 'Rapport CS — DOE' },
-  { value: 'RAPPORT_CS_ANNEXES', label: 'Rapport CS — Annexes' },
-  { value: 'RAPPORT_CS_PLANS', label: 'Rapport CS — Plans' },
-  { value: 'DECISION_CS', label: 'Décision CS' },
-  { value: 'FICHE_OUVERTURE_HO_VALIDEE', label: "Fiche d'ouverture HO validée" },
-  { value: 'PROJET_TECHNIQUE', label: 'Projet technique' },
-  { value: 'AUTRE', label: 'Autre' },
-]
-
-function libelleTypePiece(type: TypePiece): string {
-  return TYPE_PIECE_OPTIONS.find((o) => o.value === type)?.label ?? type
-}
 
 function formatTaille(octets: number): string {
   if (octets < 1024) return `${octets} o`
@@ -54,8 +32,11 @@ interface PiecesInvestissementModalProps {
 export function PiecesInvestissementModal({ numeroOperation, label, canManage, onClose }: PiecesInvestissementModalProps) {
   const { pieces, loading, error, mutation, updatePieceMetadata, deletePiece, downloadPiece } =
     usePiecesInvestissement(numeroOperation)
+  const { items: typesPiece } = useLibelleReferentiel('TYPE_PIECE_INVESTISSEMENT')
+  const typePieceOptions = typesPiece.filter((t) => t.actif).map((t) => ({ value: t.code, label: t.libelle }))
+  const libelleTypePiece = (code: TypePiece) => typesPiece.find((t) => t.code === code)?.libelle ?? code
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editTypePiece, setEditTypePiece] = useState<TypePiece>('AUTRE')
+  const [editTypePiece, setEditTypePiece] = useState<TypePiece>('')
   const [editNumeroReevaluation, setEditNumeroReevaluation] = useState('0')
   const [pieceToDelete, setPieceToDelete] = useState<InvestissementPiece | null>(null)
 
@@ -99,10 +80,10 @@ export function PiecesInvestissementModal({ numeroOperation, label, canManage, o
                   {editingId === piece.id_investissement_piece ? (
                     <div className="row" style={{ gap: 10, flex: 1, flexWrap: 'wrap' }}>
                       <Combobox
-                        options={TYPE_PIECE_OPTIONS}
+                        options={typePieceOptions}
                         value={editTypePiece}
                         onChange={(v) => {
-                          if (v) setEditTypePiece(v as TypePiece)
+                          if (v) setEditTypePiece(v)
                         }}
                         placeholder="Type de pièce"
                         ariaLabel="Type de pièce"

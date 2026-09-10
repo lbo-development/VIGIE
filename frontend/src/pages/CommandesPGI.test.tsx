@@ -181,6 +181,17 @@ describe('CommandesPGI', () => {
     expect(screen.getByText('M2511830-10')).toBeInTheDocument()
   })
 
+  it('affiche "X commandes sélectionnées sur X commandes enregistrées", narrowed by the search filter', () => {
+    render(<CommandesPGI />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Générale')
+    selectComboboxOption('Filtrer par service', 'Maintenance')
+    expect(screen.getByText('4 commandes sélectionnées sur 4 commandes enregistrées.')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Recherche'), { target: { value: 'GPMM' } })
+    expect(screen.getByText('1 commandes sélectionnées sur 4 commandes enregistrées.')).toBeInTheDocument()
+  })
+
   it("ne plante pas quand une commande a un Marché encore null (donnée antérieure au correctif HM)", () => {
     render(<CommandesPGI />)
 

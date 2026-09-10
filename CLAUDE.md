@@ -41,6 +41,7 @@ tête — **toute nouvelle route doit monter `requireAuth`**, sans exception).
 - Toute nouvelle variable d'environnement doit être ajoutée à la fois dans le fichier réel (non commité) et dans le `.env.example` correspondant, avec une valeur d'exemple neutre.
 - Tout changement de schéma de base de données passe par une migration Supabase CLI (voir `database/migrations/README.md`), jamais par une modification manuelle non versionnée.
 - **Claude Code ne modifie jamais directement la base Supabase (schéma ou données) — ni via le SDK, ni via l'API REST, ni via une commande shell.** La lecture (vérification, introspection) reste autorisée, jamais l'écriture (INSERT/UPDATE/DELETE/DDL/GRANT...). Si une modification est nécessaire, toujours proposer le script SQL correspondant et laisser l'utilisateur l'exécuter lui-même dans l'éditeur SQL du dashboard Supabase.
+- **Tout accès direct de Claude Code à la base (audit, vérification) passe obligatoirement par un rôle Postgres dédié `claude_readonly`, en lecture seule uniquement — jamais par `service_role` ni par le rôle `postgres`.** Script de création, gestion de la chaîne de connexion (`backend/.env`, variable `DATABASE_URL_READONLY`) : `ForClaude/SECURITY.md` §7.
 
 ## Commandes utiles
 
@@ -87,6 +88,30 @@ service hérite implicitement de sa direction) — géré exclusivement par le r
 `ADMIN_APP`. Décision et schéma détaillés dans `docs/ARCHITECTURE.md` (section
 « Paramétrage applicatif »), policies RLS dans `ForClaude/SECURITY.md` §2.3. Ne pas
 réinventer un autre mécanisme de configuration dynamique sans repartir de cette décision.
+
+**Cas distinct : listes de valeurs fixes** (ex. type de pièce marché/investissement) —
+prises en charge par un second mécanisme, volontairement séparé, `finances.libelle_referentiel`
+(`docs/ARCHITECTURE.md` section « Référentiel générique de listes », RLS dans
+`ForClaude/SECURITY.md` §2.9). Ce n'est **pas** une réinvention du mécanisme ci-dessus : la
+forme du besoin diffère (liste de lignes référencée par FK depuis d'autres tables, sans
+portée organisationnelle) là où `parametre_application` stocke une valeur scalaire par
+portée direction/service. Toute nouvelle liste de valeurs administrable par `ADMIN_APP`
+rejoint `libelle_referentiel` (nouveau `DOMAINE`) ; toute nouvelle valeur scalaire de
+configuration rejoint `parametre_application` — ne pas mélanger les deux formes.
+
+## Contrainte de format Markdown (compatibilité export PDF)
+
+Tous les fichiers `.md` générés doivent respecter ces règles pour être compatibles
+avec l'extension VS Code "Markdown PDF" (yzane), qui interprète tout bloc démarrant
+par `---` en début de fichier comme du frontmatter YAML :
+
+- Ne jamais commencer un fichier `.md` par une ligne `---`
+- Ne jamais utiliser `---` comme séparateur visuel en tout début de document
+- Si un séparateur horizontal est nécessaire, utiliser `___` ou `***` à la place de `---`
+- Le titre principal doit être en première ligne, au format `# Titre` (pas de ligne `---` avant)
+- Si un frontmatter YAML est réellement voulu, il doit être strictement valide
+  (clé: valeur), encadré par deux `---`, sans texte libre ni ponctuation ambiguë
+  (`:`, `&`) dans les valeurs
 
 ## langue d'echange
 

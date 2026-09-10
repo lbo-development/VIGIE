@@ -22,6 +22,10 @@ vi.mock('../repositories/marcheTiers.repository.js', () => ({
   update: (...args: unknown[]) => update(...args),
   remove: (...args: unknown[]) => remove(...args),
 }))
+const countByIdMarcheTiers = vi.fn()
+vi.mock('../repositories/marchePiece.repository.js', () => ({
+  countByIdMarcheTiers: (...args: unknown[]) => countByIdMarcheTiers(...args),
+}))
 vi.mock('../repositories/fournisseur.repository.js', () => ({
   findById: (...args: unknown[]) => findByIdFournisseur(...args),
 }))
@@ -107,6 +111,7 @@ beforeEach(() => {
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
   deriveTypeProc.mockReset().mockReturnValue('MARCHE')
   existsForMarcheTiers.mockReset().mockResolvedValue(false)
+  countByIdMarcheTiers.mockReset().mockResolvedValue(new Map())
 })
 
 describe('listMarcheTiers', () => {
@@ -121,7 +126,17 @@ describe('listMarcheTiers', () => {
 
     expect(findIdServiceByMatricule).not.toHaveBeenCalled()
     expect(findAll).toHaveBeenCalledWith(ID_SERVICE)
-    expect(result).toEqual([MARCHE_TIERS])
+    expect(result).toEqual([{ ...MARCHE_TIERS, nombre_pieces: 0 }])
+  })
+
+  it('enrichit chaque marché tiers avec NOMBRE_PIECES (finances.marche_piece, via marchePieceRepository.countByIdMarcheTiers)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ type_role: 'ADMIN_APP', id_service: null, id_cellule: null, id_direction: null, id_role: 1 }])
+    countByIdMarcheTiers.mockResolvedValue(new Map([[1, 4]]))
+
+    const result = await listMarcheTiers(MATRICULE, ID_SERVICE)
+
+    expect(countByIdMarcheTiers).toHaveBeenCalledWith([1])
+    expect(result).toEqual([{ ...MARCHE_TIERS, nombre_pieces: 4 }])
   })
 
   it("ADMIN_APP sans idService transmis : renvoie une liste vide", async () => {
@@ -141,7 +156,7 @@ describe('listMarcheTiers', () => {
 
     expect(findIdServiceByMatricule).toHaveBeenCalledWith(MATRICULE)
     expect(findAll).toHaveBeenCalledWith(ID_SERVICE)
-    expect(result).toEqual([MARCHE_TIERS])
+    expect(result).toEqual([{ ...MARCHE_TIERS, nombre_pieces: 0 }])
   })
 
   it("acteur sans service propre : renvoie une liste vide", async () => {

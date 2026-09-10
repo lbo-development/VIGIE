@@ -165,6 +165,16 @@ describe('GisementTechnique', () => {
     expect(screen.queryByText('Manutention')).not.toBeInTheDocument()
   })
 
+  it('affiche "X secteurs sélectionnés sur X secteurs enregistrés", narrowed by the status filter', () => {
+    render(<GisementTechnique />)
+
+    selectDirectionAndService()
+    expect(screen.getByText('2 secteurs sélectionnés sur 2 secteurs enregistrés.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les secteurs par statut', 'Actifs')
+    expect(screen.getByText('1 secteurs sélectionnés sur 2 secteurs enregistrés.')).toBeInTheDocument()
+  })
+
   it('filtre en cascade : la combo Service ne propose que les services de la direction choisie', () => {
     render(<GisementTechnique />)
 

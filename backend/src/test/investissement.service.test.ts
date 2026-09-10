@@ -13,6 +13,10 @@ vi.mock('../repositories/investissement.repository.js', () => ({
   findByNumeroOperation: (...args: unknown[]) => findByNumeroOperation(...args),
   updateManagedFields: (...args: unknown[]) => updateManagedFieldsRepo(...args),
 }))
+const countByNumeroOperations = vi.fn()
+vi.mock('../repositories/investissementPiece.repository.js', () => ({
+  countByNumeroOperations: (...args: unknown[]) => countByNumeroOperations(...args),
+}))
 vi.mock('../repositories/acteur.repository.js', () => ({
   findIdServiceByMatricule: (...args: unknown[]) => findIdServiceByMatricule(...args),
 }))
@@ -40,6 +44,7 @@ beforeEach(() => {
   findActiveByMatricule.mockReset().mockResolvedValue([])
   findLastImportRow.mockReset().mockResolvedValue({ exists: true, valeur: '2026-09-03' })
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
+  countByNumeroOperations.mockReset().mockResolvedValue(new Map())
 })
 
 describe('listInvestissements', () => {
@@ -54,7 +59,17 @@ describe('listInvestissements', () => {
 
     expect(findIdServiceByMatricule).not.toHaveBeenCalled()
     expect(findAllInvestissement).toHaveBeenCalledWith(ID_SERVICE)
-    expect(result).toEqual([OPERATION])
+    expect(result).toEqual([{ ...OPERATION, nombre_pieces: 0 }])
+  })
+
+  it('enrichit chaque opération avec NOMBRE_PIECES (finances.investissement_piece, via investissementPieceRepository.countByNumeroOperations)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ type_role: 'ADMIN_APP', id_service: null, id_cellule: null, id_direction: null, id_role: 1 }])
+    countByNumeroOperations.mockResolvedValue(new Map([['VN000203', 2]]))
+
+    const result = await listInvestissements(MATRICULE, ID_SERVICE)
+
+    expect(countByNumeroOperations).toHaveBeenCalledWith(['VN000203'])
+    expect(result).toEqual([{ ...OPERATION, nombre_pieces: 2 }])
   })
 
   it("ADMIN_APP sans idService transmis : renvoie une liste vide", async () => {
@@ -73,7 +88,7 @@ describe('listInvestissements', () => {
 
     expect(findIdServiceByMatricule).toHaveBeenCalledWith(MATRICULE)
     expect(findAllInvestissement).toHaveBeenCalledWith(ID_SERVICE)
-    expect(result).toEqual([OPERATION])
+    expect(result).toEqual([{ ...OPERATION, nombre_pieces: 0 }])
   })
 
   it("acteur non ADMIN_APP sans service propre : renvoie une liste vide", async () => {

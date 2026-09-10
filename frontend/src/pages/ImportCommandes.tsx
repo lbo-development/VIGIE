@@ -94,7 +94,7 @@ export function ImportCommandes() {
       <div className="stack">
         <div className="page-heading">
           <div>
-            <h1>Importation commandes PGI</h1>
+            <h1>Importation des commandes PGI</h1>
             <p>Import des commandes depuis un export Excel du PGI.</p>
           </div>
         </div>
@@ -146,7 +146,7 @@ export function ImportCommandes() {
     <div className="stack">
       <div className="page-heading">
         <div>
-          <h1>Importation commandes PGI</h1>
+          <h1>Importation des commandes PGI</h1>
           {idService === null ? (
             <p>Import des commandes depuis un export Excel du PGI.</p>
           ) : isParametreNonInitialise ? (

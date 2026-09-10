@@ -42,17 +42,19 @@ export function Sidebar({ items, parametresLink, hidden, theme, onToggleTheme }:
     <aside className="app-sidebar" aria-label="Navigation principale latérale" aria-hidden={hidden}>
       <nav className="sidebar-nav gp-scroll">
         {items.map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            className={`sidebar-item${isItemActive(location.pathname, item.to) ? ' is-active' : ''}`}
-            data-label={item.label}
-          >
-            <svg className="ti">
-              <use href={`#${item.icon}`} />
-            </svg>
-            <span className="sidebar-label">{item.label}</span>
-          </Link>
+          <div key={item.to}>
+            {item.separatorBefore && <hr className="divider" style={{ margin: '8px 0' }} />}
+            <Link
+              to={item.to}
+              className={`sidebar-item${isItemActive(location.pathname, item.to) ? ' is-active' : ''}`}
+              data-label={item.label}
+            >
+              <svg className="ti">
+                <use href={`#${item.icon}`} />
+              </svg>
+              <span className="sidebar-label">{item.label}</span>
+            </Link>
+          </div>
         ))}
       </nav>
 

@@ -20,6 +20,10 @@ vi.mock('../repositories/marche.repository.js', () => ({
   findByNummarche: (...args: unknown[]) => findByNummarche(...args),
   updateManagedFields: (...args: unknown[]) => updateManagedFields(...args),
 }))
+const countByNummarches = vi.fn()
+vi.mock('../repositories/marchePiece.repository.js', () => ({
+  countByNummarches: (...args: unknown[]) => countByNummarches(...args),
+}))
 vi.mock('../repositories/cug.repository.js', () => ({
   findAll: (...args: unknown[]) => findAllCug(...args),
   findByCode: (...args: unknown[]) => findByCodeCug(...args),
@@ -92,6 +96,7 @@ beforeEach(() => {
   findActiveByMatricule.mockReset().mockResolvedValue([])
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
   findLastImportRow.mockReset().mockResolvedValue({ exists: true, valeur: '2026-08-10' })
+  countByNummarches.mockReset().mockResolvedValue(new Map())
 })
 
 describe('listMarches', () => {
@@ -108,7 +113,17 @@ describe('listMarches', () => {
     expect(findAllCug).toHaveBeenCalledWith(ID_SERVICE)
     expect(findAllFournisseur).toHaveBeenCalledWith(ID_SERVICE)
     expect(findByFournisseurIds).toHaveBeenCalledWith([5])
-    expect(result).toEqual([{ nummarche: 'M0909311', id_fournisseur: 5, fournisseur_raison_sociale: 'NAID' }])
+    expect(result).toEqual([{ nummarche: 'M0909311', id_fournisseur: 5, fournisseur_raison_sociale: 'NAID', nombre_pieces: 0 }])
+  })
+
+  it('enrichit chaque marché avec NOMBRE_PIECES (finances.marche_piece, via marchePieceRepository.countByNummarches)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ type_role: 'ADMIN_APP', id_service: null, id_cellule: null, id_direction: null, id_role: 1 }])
+    countByNummarches.mockResolvedValue(new Map([['M0909311', 3]]))
+
+    const result = await listMarches(MATRICULE, ID_SERVICE)
+
+    expect(countByNummarches).toHaveBeenCalledWith(['M0909311'])
+    expect(result).toEqual([{ nummarche: 'M0909311', id_fournisseur: 5, fournisseur_raison_sociale: 'NAID', nombre_pieces: 3 }])
   })
 
   it('marché créé manuellement sans CUG (CODE_CUG null) : reste visible via son fournisseur, pas de doublon si aussi trouvé par CUG', async () => {
@@ -122,8 +137,8 @@ describe('listMarches', () => {
     const result = await listMarches(MATRICULE, ID_SERVICE)
 
     expect(result).toEqual([
-      { nummarche: 'M0909311', id_fournisseur: 5, code_cug: '268', fournisseur_raison_sociale: 'NAID' },
-      { nummarche: 'M_SANS_CUG', id_fournisseur: 5, code_cug: null, fournisseur_raison_sociale: 'NAID' },
+      { nummarche: 'M0909311', id_fournisseur: 5, code_cug: '268', fournisseur_raison_sociale: 'NAID', nombre_pieces: 0 },
+      { nummarche: 'M_SANS_CUG', id_fournisseur: 5, code_cug: null, fournisseur_raison_sociale: 'NAID', nombre_pieces: 0 },
     ])
   })
 
@@ -137,8 +152,8 @@ describe('listMarches', () => {
     const result = await listMarches(MATRICULE, ID_SERVICE)
 
     expect(result).toEqual([
-      { nummarche: 'M_SANS_FOURNISSEUR', id_fournisseur: null, fournisseur_raison_sociale: null },
-      { nummarche: 'M_FOURNISSEUR_INCONNU', id_fournisseur: 999, fournisseur_raison_sociale: null },
+      { nummarche: 'M_SANS_FOURNISSEUR', id_fournisseur: null, fournisseur_raison_sociale: null, nombre_pieces: 0 },
+      { nummarche: 'M_FOURNISSEUR_INCONNU', id_fournisseur: 999, fournisseur_raison_sociale: null, nombre_pieces: 0 },
     ])
   })
 
@@ -161,7 +176,7 @@ describe('listMarches', () => {
     expect(findAllCug).toHaveBeenCalledWith(ID_SERVICE)
     expect(findAllFournisseur).toHaveBeenCalledWith(ID_SERVICE)
     expect(findByFournisseurIds).toHaveBeenCalledWith([5])
-    expect(result).toEqual([{ nummarche: 'M0909311', id_fournisseur: 5, fournisseur_raison_sociale: 'NAID' }])
+    expect(result).toEqual([{ nummarche: 'M0909311', id_fournisseur: 5, fournisseur_raison_sociale: 'NAID', nombre_pieces: 0 }])
   })
 
   it("acteur non ADMIN_APP sans service propre : renvoie une liste vide", async () => {

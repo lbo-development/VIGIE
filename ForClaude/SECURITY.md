@@ -19,7 +19,7 @@ Application à usage métier (interne/professionnel). Pas de données utilisateu
 
 **Objectif** : tout code écrit ou modifié doit viser un niveau de sécurité ≥ 9/10. En cas de doute entre simplicité et sécurité, la sécurité prime. Si une consigne ci-dessous ne peut pas être respectée pour une raison technique, il faut le signaler explicitement dans la réponse plutôt que de l'ignorer silencieusement.
 
----
+___
 
 ## 1. Authentification (Supabase Auth)
 
@@ -375,6 +375,61 @@ problème de reproductibilité (une reconstruction du projet Supabase depuis les
 seules ne les recréerait pas). À traiter un jour via une migration de rattrapage, sans
 urgence.
 
+### 2.8 Investissement (`finances.operation_investissement`, `finances.investissement_piece`)
+
+Même modèle que `finances.marche`/`finances.marche_piece` (§2.4 pour la comparaison de
+principe avec SITE/SECTEUR) :
+
+- **Lecture** scopée par service sur les deux tables (`operation_investissement_select_scoped`,
+  `investissement_piece_select_scoped` : `id_service = finances.current_user_id_service() OR
+  current_user_has_role('ADMIN_APP')`) — pas ouverte à tout `authenticated` comme
+  SITE/SECTEUR/SEUIL_VALIDATION_DS, décision reprise de `finances.marche_piece` (documents
+  jugés plus sensibles qu'un référentiel géographique).
+- **Écriture** (dépôt/modification/suppression de pièce) réservée
+  `assertManagesServiceOrHasRoleCb` — ADMIN_APP transverse, ADMIN_SERVICE ou CB sur le
+  service concerné — vérification de rôle seulement en RLS, scoping fin par service
+  appliqué côté Express, même principe que §2.4/§2.5 : ne jamais considérer la policy RLS
+  seule comme suffisante ici non plus.
+- **Suppression physique** des pièces (`finances.investissement_piece`), pas d'archivage —
+  même décision que `finances.marche_piece` le 02/09/2026.
+- `finances.operation_investissement` n'a pas de voie de création manuelle (contrairement à
+  `finances.marche`) : alimentée exclusivement par import PGI, pas de policy `INSERT`/`DELETE`
+  ouverte à un rôle applicatif au-delà de l'import lui-même.
+
+Détail du schéma et des couches : `docs/ARCHITECTURE.md` §"Module Investissements".
+Migrations : `20260903110000_operation_investissement_import.sql` (table, RLS),
+`20260904130000_create_investissement_piece.sql` (table, RLS, bucket Storage
+`investissement-pieces`).
+
+### 2.9 Référentiel libellé (`finances.libelle_referentiel`)
+
+Référentiel générique de listes de valeurs fixes (type de pièce marché/investissement à ce
+jour), administrable par `ADMIN_APP` — remplace les CHECK SQL figés qui existaient
+auparavant sur `marche_piece.type_piece`/`investissement_piece.type_piece`. Décision et
+schéma complets : `docs/ARCHITECTURE.md` §"Référentiel générique de listes". Points propres
+à la sécurité de cette table, à ne pas manquer :
+
+- **Écriture réservée `ADMIN_APP` seul** — **pas** de délégation `ADMIN_SERVICE` comme pour
+  CUG (§2.6) ou SITE/SECTEUR/SEUIL_VALIDATION_DS (§2.4) : ce référentiel est transverse à
+  toute l'application, aucun service n'en est propriétaire, donc pas de notion de "service
+  concerné" à déléguer.
+- **Lecture ouverte à tout `authenticated`** (`libelle_referentiel_select_authenticated`,
+  `using (public.current_user_matricule() is not null)`) — nécessaire pour peupler les
+  listes déroulantes de dépôt de pièce, quel que soit le service de l'appelant.
+- **Suppression physique volontairement possible** (contrairement à DIRECTION/SERVICE/
+  CELLULE/CUG/SITE/SECTEUR, qui n'utilisent que `ACTIF`) — mais bloquée nativement par une
+  FK composite `(domaine, code)` sans `ON DELETE`, portée par chaque table cliente : Postgres
+  refuse la suppression tant qu'au moins une pièce référence le code (`RESTRICT` par défaut).
+  `libelleReferentiel.service.ts#deleteLibelle` traduit cette violation Postgres (code erreur
+  `23503`) en message métier 409 plutôt que de la laisser remonter brute au client (voir §8
+  ci-dessous) — ne jamais retirer cette traduction en pensant "simplifier" le code, le
+  message Postgres brut ne doit jamais atteindre le frontend.
+- **Domaines couverts** : liste fermée dans `libelleReferentiel.service.ts#DOMAINES`
+  (validée par un schéma Zod `z.enum` à chaque lecture/écriture) — étendre cette énumération
+  avant d'ajouter un nouveau domaine, ne jamais accepter une chaîne libre côté service.
+
+Migration : `supabase/migrations/20260905090000_create_libelle_referentiel.sql`.
+
 ## 3. Validation et sanitization des données
 
 - Toute donnée entrante (body, query params, headers, params d'URL) côté Express doit être validée avec un schéma explicite (ex. `zod` ou `yup`) avant traitement — jamais utilisée brute.
@@ -432,6 +487,22 @@ urgence.
 - Si un secret a été accidentellement committé dans l'historique Git, le signaler explicitement plutôt que de simplement le supprimer du fichier (il reste dans l'historique et doit être révoqué/régénéré).
 - **`supabase/.gitignore` doit exclure `.temp` et `.branches`** (convention standard du CLI Supabase, `supabase init`) — incident du 30/08/2026 : `supabase/.temp/` était committé, exposant `project-ref`, `organization_id` et l'URL du pooler Postgres (`linked-project.json`, `pooler-url`, `project-ref`). Aucun mot de passe dans ces fichiers, mais publier l'endpoint de connexion directe à la base réduit inutilement le coût de reconnaissance d'un attaquant. Retiré du suivi (`git rm -r --cached`), fichiers conservés sur disque (nécessaires au CLI local).
 - **Une clé Supabase manquante doit faire échouer le démarrage en production (`throw`), jamais un simple `console.warn` suivi d'un repli silencieux** — incident du 30/08/2026 : `config/env.ts` (backend) et `lib/supabaseClient.ts` (frontend) substituaient une valeur de repli syntaxiquement valide (`placeholder-anon-key`, `http://localhost:54321`) même quand `NODE_ENV`/`import.meta.env.PROD` valait production, transformant une erreur de configuration immédiate et visible en une cascade d'échecs réseau opaques. Le repli tolérant (avec avertissement) reste nécessaire en dev/test — voir `backend/src/test/env.test.ts` et `frontend/src/lib/supabaseClient.test.ts`.
+- **Accès direct de Claude Code à la base (introspection/vérification, ex. audit RLS) passe obligatoirement par un rôle Postgres dédié `claude_readonly`, jamais par `service_role` ni par le rôle superutilisateur `postgres`.** Ce rôle ne porte que des `GRANT SELECT` (schéma `finances` et `pg_catalog.pg_policies` pour l'audit des policies) — aucun droit d'écriture ni de DDL, de sorte que l'interdiction de modifier la base (voir `CLAUDE.md`) soit imposée techniquement, pas seulement respectée sur promesse. Script de création (à exécuter par l'utilisateur dans l'éditeur SQL Supabase, jamais par Claude Code — voir §2 sur l'interdiction d'écriture) :
+  ```sql
+  create role claude_readonly with login password '<mot_de_passe_dédié, distinct de celui de postgres/service_role>';
+  grant usage on schema finances, public to claude_readonly;
+  grant select on all tables in schema finances, public to claude_readonly;
+  alter default privileges in schema finances grant select on tables to claude_readonly;
+  alter default privileges in schema public grant select on tables to claude_readonly;
+  grant select on pg_catalog.pg_policies to claude_readonly;
+  ```
+  La chaîne de connexion (`postgresql://claude_readonly:<mot_de_passe>@<host>:5432/postgres`,
+  host/port identiques à ceux affichés par le bouton "Connect" du dashboard Supabase, qui
+  n'affiche que l'utilisateur `postgres` par défaut — remplacer juste l'utilisateur et le mot
+  de passe) est stockée dans `backend/.env` sous `DATABASE_URL_READONLY`, **jamais collée en
+  clair dans une conversation** — entrée factice correspondante ajoutée à
+  `backend/.env.example`. Mot de passe distinct de celui de `postgres`/`service_role` (jamais
+  de réutilisation entre rôles).
 
 ## 8. Gestion des erreurs et des logs
 

@@ -7,6 +7,7 @@ import { useServices } from '../hooks/useServices'
 import { Combobox } from '../components/Combobox'
 import { PiecesInvestissementModal } from '../components/PiecesInvestissementModal'
 import { AddPieceInvestissementModal } from '../components/AddPieceInvestissementModal'
+import { PieceCountBadge } from '../components/PieceCountBadge'
 import { api, ApiError } from '../services/api'
 import '../styles/investissement.css'
 
@@ -326,7 +327,12 @@ export function InvestissementsPGI() {
           numeroOperation={piecesModalOperation.numero_operation}
           label={piecesModalOperation.numero_operation}
           canManage={canManage}
-          onClose={() => setPiecesModalOperation(null)}
+          onClose={() => {
+            setPiecesModalOperation(null)
+            // Rafraîchit NOMBRE_PIECES (pastille de l'icône) — l'ajout/la suppression d'une pièce
+            // dans la modale ne met à jour que sa propre liste, jamais la liste des opérations.
+            void refetch()
+          }}
         />
       )}
 
@@ -335,7 +341,10 @@ export function InvestissementsPGI() {
           numeroOperation={addPieceModalOperation.numero_operation}
           label={addPieceModalOperation.numero_operation}
           onClose={() => setAddPieceModalOperation(null)}
-          onSaved={() => setAddPieceModalOperation(null)}
+          onSaved={() => {
+            setAddPieceModalOperation(null)
+            void refetch()
+          }}
         />
       )}
     </div>
@@ -480,14 +489,18 @@ function InvestissementCard({
         <span className="investissement-card__numop">{operation.numero_operation}</span>
         <span className="investissement-card__libservice">{displayLibelle(operation)}</span>
         <span className="investissement-card__dots">
-          <span
-            className={`investissement-card__dot ${operation.actif ? 'investissement-card__dot--on' : 'investissement-card__dot--off'}`}
-            title={operation.actif ? 'Actif' : 'Inactif'}
-          />
-          <span
-            className={`investissement-card__dot ${operation.utilisable ? 'investissement-card__dot--on' : 'investissement-card__dot--off'}`}
-            title={operation.utilisable ? 'Utilisable' : 'Non utilisable'}
-          />
+          <span className="investissement-card__dot-row">
+            <span className="investissement-card__dot-label">{operation.actif ? 'Actif' : 'Inactif'}</span>
+            <span
+              className={`investissement-card__dot ${operation.actif ? 'investissement-card__dot--on' : 'investissement-card__dot--off'}`}
+            />
+          </span>
+          <span className="investissement-card__dot-row">
+            <span className="investissement-card__dot-label">{operation.utilisable ? 'Utilisable' : 'Non utilisable'}</span>
+            <span
+              className={`investissement-card__dot ${operation.utilisable ? 'investissement-card__dot--on' : 'investissement-card__dot--off'}`}
+            />
+          </span>
         </span>
       </div>
 
@@ -508,7 +521,7 @@ function InvestissementCard({
           <table className="investissement-disponible-table">
             <thead>
               <tr>
-                <th aria-hidden="true" />
+                <th className="investissement-disponible-table__corner" aria-hidden="true" />
                 <th>.1</th>
                 <th>.8</th>
               </tr>
@@ -546,11 +559,17 @@ function InvestissementCard({
             </span>
           )}
           <span className="gp-tip" data-tip="Visualiser les pièces">
-            <button aria-label="Visualiser les pièces" onClick={onPieces}>
+            <button
+              aria-label={
+                operation.nombre_pieces > 0 ? `Visualiser les pièces (${operation.nombre_pieces})` : 'Visualiser les pièces'
+              }
+              onClick={onPieces}
+            >
               <svg className="ti">
                 <use href="#i-folder" />
               </svg>
             </button>
+            <PieceCountBadge count={operation.nombre_pieces} />
           </span>
           {canManage && (
             <span className="gp-tip" data-tip="Ajouter une pièce">
@@ -740,6 +759,7 @@ function EditInvestissementModal({
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
 
             <label className="gp-choice" style={{ justifyContent: 'space-between' }}>
               <span>Utilisable</span>

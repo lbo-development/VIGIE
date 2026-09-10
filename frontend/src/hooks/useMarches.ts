@@ -25,6 +25,8 @@ export interface Marche {
   mt_solde: number | null
   alertemt: number
   alertedate: number
+  /** Nombre de pièces déposées (finances.marche_piece) — pastille sur l'icône « Visualiser les pièces », voir MarchesPGI.tsx. */
+  nombre_pieces: number
 }
 
 /**

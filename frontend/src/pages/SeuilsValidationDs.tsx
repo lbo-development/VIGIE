@@ -113,7 +113,7 @@ export function SeuilsValidationDs() {
             {!loading && displayedServices.length === 0 && (
               <tr>
                 <td colSpan={4}>
-                  {filterIdDirection === null ? 'Sélectionne une direction pour afficher les seuils.' : 'Aucun service.'}
+                  {filterIdDirection === null ? 'Sélectionne une direction pour afficher les seuils.' : 'Aucun service pour ce filtre.'}
                 </td>
               </tr>
             )}

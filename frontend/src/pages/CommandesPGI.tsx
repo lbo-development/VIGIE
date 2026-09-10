@@ -192,13 +192,11 @@ export function CommandesPGI() {
 
   const [search, setSearch] = useState('')
   const { sort, toggleSort } = useColumnSort<CommandeColumn>()
-  const displayedCommandes =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : sortCommandes(
-          commandes.filter((c) => matchesSearch(c, search)),
-          sort,
-        )
+  const commandesEnregistrees = filterIdDirection === null || filterIdService === null ? [] : commandes
+  const displayedCommandes = sortCommandes(
+    commandesEnregistrees.filter((c) => matchesSearch(c, search)),
+    sort,
+  )
 
   return (
     <div className="stack">
@@ -276,6 +274,12 @@ export function CommandesPGI() {
           </div>
         )}
       </div>
+
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {displayedCommandes.length} commandes sélectionnées sur {commandesEnregistrees.length} commandes enregistrées.
+        </p>
+      )}
 
       {/* max-height du gabarit (360px, gpmm.css) trop faible pour cette liste, souvent longue — agrandi localement comme ContactsModal.tsx élargit .gp-modal, sans toucher au gabarit partagé. */}
       <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 'calc(70vh - 70px)' }}>

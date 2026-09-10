@@ -11,23 +11,8 @@ import { supabase } from '../config/supabaseClient.js'
  * uniquement au scoping RLS (investissement_piece_select_scoped), pas relu applicativement.
  */
 
-export type TypePiece =
-  | 'RAPPORT_CODIR'
-  | 'RAPPORT_CODIR_VALIDE'
-  | 'RAPPORT_CODIR_ANNEXES'
-  | 'RAPPORT_CODIR_PLANS'
-  | 'DECISION_DIRECTOIRE'
-  | 'DECISION_DIRECTOIRE_ANNEXES'
-  | 'DECISION_DIRECTOIRE_PLANS'
-  | 'RAPPORT_CS'
-  | 'RAPPORT_CS_VALIDE'
-  | 'RAPPORT_CS_DOE'
-  | 'RAPPORT_CS_ANNEXES'
-  | 'RAPPORT_CS_PLANS'
-  | 'DECISION_CS'
-  | 'FICHE_OUVERTURE_HO_VALIDEE'
-  | 'PROJET_TECHNIQUE'
-  | 'AUTRE'
+/** Code du référentiel finances.libelle_referentiel (domaine TYPE_PIECE_INVESTISSEMENT) — plus une union figée depuis la migration 20260905090000, voir libelleReferentiel.service.ts#assertCodeActif. */
+export type TypePiece = string
 
 const BUCKET = 'investissement-pieces'
 
@@ -69,6 +54,23 @@ export async function findById(idInvestissementPiece: number): Promise<Investiss
     .maybeSingle()
   if (error) throw error
   return data
+}
+
+/** Nombre de pièces par opération, pour la pastille de InvestissementsPGI.tsx (icône « Visualiser les pièces »). */
+export async function countByNumeroOperations(numeroOperations: string[]): Promise<Map<string, number>> {
+  if (numeroOperations.length === 0) return new Map()
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('investissement_piece')
+    .select('numero_operation')
+    .in('numero_operation', numeroOperations)
+  if (error) throw error
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) {
+    const key = row.numero_operation as string
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
 }
 
 export async function create(

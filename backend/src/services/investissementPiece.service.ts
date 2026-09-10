@@ -5,27 +5,11 @@ import * as investissementRepository from '../repositories/investissement.reposi
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
 import { assertManagesServiceOrHasRoleCb } from './authorization.service.js'
+import * as libelleReferentielService from './libelleReferentiel.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { InvestissementPiece } from '../repositories/investissementPiece.repository.js'
 
-const TYPE_PIECE_VALUES = [
-  'RAPPORT_CODIR',
-  'RAPPORT_CODIR_VALIDE',
-  'RAPPORT_CODIR_ANNEXES',
-  'RAPPORT_CODIR_PLANS',
-  'DECISION_DIRECTOIRE',
-  'DECISION_DIRECTOIRE_ANNEXES',
-  'DECISION_DIRECTOIRE_PLANS',
-  'RAPPORT_CS',
-  'RAPPORT_CS_VALIDE',
-  'RAPPORT_CS_DOE',
-  'RAPPORT_CS_ANNEXES',
-  'RAPPORT_CS_PLANS',
-  'DECISION_CS',
-  'FICHE_OUVERTURE_HO_VALIDEE',
-  'PROJET_TECHNIQUE',
-  'AUTRE',
-] as const
+const DOMAINE_TYPE_PIECE = 'TYPE_PIECE_INVESTISSEMENT' as const
 const MAX_TAILLE_OCTETS = 10 * 1024 * 1024
 const PDF_MAGIC_BYTES = Buffer.from('%PDF')
 
@@ -74,7 +58,7 @@ export async function listPieces(matricule: string | null, numeroOperation: stri
 
 const uploadPieceSchema = z.object({
   numeroOperation: z.string().trim().min(1, "Numéro d'opération requis."),
-  typePiece: z.enum(TYPE_PIECE_VALUES),
+  typePiece: z.string().trim().min(1, 'Type de pièce requis.'),
   numeroReevaluation: z.coerce.number().int().nonnegative(),
 })
 
@@ -98,6 +82,7 @@ export async function uploadPiece(matricule: string | null, input: unknown, file
   const result = uploadPieceSchema.safeParse(input)
   if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
   const data = result.data
+  await libelleReferentielService.assertCodeActif(DOMAINE_TYPE_PIECE, data.typePiece)
 
   const idService = await resolveTargetIdService(data.numeroOperation)
   await assertManagesServiceOrHasRoleCb(matricule, idService)
@@ -127,7 +112,7 @@ export async function uploadPiece(matricule: string | null, input: unknown, file
 }
 
 const updateMetadataSchema = z.object({
-  typePiece: z.enum(TYPE_PIECE_VALUES),
+  typePiece: z.string().trim().min(1, 'Type de pièce requis.'),
   numeroReevaluation: z.number().int().nonnegative(),
 })
 
@@ -139,6 +124,7 @@ export async function updatePieceMetadata(
 ): Promise<InvestissementPiece> {
   const result = updateMetadataSchema.safeParse(input)
   if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+  await libelleReferentielService.assertCodeActif(DOMAINE_TYPE_PIECE, result.data.typePiece)
 
   const existing = await investissementPieceRepository.findById(idInvestissementPiece)
   if (!existing) throw new AppError('Pièce introuvable', 404)

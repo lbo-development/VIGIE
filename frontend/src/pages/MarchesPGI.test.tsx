@@ -57,6 +57,7 @@ function makeMarche(overrides: Partial<Marche>): Marche {
     mt_solde: 50000,
     alertemt: 0.8,
     alertedate: 30,
+    nombre_pieces: 0,
     ...overrides,
   }
 }
@@ -182,6 +183,19 @@ describe('MarchesPGI', () => {
     expect(screen.getByText('Nettoyage des installations')).toBeInTheDocument()
   })
 
+  it('affiche le libellé Actif/Fiche complète en permanence devant chaque pastille, pas seulement au survol', () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', actif: false, completude: false })]
+    render(<MarchesPGI />)
+
+    const card = screen.getByText(/M0909311/).closest('.marche-card') as HTMLElement
+    expect(within(card).getByText('Archivé')).toBeInTheDocument()
+    expect(within(card).getByText('Fiche incomplète')).toBeInTheDocument()
+    expect(within(card).queryByTitle('Archivé')).not.toBeInTheDocument()
+    expect(within(card).queryByTitle('Fiche incomplète')).not.toBeInTheDocument()
+  })
+
   it("libellé « État des marchés au [date] » : lit /marches/last-import pour le service filtré (idService en query, pas forcément le sien)", async () => {
     currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
     currentUserMock.data.idService = null
@@ -271,6 +285,45 @@ describe('MarchesPGI', () => {
 
     expect(screen.getByRole('button', { name: 'Visualiser' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument()
+  })
+
+  it("affiche une pastille avec NOMBRE_PIECES sur l'icône Visualiser les pièces", () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', nombre_pieces: 5 })]
+    render(<MarchesPGI />)
+
+    expect(screen.getByRole('button', { name: 'Visualiser les pièces (5)' })).toBeInTheDocument()
+    expect(screen.getByText('5')).toHaveClass('piece-count-badge')
+  })
+
+  it("n'affiche pas de pastille quand NOMBRE_PIECES vaut 0", () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', nombre_pieces: 0 })]
+    render(<MarchesPGI />)
+
+    expect(screen.getByRole('button', { name: 'Visualiser les pièces' })).toBeInTheDocument()
+    expect(screen.queryByText('0')).not.toBeInTheDocument()
+  })
+
+  it('fermer la modale des pièces rafraîchit la liste des marchés (NOMBRE_PIECES peut avoir changé — ajout/suppression dans la modale)', async () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', nombre_pieces: 2 })]
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      path.startsWith('/marches/pieces') || path.startsWith('/libelles-referentiel')
+        ? Promise.resolve([])
+        : Promise.resolve({ exists: true, valeur: null }),
+    )
+    render(<MarchesPGI />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visualiser les pièces (2)' }))
+    const modal = await screen.findByRole('dialog', { name: 'Pièces — M0909311' })
+    expect(marchesMock.refetch).not.toHaveBeenCalled()
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Retour' }))
+    expect(marchesMock.refetch).toHaveBeenCalledTimes(1)
   })
 
   it('modale de visualisation — ouverture, affiche les champs en lecture seule, se ferme sur "Retour"', () => {

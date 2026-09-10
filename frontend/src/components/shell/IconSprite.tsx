@@ -1,7 +1,7 @@
 import iconsSvg from '../../assets/icons.svg?raw'
 
 /**
- * Sprite d'icônes GPMM (35 icônes, nomenclature #i-xxx), injecté une seule fois
+ * Sprite d'icônes GPMM (40 icônes, nomenclature #i-xxx), injecté une seule fois
  * dans le document pour que <use href="#i-xxx"> fonctionne partout dans l'app.
  * Contenu de icons.svg réutilisé tel quel, non modifié (voir INSTRUCTIONS_UX.md) —
  * l'injection inline (plutôt qu'un <img>/fetch externe) est requise pour que les

@@ -5,6 +5,7 @@ import { RequireAuth } from './components/RequireAuth'
 import { AppShell } from './components/shell/AppShell'
 import { Login } from './pages/Login'
 import { Home } from './pages/Home'
+import { DemandeAchat } from './pages/DemandeAchat'
 import { GisementGeographique } from './pages/GisementGeographique'
 import { GisementTechnique } from './pages/GisementTechnique'
 import { Reglages } from './pages/Reglages'
@@ -14,6 +15,9 @@ import { Cellules } from './pages/Cellules'
 import { SeuilsValidationDs } from './pages/SeuilsValidationDs'
 import { Fournisseurs } from './pages/Fournisseurs'
 import { Cug } from './pages/Cug'
+import { LibelleReferentiel } from './pages/LibelleReferentiel'
+import { Utilisateurs } from './pages/Utilisateurs'
+import { RolesUtilisateurs } from './pages/RolesUtilisateurs'
 import { MarchesPGI } from './pages/MarchesPGI'
 import { ImportMarches } from './pages/ImportMarches'
 import { MarchesTiers } from './pages/MarchesTiers'
@@ -44,6 +48,7 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<Home />} />
+              <Route path="/demandes-achat" element={<DemandeAchat />} />
               <Route path="/parametres/gisement-geographique" element={<GisementGeographique />} />
               <Route path="/parametres/gisement-technique" element={<GisementTechnique />} />
               <Route path="/parametres/reglages" element={<Reglages />} />
@@ -53,6 +58,9 @@ function App() {
               <Route path="/parametres/seuils-validation-ds" element={<SeuilsValidationDs />} />
               <Route path="/fournisseurs" element={<Fournisseurs />} />
               <Route path="/parametres/cug" element={<Cug />} />
+              <Route path="/parametres/libelle-referentiel" element={<LibelleReferentiel />} />
+              <Route path="/parametres/utilisateurs" element={<Utilisateurs />} />
+              <Route path="/parametres/roles" element={<RolesUtilisateurs />} />
               <Route path="/marches" element={<MarchesPGI />} />
               <Route path="/marches/import" element={<ImportMarches />} />
               <Route path="/marches/tiers" element={<MarchesTiers />} />

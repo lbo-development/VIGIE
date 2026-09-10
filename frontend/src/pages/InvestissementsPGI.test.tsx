@@ -51,6 +51,7 @@ const INVESTISSEMENTS: OperationInvestissement[] = [
     mt_engage_cp8: 3000,
     mt_liquide_cp8: 1000,
     mt_solde_cp8: 5000,
+    nombre_pieces: 3,
   },
   {
     numero_operation: 'SU010096',
@@ -80,15 +81,17 @@ const INVESTISSEMENTS: OperationInvestissement[] = [
     mt_engage_cp8: 0,
     mt_liquide_cp8: 0,
     mt_solde_cp8: 0,
+    nombre_pieces: 0,
   },
 ]
 
+const refetchInvestissementsMock = vi.hoisted(() => vi.fn())
 vi.mock('../hooks/useInvestissementsPgi', () => ({
   useInvestissementsPgi: (idService: number | null) => ({
     investissements: idService === null ? [] : INVESTISSEMENTS.filter((i) => i.id_service === idService),
     loading: false,
     error: null,
-    refetch: vi.fn(),
+    refetch: refetchInvestissementsMock,
   }),
 }))
 const lastImportInfoMock = vi.hoisted(() => ({ value: null as { exists: boolean; valeur: string | null } | null }))
@@ -121,8 +124,17 @@ describe('InvestissementsPGI', () => {
     currentUserMock.data.roles = []
     currentUserMock.data.idService = null
     lastImportInfoMock.value = null
+    refetchInvestissementsMock.mockReset()
     vi.mocked(api.put).mockReset()
-    vi.mocked(api.get).mockReset().mockResolvedValue([])
+    vi.mocked(api.get)
+      .mockReset()
+      .mockImplementation((path: string) =>
+        path.startsWith('/libelles-referentiel')
+          ? Promise.resolve([
+              { domaine: 'TYPE_PIECE_INVESTISSEMENT', code: 'RAPPORT_CODIR', libelle: 'RAPPORT_CODIR', ordre: 1, actif: true },
+            ])
+          : Promise.resolve([]),
+      )
     vi.mocked(api.postForm).mockReset()
   })
 
@@ -187,8 +199,21 @@ describe('InvestissementsPGI', () => {
 
     const activeCard = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
     const inactiveCard = screen.getByText('SU010096').closest('.investissement-card') as HTMLElement
-    expect(within(activeCard).getByTitle('Actif')).toBeInTheDocument()
-    expect(within(inactiveCard).getByTitle('Inactif')).toBeInTheDocument()
+    expect(within(activeCard).getByText('Actif')).toBeInTheDocument()
+    expect(within(inactiveCard).getByText('Inactif')).toBeInTheDocument()
+  })
+
+  it('affiche les libellés Actif/Utilisable en permanence devant les pastilles, empilées avec Actif en premier', () => {
+    render(<InvestissementsPGI />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Générale')
+    selectComboboxOption('Filtrer par service', 'Maintenance')
+
+    const activeCard = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
+    expect(within(activeCard).queryByTitle('Actif')).not.toBeInTheDocument()
+    const rows = within(activeCard).getAllByText(/^(Actif|Inactif|Utilisable|Non utilisable)$/)
+    expect(rows[0]).toHaveTextContent('Actif')
+    expect(rows[1]).toHaveTextContent('Utilisable')
   })
 
   it('affiche un second point Utilisable, à côté du point Actif', () => {
@@ -199,8 +224,8 @@ describe('InvestissementsPGI', () => {
 
     const utilisableCard = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
     const nonUtilisableCard = screen.getByText('SU010096').closest('.investissement-card') as HTMLElement
-    expect(within(utilisableCard).getByTitle('Utilisable')).toBeInTheDocument()
-    expect(within(nonUtilisableCard).getByTitle('Non utilisable')).toBeInTheDocument()
+    expect(within(utilisableCard).getByText('Utilisable')).toBeInTheDocument()
+    expect(within(nonUtilisableCard).getByText('Non utilisable')).toBeInTheDocument()
   })
 
   it('affiche le statut PGI, les montants Travaux/FESI et les 4 montants disponibles (AP.1/AP.8/CP.1/CP.8)', () => {
@@ -335,15 +360,27 @@ describe('InvestissementsPGI', () => {
       expect(within(card).queryByRole('button', { name: 'Modifier' })).not.toBeInTheDocument()
     })
 
-    it('icône Visualiser les pièces présente et active, Ajouter une pièce masquée sans droits', () => {
+    it('icône Visualiser les pièces présente et active, avec la pastille du nombre de pièces (NOMBRE_PIECES), Ajouter une pièce masquée sans droits', () => {
       render(<InvestissementsPGI />)
 
       selectComboboxOption('Filtrer par direction', 'Direction Générale')
       selectComboboxOption('Filtrer par service', 'Maintenance')
 
       const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
-      expect(within(card).getByRole('button', { name: 'Visualiser les pièces' })).not.toBeDisabled()
+      expect(within(card).getByRole('button', { name: 'Visualiser les pièces (3)' })).not.toBeDisabled()
+      expect(within(card).getByText('3')).toHaveClass('piece-count-badge')
       expect(within(card).queryByRole('button', { name: 'Ajouter une pièce' })).not.toBeInTheDocument()
+    })
+
+    it("n'affiche pas de pastille quand NOMBRE_PIECES vaut 0", () => {
+      render(<InvestissementsPGI />)
+
+      selectComboboxOption('Filtrer par direction', 'Direction Générale')
+      selectComboboxOption('Filtrer par service', 'Maintenance')
+
+      const card = screen.getByText('SU010096').closest('.investissement-card') as HTMLElement
+      expect(within(card).getByRole('button', { name: 'Visualiser les pièces' })).toBeInTheDocument()
+      expect(within(card).queryByText('0')).not.toBeInTheDocument()
     })
 
     it('icône Ajouter une pièce présente et active pour ADMIN_SERVICE', () => {
@@ -361,11 +398,27 @@ describe('InvestissementsPGI', () => {
       selectComboboxOption('Filtrer par service', 'Maintenance')
 
       const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
-      fireEvent.click(within(card).getByRole('button', { name: 'Visualiser les pièces' }))
+      fireEvent.click(within(card).getByRole('button', { name: 'Visualiser les pièces (3)' }))
 
       const modal = await screen.findByRole('dialog', { name: 'Pièces — VN000203' })
       expect(within(modal).getByText('Aucune pièce déposée pour cette opération.')).toBeInTheDocument()
       expect(api.get).toHaveBeenCalledWith('/investissements/pieces?numeroOperation=VN000203')
+    })
+
+    it('fermer la modale des pièces rafraîchit la liste des opérations (NOMBRE_PIECES peut avoir changé — ajout/suppression dans la modale)', async () => {
+      render(<InvestissementsPGI />)
+
+      selectComboboxOption('Filtrer par direction', 'Direction Générale')
+      selectComboboxOption('Filtrer par service', 'Maintenance')
+
+      const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
+      fireEvent.click(within(card).getByRole('button', { name: 'Visualiser les pièces (3)' }))
+
+      const modal = await screen.findByRole('dialog', { name: 'Pièces — VN000203' })
+      expect(refetchInvestissementsMock).not.toHaveBeenCalled()
+
+      fireEvent.click(within(modal).getByRole('button', { name: 'Retour' }))
+      expect(refetchInvestissementsMock).toHaveBeenCalledTimes(1)
     })
 
     it('Ajouter une pièce ouvre la modale de dépôt et envoie le fichier via postForm (ADMIN_SERVICE)', async () => {
@@ -380,6 +433,7 @@ describe('InvestissementsPGI', () => {
       const file = new File([new Uint8Array(10)], 'rapport.pdf', { type: 'application/pdf' })
       const input = modal.querySelector('input[type="file"]') as HTMLInputElement
       fireEvent.change(input, { target: { files: [file] } })
+      await within(modal).findByText('RAPPORT_CODIR')
       fireEvent.click(within(modal).getByRole('button', { name: 'Ajouter' }))
 
       await waitFor(() => expect(api.postForm).toHaveBeenCalledTimes(1))

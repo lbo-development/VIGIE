@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import * as marcheRepository from '../repositories/marche.repository.js'
+import * as marchePieceRepository from '../repositories/marchePiece.repository.js'
 import * as cugRepository from '../repositories/cug.repository.js'
 import * as fournisseurRepository from '../repositories/fournisseur.repository.js'
 import * as acteurRepository from '../repositories/acteur.repository.js'
@@ -12,6 +13,8 @@ import type { Marche } from '../repositories/marche.repository.js'
 export interface MarcheWithFournisseur extends Marche {
   /** FOURNISSEUR.RAISON_SOCIALE_SERVICE du titulaire (via MARCHE.ID_FOURNISSEUR), pas MARCHE.TITULAIRE_SERVICE (figé à la création, cf. import-marches-pgi.md §3). */
   fournisseur_raison_sociale: string | null
+  /** Nombre de pièces déposées (finances.marche_piece, TYPE_MARCHE='SERVICE') — pastille sur l'icône « Visualiser les pièces » (MarchesPGI.tsx, décision du 05/09/2026). */
+  nombre_pieces: number
 }
 
 /**
@@ -72,11 +75,14 @@ export async function listMarches(matricule: string | null, idService?: number):
   ])
 
   const marchesByNummarche = new Map([...marchesByCug, ...marchesByFournisseur].map((m) => [m.nummarche, m]))
+  const marches = Array.from(marchesByNummarche.values())
 
   const raisonSocialeById = new Map(fournisseurs.map((f) => [f.id_fournisseur, f.raison_sociale_service]))
-  return Array.from(marchesByNummarche.values()).map((m) => ({
+  const pieceCounts = await marchePieceRepository.countByNummarches(marches.map((m) => m.nummarche))
+  return marches.map((m) => ({
     ...m,
     fournisseur_raison_sociale: m.id_fournisseur !== null ? (raisonSocialeById.get(m.id_fournisseur) ?? null) : null,
+    nombre_pieces: pieceCounts.get(m.nummarche) ?? 0,
   }))
 }
 
@@ -146,7 +152,7 @@ const updateMarcheManagedFieldsSchema = z.object({
  * a besoin d'un idService), alors que `finances.marche` n'a pas de colonne
  * id_service directe.
  */
-async function resolveMarcheIdService(marche: Marche): Promise<number | null> {
+export async function resolveMarcheIdService(marche: Marche): Promise<number | null> {
   if (marche.code_cug) {
     const cug = await cugRepository.findByCode(marche.code_cug)
     if (cug) return cug.id_service

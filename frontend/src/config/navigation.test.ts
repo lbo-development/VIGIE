@@ -23,42 +23,51 @@ describe('filterParametresItems', () => {
     expect(result).toEqual([])
   })
 
-  it('ADMIN_SERVICE voit "Paramètres" (dont "Seuils de validation DS" et "CUG") mais pas "Réglages"', () => {
+  it('ADMIN_SERVICE voit "Paramètres" (dont "Seuils de validation DS", "CUG" et "Rôles") mais pas "Réglages", "Référentiel libellé" ni "Utilisateurs"', () => {
     const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: false, isAdminService: true })
 
     expect(result.map((i) => i.label)).toEqual([
+      'CUG',
       'Gisement géographique',
       'Gisement technique',
       'Seuils de validation DS',
-      'CUG',
+      'Rôles',
     ])
   })
 
-  it('ADMIN_APP voit toutes les entrées (Réglages, Directions, Services, Cellules, Seuils de validation DS, CUG)', () => {
+  it('ADMIN_APP voit toutes les entrées, dans l\'ordre Directions/Services/Cellules/CUG/gisements puis Seuils de validation DS/Référentiel libellé/Utilisateurs/Rôles puis Réglages', () => {
     const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: true, isAdminService: false })
 
     expect(result.map((i) => i.label)).toEqual([
-      'Gisement géographique',
-      'Gisement technique',
-      'Réglages',
       'Directions',
       'Services',
       'Cellules',
-      'Seuils de validation DS',
       'CUG',
+      'Gisement géographique',
+      'Gisement technique',
+      'Seuils de validation DS',
+      'Référentiel libellé',
+      'Utilisateurs',
+      'Rôles',
+      'Réglages',
     ])
   })
 
   it('"Fournisseurs" n\'apparaît pas dans "Paramètres" (déplacé dans l\'en-tête)', () => {
     expect(PARAMETRES_ITEMS.map((i) => i.label)).not.toContain('Fournisseurs')
   })
+
+  it('un séparateur (separatorBefore) précède "Seuils de validation DS", "Utilisateurs" et "Réglages", et eux seuls', () => {
+    const withSeparator = PARAMETRES_ITEMS.filter((i) => i.separatorBefore).map((i) => i.label)
+    expect(withSeparator).toEqual(['Seuils de validation DS', 'Utilisateurs', 'Réglages'])
+  })
 })
 
 describe('filterNavItems', () => {
-  it('"Accueil", "Marchés", "Commandes" et "Investissements" sont toujours visibles', () => {
+  it('"Accueil", "Marchés", "Commandes PGI" et "Investissements" sont toujours visibles', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Suivi des DA', 'Marchés', 'Commandes PGI', 'Investissements'])
   })
 
   it("masque \"Fournisseurs\" pour un compte non rattaché à un ACTEUR (ni rôle d'administration, ni service propre)", () => {
@@ -67,22 +76,43 @@ describe('filterNavItems', () => {
     expect(result.map((i) => i.label)).not.toContain('Fournisseurs')
   })
 
-  it('ADMIN_SERVICE voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
+  it('ADMIN_SERVICE voit "Marchés", "Commandes PGI", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: true, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual([
+      'Accueil',
+      'Suivi des DA',
+      'Marchés',
+      'Commandes PGI',
+      'Investissements',
+      'Fournisseurs',
+    ])
   })
 
-  it('ADMIN_APP voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
+  it('ADMIN_APP voit "Marchés", "Commandes PGI", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: true, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual([
+      'Accueil',
+      'Suivi des DA',
+      'Marchés',
+      'Commandes PGI',
+      'Investissements',
+      'Fournisseurs',
+    ])
   })
 
-  it('un Demandeur (sans rôle dédié, mais rattaché à un service) voit "Marchés", "Commandes", "Investissements" puis "Fournisseurs"', () => {
+  it('un Demandeur (sans rôle dédié, mais rattaché à un service) voit "Marchés", "Commandes PGI", "Investissements" puis "Fournisseurs"', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: true })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes', 'Investissements', 'Fournisseurs'])
+    expect(result.map((i) => i.label)).toEqual([
+      'Accueil',
+      'Suivi des DA',
+      'Marchés',
+      'Commandes PGI',
+      'Investissements',
+      'Fournisseurs',
+    ])
   })
 
   it('"Paramètres" ne figure pas dans les onglets du header (point d\'entrée : pied de sidebar)', () => {
@@ -178,14 +208,14 @@ describe('isCommandesSection', () => {
 })
 
 describe('filterCommandesSidebarItems', () => {
-  it('"État des commandes PGI du service" reste visible sans ADMIN_APP/ADMIN_SERVICE/CB, "Importation commandes PGI" masquée', () => {
+  it('"État des commandes PGI" reste visible sans ADMIN_APP/ADMIN_SERVICE/CB, "Importation des commandes PGI" masquée', () => {
     const result = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, {
       isAdminApp: false,
       isAdminService: false,
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service'])
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI'])
   })
 
   it('ADMIN_APP voit les deux options', () => {
@@ -195,7 +225,7 @@ describe('filterCommandesSidebarItems', () => {
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI', 'Importation des commandes PGI'])
   })
 
   it('ADMIN_SERVICE voit les deux options', () => {
@@ -205,7 +235,7 @@ describe('filterCommandesSidebarItems', () => {
       isCB: false,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI', 'Importation des commandes PGI'])
   })
 
   it('CB voit les deux options', () => {
@@ -215,7 +245,7 @@ describe('filterCommandesSidebarItems', () => {
       isCB: true,
     })
 
-    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI du service', 'Importation commandes PGI'])
+    expect(result.map((i) => i.label)).toEqual(['État des commandes PGI', 'Importation des commandes PGI'])
   })
 })
 

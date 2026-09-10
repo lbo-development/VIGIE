@@ -51,6 +51,7 @@ function makeMarcheTiers(overrides: Partial<MarcheTiers>): MarcheTiers {
     commentaire: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    nombre_pieces: 0,
     ...overrides,
   }
 }
@@ -132,6 +133,39 @@ describe('MarchesTiers', () => {
     expect(screen.getByText(/NAID/)).toBeInTheDocument()
   })
 
+  it("affiche une pastille avec NOMBRE_PIECES sur l'icône Visualiser les pièces, absente quand NOMBRE_PIECES vaut 0", () => {
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    marcheTiersMock.marcheTiers = [makeMarcheTiers({ nombre_pieces: 2 })]
+    render(<MarchesTiers />)
+
+    selectComboboxOption('Direction', 'Direction Générale')
+    selectComboboxOption('Service', 'Maintenance')
+
+    expect(screen.getByRole('button', { name: 'Visualiser les pièces (2)' })).toBeInTheDocument()
+    expect(screen.getByText('2')).toHaveClass('piece-count-badge')
+  })
+
+  it('fermer la modale des pièces rafraîchit la liste des marchés tiers (NOMBRE_PIECES peut avoir changé — ajout/suppression dans la modale)', async () => {
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    marcheTiersMock.marcheTiers = [makeMarcheTiers({ nummarche: 'M1234567', nombre_pieces: 2 })]
+    vi.mocked(api.get).mockImplementation((path: string) =>
+      path.startsWith('/marches/pieces') || path.startsWith('/libelles-referentiel')
+        ? Promise.resolve([])
+        : Promise.resolve({ exists: true, valeur: null }),
+    )
+    render(<MarchesTiers />)
+
+    selectComboboxOption('Direction', 'Direction Générale')
+    selectComboboxOption('Service', 'Maintenance')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visualiser les pièces (2)' }))
+    const modal = await screen.findByRole('dialog', { name: 'Pièces — M1234567' })
+    expect(marcheTiersMock.refetch).not.toHaveBeenCalled()
+
+    fireEvent.click(within(modal).getByRole('button', { name: 'Retour' }))
+    expect(marcheTiersMock.refetch).toHaveBeenCalledTimes(1)
+  })
+
   it("acteur sans rôle d'administration (simple Demandeur) : voit la liste de son service mais pas les actions d'écriture", () => {
     currentUserMock.data.roles = []
     currentUserMock.data.idService = 1
@@ -180,9 +214,19 @@ describe('MarchesTiers', () => {
     ]
     render(<MarchesTiers />)
 
-    expect(screen.getByTitle('Inactif')).toBeInTheDocument()
-    expect(screen.queryByTitle('Actif')).not.toBeInTheDocument()
+    expect(screen.getByText('Inactif')).toBeInTheDocument()
+    expect(screen.queryByText('Actif')).not.toBeInTheDocument()
     expect(screen.getByText(/j restants/)).toBeInTheDocument()
+  })
+
+  it('affiche le libellé Actif/Inactif en permanence devant la pastille, pas seulement au survol', () => {
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.idService = 1
+    marcheTiersMock.marcheTiers = [makeMarcheTiers({ actif: true })]
+    render(<MarchesTiers />)
+
+    expect(screen.getByText('Actif')).toBeInTheDocument()
+    expect(document.querySelector('.marche-dot[title]')).not.toBeInTheDocument()
   })
 
   it('modale de visualisation — ouverture, affiche les champs en lecture seule, se ferme sur "Retour"', () => {

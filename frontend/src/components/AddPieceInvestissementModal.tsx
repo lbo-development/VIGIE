@@ -1,27 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { usePiecesInvestissement, type TypePiece } from '../hooks/usePiecesInvestissement'
+import { useLibelleReferentiel } from '../hooks/useLibelleReferentiel'
 import { Combobox } from './Combobox'
 import { SpinButton } from './SpinButton'
 import { FileDropzone } from './FileDropzone'
-
-const TYPE_PIECE_OPTIONS: { value: TypePiece; label: string }[] = [
-  { value: 'RAPPORT_CODIR', label: 'Rapport CODIR' },
-  { value: 'RAPPORT_CODIR_VALIDE', label: 'Rapport CODIR validé' },
-  { value: 'RAPPORT_CODIR_ANNEXES', label: 'Rapport CODIR — Annexes' },
-  { value: 'RAPPORT_CODIR_PLANS', label: 'Rapport CODIR — Plans' },
-  { value: 'DECISION_DIRECTOIRE', label: 'Décision Directoire' },
-  { value: 'DECISION_DIRECTOIRE_ANNEXES', label: 'Décision Directoire — Annexes' },
-  { value: 'DECISION_DIRECTOIRE_PLANS', label: 'Décision Directoire — Plans' },
-  { value: 'RAPPORT_CS', label: 'Rapport CS' },
-  { value: 'RAPPORT_CS_VALIDE', label: 'Rapport CS validé' },
-  { value: 'RAPPORT_CS_DOE', label: 'Rapport CS — DOE' },
-  { value: 'RAPPORT_CS_ANNEXES', label: 'Rapport CS — Annexes' },
-  { value: 'RAPPORT_CS_PLANS', label: 'Rapport CS — Plans' },
-  { value: 'DECISION_CS', label: 'Décision CS' },
-  { value: 'FICHE_OUVERTURE_HO_VALIDEE', label: "Fiche d'ouverture HO validée" },
-  { value: 'PROJET_TECHNIQUE', label: 'Projet technique' },
-  { value: 'AUTRE', label: 'Autre' },
-]
 
 const MAX_TAILLE_OCTETS = 10 * 1024 * 1024
 
@@ -41,16 +23,26 @@ interface AddPieceInvestissementModalProps {
  */
 export function AddPieceInvestissementModal({ numeroOperation, label, onClose, onSaved }: AddPieceInvestissementModalProps) {
   const { uploadPiece, mutation } = usePiecesInvestissement(numeroOperation)
-  const [typePiece, setTypePiece] = useState<TypePiece>('RAPPORT_CODIR')
+  const { items: typesPiece } = useLibelleReferentiel('TYPE_PIECE_INVESTISSEMENT')
+  const typePieceOptions = typesPiece.filter((t) => t.actif).map((t) => ({ value: t.code, label: t.libelle }))
+  const [typePiece, setTypePiece] = useState<TypePiece>('')
   const [numeroReevaluation, setNumeroReevaluation] = useState('0')
   const [file, setFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!typePiece && typePieceOptions.length > 0) setTypePiece(typePieceOptions[0].value)
+  }, [typePiece, typePieceOptions])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setFormError(null)
     if (!file) {
       setFormError('Un fichier est requis.')
+      return
+    }
+    if (!typePiece) {
+      setFormError('Type de pièce requis.')
       return
     }
     const ok = await uploadPiece(file, typePiece, Number(numeroReevaluation))
@@ -76,10 +68,10 @@ export function AddPieceInvestissementModal({ numeroOperation, label, onClose, o
               <div className="gp-field" style={{ flex: 1 }}>
                 <label className="gp-label">Type de pièce</label>
                 <Combobox
-                  options={TYPE_PIECE_OPTIONS}
+                  options={typePieceOptions}
                   value={typePiece}
                   onChange={(v) => {
-                    if (v) setTypePiece(v as TypePiece)
+                    if (v) setTypePiece(v)
                   }}
                   placeholder="Type de pièce"
                   ariaLabel="Type de pièce"

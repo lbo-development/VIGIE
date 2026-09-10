@@ -13,7 +13,8 @@ import { supabase } from '../config/supabaseClient.js'
  */
 
 export type TypeMarchePiece = 'SERVICE' | 'TIERS'
-export type TypePiece = 'CCAP' | 'CCTP' | 'AE' | 'AVENANT' | 'BPU' | 'AUTRE'
+/** Code du référentiel finances.libelle_referentiel (domaine TYPE_PIECE_MARCHE) — plus une union figée depuis la migration 20260905090000, voir libelleReferentiel.service.ts#assertCodeActif. */
+export type TypePiece = string
 
 const BUCKET = 'marche-pieces'
 
@@ -60,6 +61,42 @@ export async function findAllByTiers(idMarcheTiers: number): Promise<MarchePiece
     .order('type_piece', { ascending: true })
   if (error) throw error
   return data ?? []
+}
+
+/** Nombre de pièces par marché service, pour la pastille de MarchesPGI.tsx (icône « Visualiser les pièces »). */
+export async function countByNummarches(nummarches: string[]): Promise<Map<string, number>> {
+  if (nummarches.length === 0) return new Map()
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('marche_piece')
+    .select('nummarche')
+    .eq('type_marche', 'SERVICE')
+    .in('nummarche', nummarches)
+  if (error) throw error
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) {
+    const key = row.nummarche as string
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
+}
+
+/** Nombre de pièces par marché tiers, pour la pastille de MarchesTiers.tsx (icône « Visualiser les pièces »). */
+export async function countByIdMarcheTiers(idMarcheTiersList: number[]): Promise<Map<number, number>> {
+  if (idMarcheTiersList.length === 0) return new Map()
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('marche_piece')
+    .select('id_marche_tiers')
+    .eq('type_marche', 'TIERS')
+    .in('id_marche_tiers', idMarcheTiersList)
+  if (error) throw error
+  const counts = new Map<number, number>()
+  for (const row of data ?? []) {
+    const key = row.id_marche_tiers as number
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+  return counts
 }
 
 export async function findById(idMarchePiece: number): Promise<MarchePiece | null> {

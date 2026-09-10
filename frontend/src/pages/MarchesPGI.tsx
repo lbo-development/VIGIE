@@ -9,6 +9,7 @@ import { Combobox } from '../components/Combobox'
 import { SpinButton } from '../components/SpinButton'
 import { PiecesMarcheModal } from '../components/PiecesMarcheModal'
 import { AddPieceMarcheModal } from '../components/AddPieceMarcheModal'
+import { PieceCountBadge } from '../components/PieceCountBadge'
 import { api, ApiError } from '../services/api'
 import '../styles/marche.css'
 
@@ -433,7 +434,12 @@ export function MarchesPGI() {
           marcheRef={{ typeMarche: 'SERVICE', nummarche: piecesModalMarche.nummarche }}
           label={piecesModalMarche.nummarche}
           canManage={canManage}
-          onClose={() => setPiecesModalMarche(null)}
+          onClose={() => {
+            setPiecesModalMarche(null)
+            // Rafraîchit NOMBRE_PIECES (pastille de l'icône) — l'ajout/la suppression d'une pièce
+            // dans la modale ne met à jour que sa propre liste, jamais la liste des marchés.
+            void refetch()
+          }}
         />
       )}
 
@@ -442,7 +448,10 @@ export function MarchesPGI() {
           marcheRef={{ typeMarche: 'SERVICE', nummarche: addPieceModalMarche.nummarche }}
           label={addPieceModalMarche.nummarche}
           onClose={() => setAddPieceModalMarche(null)}
-          onSaved={() => setAddPieceModalMarche(null)}
+          onSaved={() => {
+            setAddPieceModalMarche(null)
+            void refetch()
+          }}
         />
       )}
     </div>
@@ -593,11 +602,15 @@ function MarcheCard({
         </span>
       )}
       <span className="gp-tip" data-tip="Visualiser les pièces">
-        <button aria-label="Visualiser les pièces" onClick={onPieces}>
+        <button
+          aria-label={marche.nombre_pieces > 0 ? `Visualiser les pièces (${marche.nombre_pieces})` : 'Visualiser les pièces'}
+          onClick={onPieces}
+        >
           <svg className="ti">
             <use href="#i-folder" />
           </svg>
         </button>
+        <PieceCountBadge count={marche.nombre_pieces} />
       </span>
       {canManage && (
         <span className="gp-tip" data-tip="Ajouter une pièce">
@@ -622,14 +635,14 @@ function MarcheCard({
           <div className="marche-card__subtitle">{marche.libelle_service ?? '—'}</div>
         </div>
         <div className="marche-card__dots">
-          <span
-            className={`marche-dot ${marche.actif ? 'marche-dot--on' : 'marche-dot--off'}`}
-            title={marche.actif ? 'Actif' : 'Archivé'}
-          />
-          <span
-            className={`marche-dot ${marche.completude ? 'marche-dot--on' : 'marche-dot--off'}`}
-            title={marche.completude ? 'Fiche complète' : 'Fiche incomplète'}
-          />
+          <span className="marche-card__dot-row">
+            <span className="marche-card__dot-label">{marche.actif ? 'Actif' : 'Archivé'}</span>
+            <span className={`marche-dot ${marche.actif ? 'marche-dot--on' : 'marche-dot--off'}`} />
+          </span>
+          <span className="marche-card__dot-row">
+            <span className="marche-card__dot-label">{marche.completude ? 'Fiche complète' : 'Fiche incomplète'}</span>
+            <span className={`marche-dot ${marche.completude ? 'marche-dot--on' : 'marche-dot--off'}`} />
+          </span>
         </div>
       </div>
 

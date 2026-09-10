@@ -42,6 +42,17 @@ export async function findAll(idService?: number): Promise<Fournisseur[]> {
   return data ?? []
 }
 
+/** Recherche libre (page DemandeAchat, décision du 09/09/2026) — tous services confondus, le scoping réel reste porté par les filtres de demande_achat (matricule/service/cellule), pas ici. */
+export async function findIdsByRaisonSociale(search: string): Promise<number[]> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('fournisseur')
+    .select('id_fournisseur')
+    .ilike('raison_sociale_service', `%${search}%`)
+  if (error) throw error
+  return (data ?? []).map((f) => f.id_fournisseur)
+}
+
 export async function findById(idFournisseur: number): Promise<Fournisseur | null> {
   const { data, error } = await supabase
     .schema('finances')

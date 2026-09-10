@@ -30,8 +30,10 @@ vi.mock('../repositories/auth.repository.js', () => ({
 }))
 
 const findIdServiceByMatricule = vi.fn()
+const findByMatricule = vi.fn()
 vi.mock('../repositories/acteur.repository.js', () => ({
   findIdServiceByMatricule: (...args: unknown[]) => findIdServiceByMatricule(...args),
+  findByMatricule: (...args: unknown[]) => findByMatricule(...args),
 }))
 
 const findActiveByMatricule = vi.fn()
@@ -73,6 +75,11 @@ vi.mock('../repositories/marchePiece.repository.js', () => ({
   removeFile: (...args: unknown[]) => removeFile(...args),
 }))
 
+const findAllByDomaine = vi.fn()
+vi.mock('../repositories/libelleReferentiel.repository.js', () => ({
+  findAllByDomaine: (...args: unknown[]) => findAllByDomaine(...args),
+}))
+
 const { app } = await import('../app.js')
 
 const MATRICULE = '12520'
@@ -103,6 +110,7 @@ function authed() {
 beforeEach(() => {
   getUser.mockReset().mockResolvedValue({ data: { user: { id: 'user-1', email: 'a@b.fr' } }, error: null })
   findMatriculeByUserId.mockReset().mockResolvedValue(MATRICULE)
+  findByMatricule.mockReset().mockResolvedValue({ matricule: MATRICULE, actif: true })
   hasActiveRole.mockReset().mockResolvedValue(false)
   hasActiveRoleForService.mockReset().mockImplementation(async (_m: string, role: string) => role === 'ADMIN_SERVICE')
   findIdServiceByMatricule.mockReset().mockResolvedValue(ID_SERVICE)
@@ -118,6 +126,7 @@ beforeEach(() => {
   uploadFile.mockReset().mockResolvedValue(undefined)
   downloadFile.mockReset().mockResolvedValue(Buffer.from('contenu-pdf'))
   removeFile.mockReset().mockResolvedValue(undefined)
+  findAllByDomaine.mockReset().mockResolvedValue([{ domaine: 'TYPE_PIECE_MARCHE', code: 'CCAP', libelle: 'CCAP', ordre: 1, actif: true }])
 })
 
 describe('POST /api/marches/pieces (upload réel via multer)', () => {

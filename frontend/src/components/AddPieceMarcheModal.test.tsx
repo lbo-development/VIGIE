@@ -18,7 +18,16 @@ function selectFile(file: File) {
 }
 
 beforeEach(() => {
-  vi.mocked(api.get).mockResolvedValue([])
+  vi.mocked(api.get)
+    .mockReset()
+    .mockImplementation((path: string) =>
+      path.startsWith('/libelles-referentiel')
+        ? Promise.resolve([
+            { domaine: 'TYPE_PIECE_MARCHE', code: 'CCAP', libelle: 'CCAP', ordre: 1, actif: true },
+            { domaine: 'TYPE_PIECE_MARCHE', code: 'AE', libelle: 'AE', ordre: 3, actif: true },
+          ])
+        : Promise.resolve([]),
+    )
   vi.mocked(api.postForm).mockReset()
 })
 
@@ -53,6 +62,7 @@ describe('AddPieceMarcheModal', () => {
     )
 
     selectFile(makeFile('ccap.pdf', 'application/pdf', 1000))
+    await screen.findByText('CCAP')
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }))
 
     await waitFor(() => expect(api.postForm).toHaveBeenCalledTimes(1))
@@ -81,6 +91,7 @@ describe('AddPieceMarcheModal', () => {
     )
 
     selectFile(makeFile('ae.pdf', 'application/pdf', 1000))
+    await screen.findByText('CCAP')
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }))
 
     expect(await screen.findByText('Droits insuffisants pour ce service')).toBeInTheDocument()

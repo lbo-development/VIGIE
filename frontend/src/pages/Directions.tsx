@@ -65,6 +65,12 @@ export function Directions() {
         />
       </div>
 
+      {!loading && (
+        <p className="gp-help">
+          {filteredDirections.length} directions sélectionnées sur {directions.length} directions enregistrées.
+        </p>
+      )}
+
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
           <thead>
@@ -210,6 +216,7 @@ function DirectionFormModal({ mode, direction, onClose, onSaved }: DirectionForm
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

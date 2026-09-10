@@ -1,23 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../services/api'
 
-export type TypePiece =
-  | 'RAPPORT_CODIR'
-  | 'RAPPORT_CODIR_VALIDE'
-  | 'RAPPORT_CODIR_ANNEXES'
-  | 'RAPPORT_CODIR_PLANS'
-  | 'DECISION_DIRECTOIRE'
-  | 'DECISION_DIRECTOIRE_ANNEXES'
-  | 'DECISION_DIRECTOIRE_PLANS'
-  | 'RAPPORT_CS'
-  | 'RAPPORT_CS_VALIDE'
-  | 'RAPPORT_CS_DOE'
-  | 'RAPPORT_CS_ANNEXES'
-  | 'RAPPORT_CS_PLANS'
-  | 'DECISION_CS'
-  | 'FICHE_OUVERTURE_HO_VALIDEE'
-  | 'PROJET_TECHNIQUE'
-  | 'AUTRE'
+/** Code du référentiel finances.libelle_referentiel (domaine TYPE_PIECE_INVESTISSEMENT) — voir useLibelleReferentiel.ts. */
+export type TypePiece = string
 
 export interface InvestissementPiece {
   id_investissement_piece: number

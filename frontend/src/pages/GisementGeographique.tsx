@@ -112,10 +112,8 @@ export function GisementGeographique() {
   // Direction ET service obligatoires pour afficher la liste (décision
   // utilisateur, comme Cellules.tsx) : pas d'option "Toutes les directions"
   // ni "Tous les services".
-  const filteredSites =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : sites.filter((s) => matchesStatusFilter(s.actif, siteStatusFilter))
+  const sitesEnregistres = filterIdDirection === null || filterIdService === null ? [] : sites
+  const filteredSites = sitesEnregistres.filter((s) => matchesStatusFilter(s.actif, siteStatusFilter))
   const displayedSites = sortRows(filteredSites, siteSort, (site, column) =>
     column === 'service' ? serviceLabel(site.id_service) : column === 'lib_site' ? site.lib_site : site.actif,
   )
@@ -189,10 +187,17 @@ export function GisementGeographique() {
         </p>
       )}
 
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {filteredSites.length} sites sélectionnés sur {sitesEnregistres.length} sites enregistrés.
+        </p>
+      )}
+
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
           <thead>
             <tr>
+              <th aria-label="Réordonner" style={{ width: 32 }} />
               <SortableTh label="Service" column="service" sort={siteSort} onSort={toggleSiteSort} />
               <SortableTh label="Libellé" column="lib_site" sort={siteSort} onSort={toggleSiteSort} />
               <SortableTh label="Statut" column="actif" sort={siteSort} onSort={toggleSiteSort} />
@@ -202,12 +207,12 @@ export function GisementGeographique() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={4}>Chargement…</td>
+                <td colSpan={5}>Chargement…</td>
               </tr>
             )}
             {!loading && displayedSites.length === 0 && (
               <tr>
-                <td colSpan={4}>
+                <td colSpan={5}>
                   {filterIdDirection === null || filterIdService === null
                     ? 'Sélectionne une direction et un service pour afficher les sites.'
                     : 'Aucun site pour ce filtre.'}
@@ -216,6 +221,22 @@ export function GisementGeographique() {
             )}
             {displayedSites.map((site) => (
               <tr key={site.code_site}>
+                <td>
+                  <div className="gp-rowacts">
+                    <span className="gp-tip" data-tip="Réordonner les sites">
+                      <button
+                        aria-label="Réordonner les sites"
+                        onClick={() => {
+                          if (site.id_service !== null) setReorderModalIdService(site.id_service)
+                        }}
+                      >
+                        <svg className="ti">
+                          <use href="#i-grip-vertical" />
+                        </svg>
+                      </button>
+                    </span>
+                  </div>
+                </td>
                 <td>{serviceLabel(site.id_service)}</td>
                 <td>{site.lib_site}</td>
                 <td>
@@ -241,18 +262,6 @@ export function GisementGeographique() {
                       <button aria-label="Modifier le site" onClick={() => setSiteModal({ mode: 'edit', site })}>
                         <svg className="ti">
                           <use href="#i-pencil" />
-                        </svg>
-                      </button>
-                    </span>
-                    <span className="gp-tip" data-tip="Réordonner les sites">
-                      <button
-                        aria-label="Réordonner les sites"
-                        onClick={() => {
-                          if (site.id_service !== null) setReorderModalIdService(site.id_service)
-                        }}
-                      >
-                        <svg className="ti">
-                          <use href="#i-grip-vertical" />
                         </svg>
                       </button>
                     </span>
@@ -418,6 +427,7 @@ function SiteFormModal({ mode, site, services, directions, defaultIdService, onC
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">
@@ -780,6 +790,7 @@ function SousSiteFormModal({ mode, codeSite, sousSite, onClose, onSaved }: SousS
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

@@ -81,6 +81,16 @@ describe('Services', () => {
     expect(screen.queryByText('Maintenance')).not.toBeInTheDocument()
   })
 
+  it('affiche "X services sélectionnés sur X services enregistrés", narrowed by the status filter', () => {
+    render(<Services />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Finances')
+    expect(screen.getByText('1 services sélectionnés sur 1 services enregistrés.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les services par statut', 'Actif')
+    expect(screen.getByText('0 services sélectionnés sur 1 services enregistrés.')).toBeInTheDocument()
+  })
+
   it('ouvre le formulaire de création avec le champ direction et le flag Actif', () => {
     render(<Services />)
 

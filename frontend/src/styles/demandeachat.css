@@ -1,0 +1,155 @@
+/* =====================================================================
+   Styles propres à la page DemandeAchat (Suivi des DA) — jamais dans
+   gpmm.css, réutilisé tel quel par d'autres applications GPMM.
+
+   Règles :
+   - Toute classe ici est préfixée `.da-` pour ne jamais entrer en conflit
+     avec l'espace de noms `.gp-*` du template partagé.
+   - Composer avec les classes `.gp-*` existantes (`.gp-table`, `.gp-badge`,
+     `.gp-rowacts`, `.stack`, `.row`, etc.) plutôt que les dupliquer ici.
+   - Toutes les valeurs visuelles passent par les variables `--gp-*` de
+     gpmm.css, jamais de valeur en dur.
+
+   Icônes retenues (décision du 07/09/2026, aucune icône dédiée "envoyer"
+   ni "étoile" dans icons.svg) : #i-log-out pour "Transmettre au RC",
+   #i-chevron-right pour l'indicateur "marché tiers" de MarcheDA — utilisées
+   directement en JSX (<use href="#i-log-out">), pas de règle CSS propre à
+   ces icônes elles-mêmes, juste consignées ici pour mémoire.
+
+   #i-file-invoice / #i-files (décision du 09/09/2026) : boutons "Devis"/
+   "PC" de MarcheDA et FournisseurDA (Ajouter Devis/Ajouter pièces
+   complémentaires, par candidat dans FournisseurDA) — icônes absentes du
+   sprite jusqu'ici, ajoutées à ForClaude/Template UX/icons.svg (jamais
+   dupliquées localement, cf. INSTRUCTIONS_UX.md) à partir de deux PNG
+   fournis par l'utilisateur (Devis.png/Pièces complémentaire.png),
+   redessinées en traits fins (style icons.svg — viewBox 24x24, fill:none,
+   stroke:currentColor) plutôt que reproduites telles quelles (icônes
+   couleur/pleines, hors style du design system).
+   ===================================================================== */
+
+/* Boutons "Marché concerné" / "Fournisseurs consultés" de CreationDA,
+   désactivés tant que MarcheDA/FournisseurDA ne sont pas construits — même
+   rendu qu'un .gp-btn désactivé standard, juste la place pour une future
+   évolution propre à cette page. */
+.da-modal__resume {
+  color: var(--gp-text-muted);
+}
+
+/* Largeurs de colonnes fixées via <colgroup> (JSX) — Numéro DA au plus
+   court pour afficher le numéro en entier, Objet récupère tout le reste
+   (seule colonne sans largeur dans le colgroup). */
+.da-table {
+  table-layout: fixed;
+}
+
+/* Colonnes à largeur fixe : le contenu qui dépasse s'affiche en ellipsis
+   plutôt que de casser la mise en page (Objet, seule colonne flexible,
+   reste en retour à la ligne normal — voir règle .gp-table plus bas). */
+.da-table th,
+.da-table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.da-table td:nth-child(2) {
+  white-space: normal;
+  overflow-wrap: break-word;
+  /* Réductions successives : 90% → 81% → 72.9% → 65.61% → 59.05% → 50.19% → 42.66%
+     de l'espace effectivement utilisé par le contenu — la colonne elle-même
+     reste "auto" dans le colgroup (seule colonne flexible du tableau,
+     table-layout:fixed) : lui donner une largeur explicite ici casserait ce
+     mécanisme (elle deviendrait candidate à la redistribution d'espace du
+     navigateur au lieu d'absorber simplement le reste). Dernière réduction
+     (09/09/2026, -15%) en miroir de l'agrandissement de Montant DA
+     (colgroup JSX, 106px → 122px, +15%) : la largeur gagnée par l'une est
+     reprise sur l'autre, seule colonne flexible du tableau. */
+  max-width: 42.66%;
+}
+/* Montant DA (3e colonne) — aligné à droite, comme tout montant (décision du 09/09/2026). */
+.da-table th:nth-child(3),
+.da-table td:nth-child(3) {
+  text-align: right;
+}
+/* Fournisseur (4e colonne) : police réduite à 12px (au lieu de 13px hérité de .gp-table). */
+.da-table td:nth-child(4) {
+  font-size: 12px;
+}
+/* Actions contient des boutons (pas du texte) : jamais coupés par l'ellipsis. */
+.da-table td:last-child {
+  overflow: visible;
+}
+
+/* Modale MarcheDA (croquis DA.pdf page 3) : pastilles "Alerte date"/"Alerte
+   montant" (rouge si le seuil ALERTEDATE/ALERTEMT*MTMAXI est dépassé, vert
+   sinon) et indicateur "marché tiers" (pas d'alerte sur montant pour ceux-ci
+   — décision du 07/09/2026 : #i-chevron-right, aucune icône "étoile" dans
+   icons.svg). */
+.da-alert-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+.da-alert-dot--ok {
+  background: var(--gp-success);
+}
+.da-alert-dot--warn {
+  background: var(--gp-danger);
+}
+.da-alert-tiers {
+  color: var(--gp-warning);
+}
+
+/* Toutes les colonnes ont une largeur fixe via <colgroup> (JSX) — plus de
+   colonne "auto" (contrairement à .da-table de la liste des DA) : décision
+   du 09/09/2026, une colonne flexible + max-width en % laissait un espace
+   mort visible entre le texte tronqué et la colonne suivante ("les colonnes
+   doivent être contiguës"). Comme la somme des largeurs est inférieure à la
+   largeur réelle du tableau (width:100%), le navigateur les étire toutes
+   proportionnellement pour remplir l'espace — les ratios entre colonnes
+   restent donc exacts, sans espace mort ni recalcul manuel du conteneur. */
+.da-marche-table {
+  table-layout: fixed;
+}
+
+/* Colonne Fournisseur (2e colonne) : retour à la ligne (au lieu de nowrap
+   hérité de .gp-table) et police réduite à 12px (au lieu de 13px). */
+.da-marche-table td:nth-child(2) {
+  font-size: 12px;
+  white-space: normal;
+  overflow-wrap: break-word;
+}
+
+/* Colonne Libelle (3e colonne) : retour à la ligne sur 2 lignes plutôt que
+   nowrap (défaut .gp-table) — évite qu'un libellé long n'écrase les
+   colonnes d'alerte. Police réduite à 12px (au lieu de 13px hérité de
+   .gp-table) pour ce contenu plus long que les autres colonnes. */
+.da-marche-table td:nth-child(3) {
+  white-space: normal;
+  font-size: 12px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* Modale FournisseurDA (décision du 09/09/2026) : liste "Fournisseurs"
+   disponibles — hauteur de ligne réduite de 30% (25px, contre 36px hérité
+   de .gp-table th/td{padding:9px 12px}) pour tenir 5 lignes dans un espace
+   compact. */
+.da-fournisseurda-table td {
+  padding: 3.5px 12px;
+}
+
+/* Liste "Consultées" : hauteur de ligne explicite (41px, +5px par rapport
+   aux 36px initiaux — voir hauteur du conteneur ci-dessous, 3 × 41px). */
+.da-consultees-table td {
+  padding: 5.5px 12px;
+}
+
+/* Options "Motif du choix" (Prix/Délai/Technique/Autre) : .gp-choice impose
+   14px (gpmm.css), plus gros que le reste des libellés de cet écran
+   (.gp-label = 13px, plus petite police utilisée ici) — uniformisé à 13px. */
+.gp-choice.da-motif-choice {
+  font-size: 13px;
+}

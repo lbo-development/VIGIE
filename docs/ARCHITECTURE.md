@@ -245,6 +245,89 @@ Ce point technique touche des entités du MCD (DIRECTION/SERVICE) sans y figurer
 entité métier arbitrée — à faire valider/intégrer formellement au MCD/MLD si le
 paramétrage doit devenir une entité de premier rang du modèle de données.
 
+## Référentiel générique de listes (`finances.libelle_referentiel`)
+
+Décision (05/09/2026) : les listes de valeurs fixes utilisées par des CHECK figés en base
+(type de pièce marché — CCAP/CCTP/AE/AVENANT/BPU/AUTRE — et type de pièce investissement)
+doivent devenir administrables par `ADMIN_APP` sans déploiement, comme
+`parametre_application`. **Mécanisme volontairement distinct** de `parametre_application`
+plutôt qu'une réutilisation, malgré la mise en garde de ce document (« ne pas réinventer un
+autre mécanisme de configuration dynamique ») — la forme des deux besoins diffère
+fondamentalement :
+
+| | `parametre_application` | `libelle_referentiel` |
+|---|---|---|
+| Forme d'une valeur | scalaire (`jsonb` : nombre, texte, objet) | liste de lignes (code/libellé/ordre/actif) |
+| Portée | organisationnelle (global/direction/service, cascade) | transverse à toute l'application, aucune portée |
+| Référencé par FK depuis d'autres tables | non | oui (`marche_piece.type_piece`, `investissement_piece.type_piece`) |
+| Écriture | `ADMIN_APP` | `ADMIN_APP` uniquement (pas de délégation `ADMIN_SERVICE`) |
+
+Stocker une liste de codes dans une valeur `jsonb` de `parametre_application` aurait fait
+perdre l'intégrité référentielle native (FK) vers les tables clientes, l'ordre
+d'affichage par ligne et le statut actif/inactif par ligne — d'où une table séparée plutôt
+qu'un détournement du mécanisme scalaire existant.
+
+### Schéma
+
+```sql
+create table finances.libelle_referentiel (
+  domaine     text not null,   -- ex: 'TYPE_PIECE_MARCHE', 'TYPE_PIECE_INVESTISSEMENT'
+  code        text not null,   -- ex: 'CCAP' — stocké tel quel dans les tables clientes,
+                                -- pas un identifiant de substitution (lisible en base/export)
+  libelle     text not null,
+  ordre       integer not null,
+  actif       boolean not null default true,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now(),
+  constraint libelle_referentiel_pkey primary key (domaine, code)
+);
+```
+
+**Intégrité référentielle** : chaque table cliente (`marche_piece`, `investissement_piece`)
+porte une colonne générée fixant son domaine (`domaine_type_piece text generated always as
+('TYPE_PIECE_MARCHE') stored`, par exemple) et une FK composite `(domaine_type_piece,
+type_piece) → libelle_referentiel(domaine, code)`, **sans** clause `ON DELETE` : Postgres
+refuse donc nativement (`RESTRICT`, comportement par défaut) la suppression physique d'un
+code encore utilisé par au moins une pièce. `ACTIF` reste le moyen normal de retirer un
+code des formulaires de saisie sans en perdre l'historique ; la suppression physique ne
+s'applique en pratique qu'à un code jamais utilisé.
+
+**RLS** : lecture ouverte à tout `authenticated` (nécessaire pour peupler les listes
+déroulantes de dépôt de pièce, quel que soit l'appelant) ; écriture
+(`INSERT`/`UPDATE`/`DELETE`) réservée `ADMIN_APP` seul — pas de délégation `ADMIN_SERVICE`
+comme pour CUG/SEUIL_VALIDATION_DS (`ForClaude/SECURITY.md` §2.4/§2.6) : ce référentiel est
+transverse à toute l'application, aucun service n'en est propriétaire.
+
+**Réordonnancement** : glisser-déposer côté écran (`frontend/src/hooks/useDragReorder.ts`,
+même mécanique que `secteur`/`site`, `ForClaude/SECURITY.md`), persisté via
+`PUT /libelles-referentiel/reorder` (`{ domaine, codes }`) — le service refuse tout code qui
+n'appartient pas au domaine annoncé avant d'appliquer le nouvel ordre, même principe que
+`secteur.service.ts#reorderSecteurs`. Une nouvelle valeur est créée à l'ordre `0`,
+repositionnée ensuite par glisser-déposer (pas de champ "ordre" dans le formulaire de
+création, même principe que `sousSecteur.service.ts`).
+
+### Couches
+
+1. Migration : `supabase/migrations/20260905090000_create_libelle_referentiel.sql` (table,
+   RLS, import des codes existants, ajout des FK composites sur `marche_piece`/
+   `investissement_piece`).
+2. `repositories/libelleReferentiel.repository.ts` — `findAllByDomaine`, `findOne`,
+   `create`, `update`, `remove`, `reorder`.
+3. `services/libelleReferentiel.service.ts` — `DOMAINES` (énumération des domaines
+   couverts, à étendre ici pour toute nouvelle liste), `listByDomaine` (lecture),
+   `assertCodeActif` (réutilisée par `marchePiece.service.ts`/`investissementPiece.service.ts`
+   avant tout dépôt/modification de pièce, en remplacement du CHECK SQL supprimé),
+   `createLibelle`/`updateLibelle`/`deleteLibelle`/`reorderLibelles` (écriture, réservées
+   `ADMIN_APP`). `deleteLibelle` traduit une violation de FK Postgres (23503) en erreur
+   métier 409 plutôt que de la laisser remonter brute au client (`ForClaude/SECURITY.md` §8).
+4. `controllers/libelleReferentiel.controller.ts`, `routes/libelleReferentiel.routes.ts`,
+   montées sur `/api/libelles-referentiel` (`/reorder` déclarée avant `/:domaine/:code`,
+   sinon Express interprète "reorder" comme un domaine).
+5. Frontend : `hooks/useLibelleReferentiel.ts` (lecture, consommé par les modales de dépôt
+   de pièce marché/investissement) et `pages/LibelleReferentiel.tsx` (écran d'administration
+   complet — CRUD + glisser-déposer — monté sur `/parametres/libelle-referentiel`, réservé
+   `ADMIN_APP` au niveau du menu comme du backend).
+
 ## Module Marchés
 
 Trois entités liées, toutes dans le schéma `finances`, réparties sur deux registres de
@@ -355,6 +438,75 @@ le hook `usePiecesMarche.ts`) : `PiecesMarcheModal.tsx` (consultation/édition/s
 sans équivalent dans le design system GPMM — voir `ForClaude/INSTRUCTIONS_UX.md`). Styles
 dans `styles/marche.css` (classes `.marche-*`) et `styles/tableauDeBord.css` (indicateurs
 chiffrés, réutilisable par de futurs tableaux de bord).
+
+## Module Investissements
+
+Plus simple que le module Marchés : une opération d'investissement n'a qu'une seule forme
+(pas de dualité SERVICE/TIERS), alimentée uniquement par import PGI (aucune création
+manuelle, contrairement à `finances.marche`).
+
+### Entités et relations
+
+```
+finances.operation_investissement   opération d'investissement du service, import PGI,
+                                     clé naturelle NUMERO_OPERATION
+  └─ CODE_CUG → finances.cug        (résolution du service, comme finances.marche)
+
+finances.investissement_piece       pièces documentaires (rapports CODIR/CS, décisions,
+                                     fiches d'ouverture, projet technique...), rattachées
+                                     à un numéro de réévaluation, fichier dans le bucket
+                                     Storage `investissement-pieces`
+  ├─ NUMERO_OPERATION → finances.operation_investissement
+  └─ ID_SERVICE → finances.service  (stampé une fois à l'insertion, jamais réécrit —
+     scoping RLS uniquement, même principe que finances.marche_piece)
+```
+
+`finances.operation_investissement.UTILISABLE` est un champ manuel (pas une colonne
+générée comme `finances.marche.UTILISABLE`) : aucun second critère de type `COMPLETUDE`
+n'est documenté pour ce module.
+
+### RLS et droits
+
+**Lecture** : `finances.investissement_piece` a une policy RLS `SELECT` scopée par service
+(`investissement_piece_select_scoped` : `id_service = finances.current_user_id_service() OR
+current_user_has_role('ADMIN_APP')`), même principe que `finances.marche_piece`
+(`ForClaude/SECURITY.md` §2.4 pour la comparaison avec le modèle SITE/SECTEUR, ouvert à tout
+`authenticated`). `finances.operation_investissement` porte elle aussi une policy `SELECT`
+scopée par service (`operation_investissement_select_scoped`).
+
+Écriture (création/modification/suppression, dépôt de pièce) réservée
+`assertManagesServiceOrHasRoleCb` — ADMIN_APP (transverse), ADMIN_SERVICE (son service) ou
+CB (son service) — même fonction d'autorisation que le module Marchés
+(`authorization.service.ts`), traduite en policies RLS identiques sur les deux tables.
+
+Suppression physique d'une pièce (pas d'archivage) : même principe que
+`finances.marche_piece`.
+
+### Couches (backend)
+
+| Ressource | repository | service | controller | routes montées sur |
+|---|---|---|---|---|
+| Opération d'investissement | `investissement.repository.ts` | `investissement.service.ts` | `investissement.controller.ts` | `/investissements` |
+| Import PGI investissements | — (réutilise `investissement.repository.ts`) | `investissementImport.service.ts` | `investissementImport.controller.ts` | `/investissements/import` |
+| Pièces d'investissement | `investissementPiece.repository.ts` | `investissementPiece.service.ts` | `investissementPiece.controller.ts` | `/investissements/pieces` |
+
+`listInvestissements` (`investissement.service.ts`) enrichit chaque opération de
+`nombre_pieces` (comptage `finances.investissement_piece` par `numero_operation`, via
+`investissementPieceRepository.countByNumeroOperations`) — pastille sur l'icône « Visualiser
+les pièces » de `InvestissementsPGI.tsx` (même principe pour `finances.marche`/
+`finances.marche_tiers`, `marche.service.ts`/`marcheTiers.service.ts`).
+
+### Frontend
+
+| Page | Hook(s) | Route |
+|---|---|---|
+| `InvestissementsPGI.tsx` | `useInvestissementsPgi`, `useInvestissementLastImport` | `/investissements` |
+| `ImportInvestissements.tsx` | `useInvestissementImport` | `/investissements/import` |
+
+Composants dédiés aux pièces (via `usePiecesInvestissement.ts`) : `PiecesInvestissementModal.tsx`
+(consultation/édition/suppression), `AddPieceInvestissementModal.tsx` (dépôt) — mêmes
+composants partagés que le module Marchés (`FileDropzone.tsx`, `PieceCountBadge.tsx`).
+Styles dans `styles/investissement.css`.
 
 ## Authentification & sécurité
 

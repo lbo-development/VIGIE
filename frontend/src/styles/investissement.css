@@ -72,13 +72,26 @@
   padding-top: 2px;
 }
 
-/* Point(s) de statut (Actif, Utilisable) groupés en ligne à droite de l'en-tête — même principe que .marche-card__dots (marche.css), en ligne plutôt qu'en colonne. */
+/* Point(s) de statut (Actif, Utilisable) empilés à droite de l'en-tête, Actif en premier —
+   même principe que .marche-card__dots (marche.css). Libellé affiché en permanence devant
+   chaque pastille plutôt qu'un tooltip au survol (décision utilisateur, 05/09/2026). */
 .investissement-card__dots {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 6px;
   flex: none;
   padding-top: 4px;
+}
+.investissement-card__dot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.investissement-card__dot-label {
+  font-size: 11px;
+  color: var(--gp-text-secondary);
+  white-space: nowrap;
 }
 
 .investissement-card__dot {
@@ -170,6 +183,15 @@
 .investissement-disponible-table th:first-child,
 .investissement-disponible-table td:first-child {
   width: 44px;
+}
+/* Cellule d'angle vide (au-dessus de AP/CP) : sans bordure ni fond pour se fondre
+   dans la carte plutôt que d'afficher une case vide (décision utilisateur, 05/09/2026).
+   Sélecteur `th.investissement-disponible-table__corner` : spécificité supérieure à la
+   règle générique `.investissement-disponible-table th` ci-dessus, sinon le `border`
+   générique l'emporterait malgré cette règle. */
+.investissement-disponible-table th.investissement-disponible-table__corner {
+  border: none;
+  background: transparent;
 }
 /* Colonnes .1/.8 à largeur fixe, dimensionnée pour "10 000 000 €" (12 caractères en
    --gp-mono 13px) sans jamais passer à la ligne. */

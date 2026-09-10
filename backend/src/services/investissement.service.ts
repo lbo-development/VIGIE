@@ -1,11 +1,17 @@
 import { z } from 'zod'
 import * as investissementRepository from '../repositories/investissement.repository.js'
+import * as investissementPieceRepository from '../repositories/investissementPiece.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import { findLastImportRow, type LastImportInfo } from './investissementImport.service.js'
 import { assertManagesServiceOrHasRoleCb } from './authorization.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { OperationInvestissement } from '../repositories/investissement.repository.js'
+
+export interface OperationInvestissementWithPieceCount extends OperationInvestissement {
+  /** Nombre de pièces déposées (finances.investissement_piece) — pastille sur l'icône « Visualiser les pièces » (InvestissementsPGI.tsx, décision du 05/09/2026). */
+  nombre_pieces: number
+}
 
 /**
  * Lecture de finances.operation_investissement — même principe que
@@ -28,13 +34,15 @@ async function resolveReadScope(matricule: string | null): Promise<{ isAdminApp:
  * pour tout autre acteur, le service transmis est ignoré au profit de son propre service
  * (défense en profondeur, même logique que commandePgi.service.ts/marche.service.ts).
  */
-export async function listInvestissements(matricule: string | null, idService?: number): Promise<OperationInvestissement[]> {
+export async function listInvestissements(matricule: string | null, idService?: number): Promise<OperationInvestissementWithPieceCount[]> {
   const { isAdminApp, ownIdService } = await resolveReadScope(matricule)
 
   const effectiveIdService = isAdminApp ? idService : (ownIdService ?? undefined)
   if (effectiveIdService === undefined) return []
 
-  return investissementRepository.findAll(effectiveIdService)
+  const investissements = await investissementRepository.findAll(effectiveIdService)
+  const pieceCounts = await investissementPieceRepository.countByNumeroOperations(investissements.map((i) => i.numero_operation))
+  return investissements.map((i) => ({ ...i, nombre_pieces: pieceCounts.get(i.numero_operation) ?? 0 }))
 }
 
 /**

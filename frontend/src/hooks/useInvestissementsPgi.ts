@@ -32,6 +32,8 @@ export interface OperationInvestissement {
   mt_engage_cp8: number
   mt_liquide_cp8: number
   mt_solde_cp8: number
+  /** Nombre de pièces déposées (finances.investissement_piece) — pastille sur l'icône « Visualiser les pièces », voir InvestissementsPGI.tsx. */
+  nombre_pieces: number
 }
 
 /**

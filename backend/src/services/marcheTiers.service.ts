@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import * as marcheTiersRepository from '../repositories/marcheTiers.repository.js'
+import * as marchePieceRepository from '../repositories/marchePiece.repository.js'
 import * as fournisseurRepository from '../repositories/fournisseur.repository.js'
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
@@ -8,6 +9,11 @@ import { assertManagesServiceOrHasRoleCb } from './authorization.service.js'
 import { deriveTypeProc } from './marcheImport.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { MarcheTiers } from '../repositories/marcheTiers.repository.js'
+
+export interface MarcheTiersWithPieceCount extends MarcheTiers {
+  /** Nombre de pièces déposées (finances.marche_piece, TYPE_MARCHE='TIERS') — pastille sur l'icône « Visualiser les pièces » (MarchesTiers.tsx, décision du 05/09/2026). */
+  nombre_pieces: number
+}
 
 const NUMMARCHE_REGEX = /^[PMS]\d{7}[A-Za-z0-9]*$/
 const TYPEDECOMPOPRIX_VALUES = ['FORFAIT', 'BPU'] as const
@@ -48,11 +54,14 @@ async function resolveReadScope(matricule: string | null): Promise<{ isAdminApp:
  * Marchés d'un service tiers (/marches/tiers, voir MarchesTiers.tsx) —
  * jamais mélangés avec finances.marche (décision explicite du 01/09/2026).
  */
-export async function listMarcheTiers(matricule: string | null, idService?: number): Promise<MarcheTiers[]> {
+export async function listMarcheTiers(matricule: string | null, idService?: number): Promise<MarcheTiersWithPieceCount[]> {
   const { isAdminApp, ownIdService } = await resolveReadScope(matricule)
   const effectiveIdService = isAdminApp ? idService : (ownIdService ?? undefined)
   if (effectiveIdService === undefined) return []
-  return marcheTiersRepository.findAll(effectiveIdService)
+
+  const marchesTiers = await marcheTiersRepository.findAll(effectiveIdService)
+  const pieceCounts = await marchePieceRepository.countByIdMarcheTiers(marchesTiers.map((m) => m.id_marche_tiers))
+  return marchesTiers.map((m) => ({ ...m, nombre_pieces: pieceCounts.get(m.id_marche_tiers) ?? 0 }))
 }
 
 const createMarcheTiersSchema = z.object({

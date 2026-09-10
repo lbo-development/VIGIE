@@ -47,6 +47,17 @@ describe('Directions', () => {
     expect(screen.getByText('DSI')).toBeInTheDocument()
   })
 
+  it('affiche "X directions sélectionnées sur X directions enregistrées", narrowed by the status filter', () => {
+    render(<Directions />)
+
+    expect(screen.getByText('2 directions sélectionnées sur 2 directions enregistrées.')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrer les directions par statut' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Actif'))
+
+    expect(screen.getByText('1 directions sélectionnées sur 2 directions enregistrées.')).toBeInTheDocument()
+  })
+
   it('ouvre le formulaire de création avec Code, Libellé et Actif', () => {
     render(<Directions />)
 

@@ -1,0 +1,24 @@
+.piece-count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--gp-danger);
+  /* Blanc fixe assumé, pas var(--gp-on-danger) : ce jeton vaut un brun quasi
+     noir en thème sombre (paire de contraste pensée pour .gp-btn--danger, un
+     bouton plein), pas adaptée à cette pastille décorative où le blanc est
+     voulu dans les deux thèmes — composant hors design system, voir
+     PieceCountBadge.tsx. */
+  color: #fff;
+  font-family: var(--gp-sans);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 15px;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px var(--gp-surface);
+  pointer-events: none;
+}

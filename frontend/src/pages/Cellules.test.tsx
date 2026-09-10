@@ -102,6 +102,17 @@ describe('Cellules', () => {
     expect(screen.queryByText('Atelier')).not.toBeInTheDocument()
   })
 
+  it('affiche "X cellules sélectionnées sur X cellules enregistrées", narrowed by the status filter', () => {
+    render(<Cellules />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Générale')
+    selectComboboxOption('Filtrer par service', 'Voyageurs')
+    expect(screen.getByText('1 cellules sélectionnées sur 1 cellules enregistrées.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les cellules par statut', 'Actif')
+    expect(screen.getByText('0 cellules sélectionnées sur 1 cellules enregistrées.')).toBeInTheDocument()
+  })
+
   it('filtre en cascade : choisir une direction restreint la combo Service à ses seuls services', () => {
     render(<Cellules />)
 

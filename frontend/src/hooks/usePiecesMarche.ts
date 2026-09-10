@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, ApiError } from '../services/api'
 
 export type TypeMarchePiece = 'SERVICE' | 'TIERS'
-export type TypePiece = 'CCAP' | 'CCTP' | 'AE' | 'AVENANT' | 'BPU' | 'AUTRE'
+/** Code du référentiel finances.libelle_referentiel (domaine TYPE_PIECE_MARCHE) — voir useLibelleReferentiel.ts. */
+export type TypePiece = string
 
 export interface MarchePiece {
   id_marche_piece: number

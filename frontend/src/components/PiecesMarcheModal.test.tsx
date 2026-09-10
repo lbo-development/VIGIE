@@ -31,7 +31,16 @@ function selectComboboxOption(ariaLabel: string, optionText: string) {
 }
 
 beforeEach(() => {
-  vi.mocked(api.get).mockReset().mockResolvedValue([PIECE])
+  vi.mocked(api.get)
+    .mockReset()
+    .mockImplementation((path: string) =>
+      path.startsWith('/libelles-referentiel')
+        ? Promise.resolve([
+            { domaine: 'TYPE_PIECE_MARCHE', code: 'CCAP', libelle: 'CCAP', ordre: 1, actif: true },
+            { domaine: 'TYPE_PIECE_MARCHE', code: 'AE', libelle: 'AE', ordre: 3, actif: true },
+          ])
+        : Promise.resolve([PIECE]),
+    )
   vi.mocked(api.put).mockReset()
   vi.mocked(api.delete).mockReset()
   vi.mocked(api.getBlob).mockReset()

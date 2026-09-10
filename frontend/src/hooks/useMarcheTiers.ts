@@ -24,6 +24,8 @@ export interface MarcheTiers {
   commentaire: string | null
   created_at: string
   updated_at: string
+  /** Nombre de pièces déposées (finances.marche_piece) — pastille sur l'icône « Visualiser les pièces », voir MarchesTiers.tsx. */
+  nombre_pieces: number
 }
 
 /**

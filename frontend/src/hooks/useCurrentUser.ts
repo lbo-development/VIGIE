@@ -14,6 +14,8 @@ export interface MeResponse {
   prenom: string | null
   /** Rattachement propre de l'acteur (ACTEUR.ID_CELLULE → CELLULE.ID_SERVICE), indépendant des rôles — permet à un Demandeur (sans rôle dédié) de connaître son propre service. */
   idService: number | null
+  /** ACTEUR.ID_CELLULE directement — ajouté le 08/09/2026 pour la page DemandeAchat (verrouillage Direction/Service/Cellule sur les siens, y compris pour RC dont le rôle ne porte que ID_CELLULE). */
+  idCellule: number | null
   roles: MeRole[]
 }
 

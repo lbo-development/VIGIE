@@ -14,6 +14,42 @@ export async function findMatriculeByUserId(userId: string): Promise<string | nu
   return data?.matricule ?? null
 }
 
+/**
+ * Lookup inverse — résout l'utilisateur Supabase Auth lié à un ACTEUR, pour
+ * le bannir/débannir/supprimer (voir acteur.service.ts). `public.profiles`
+ * est partagée entre applications GPMM (ForClaude/SECURITY.md) : ne cible
+ * jamais que sa propre ligne par id/matricule, jamais une requête large.
+ */
+export async function findUserIdByMatricule(matricule: string): Promise<string | null> {
+  const { data, error } = await supabase.from('profiles').select('id').eq('matricule', matricule).maybeSingle()
+  if (error) throw error
+  return data?.id ?? null
+}
+
+/**
+ * Rattache un compte Supabase Auth déjà créé (Admin API) à un ACTEUR — pas
+ * de trigger `handle_new_user` sur `auth.users` dans ce projet (vérifié dans
+ * supabase/migrations/), l'insertion est donc explicite ici. Décision du
+ * 10/09/2026 : réservé à acteur.service.ts#createActeur (ADMIN_APP).
+ */
+export async function linkProfile(userId: string, matricule: string): Promise<void> {
+  const { error } = await supabase.from('profiles').insert({ id: userId, matricule })
+  if (error) throw error
+}
+
+/**
+ * Supprime explicitement la ligne `profiles` avant de supprimer le compte
+ * Auth correspondant (acteur.service.ts#deleteActeur) — la relation de
+ * cascade `profiles.id → auth.users.id` n'est pas garantie documentée pour
+ * ce projet partagé (ForClaude/SECURITY.md), mieux vaut ne jamais en
+ * dépendre : supprimer la ligne soi-même rend l'ordre d'appel sûr, avec ou
+ * sans ON DELETE CASCADE réel en base.
+ */
+export async function deleteProfile(userId: string): Promise<void> {
+  const { error } = await supabase.from('profiles').delete().eq('id', userId)
+  if (error) throw error
+}
+
 // Ne couvre pas la suppléance : d'après le MCD (ForClaude/CDC/mcd-phases-1-2.md),
 // la SUPPLEANCE ne s'applique qu'aux rôles RC/CDS/DS ("titulaire absent"), jamais à
 // ADMIN_APP (transverse, plusieurs titulaires possibles sans notion d'absence).

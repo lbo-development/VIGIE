@@ -18,6 +18,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * fetch() lève une TypeError brute (jamais un statut HTTP) quand le serveur est injoignable
+ * (coupure réseau, backend arrêté, CORS) — sans ça, tous les appelants affichaient le même
+ * message générique qu'une vraie erreur métier ("Une erreur est survenue."), impossible à
+ * distinguer d'un bug applicatif. Centralisé ici (statut 0, jamais renvoyé par un vrai
+ * serveur) plutôt que dans chaque page : tout `err instanceof ApiError ? err.message : ...`
+ * déjà écrit dans l'app affiche désormais ce message précis sans modification.
+ */
+async function fetchOrNetworkError(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch {
+    throw new ApiError('Impossible de contacter le serveur — vérifiez votre connexion.', 0)
+  }
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // Le token est relu à chaque appel (plutôt que mis en cache) : supabase-js
   // le rafraîchit automatiquement en arrière-plan, getSession() renvoie
@@ -30,7 +46,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // le navigateur doit générer l'en-tête multipart/form-data avec sa propre
   // boundary — le fixer en dur casserait la requête.
   const isFormData = options.body instanceof FormData
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchOrNetworkError(`${API_URL}${path}`, {
     headers: {
       ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
@@ -54,7 +70,7 @@ async function requestBlob(path: string): Promise<Blob> {
   const {
     data: { session },
   } = await supabase.auth.getSession()
-  const res = await fetch(`${API_URL}${path}`, {
+  const res = await fetchOrNetworkError(`${API_URL}${path}`, {
     headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
   })
 

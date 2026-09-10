@@ -41,12 +41,8 @@ export function Services() {
 
   // Direction obligatoire pour afficher la liste (décision utilisateur, comme
   // SeuilsValidationDs.tsx) : pas d'option "Toutes les directions".
-  const displayedServices =
-    filterIdDirection === null
-      ? []
-      : services
-          .filter((s) => s.id_direction === Number(filterIdDirection))
-          .filter((s) => matchesStatusFilter(s.actif, statusFilter))
+  const servicesEnregistres = filterIdDirection === null ? [] : services.filter((s) => s.id_direction === Number(filterIdDirection))
+  const displayedServices = servicesEnregistres.filter((s) => matchesStatusFilter(s.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -90,6 +86,12 @@ export function Services() {
           />
         </div>
       </div>
+
+      {filterIdDirection !== null && !loading && (
+        <p className="gp-help">
+          {displayedServices.length} services sélectionnés sur {servicesEnregistres.length} services enregistrés.
+        </p>
+      )}
 
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
@@ -270,6 +272,7 @@ function ServiceFormModal({ mode, service, directions, onClose, onSaved }: Servi
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

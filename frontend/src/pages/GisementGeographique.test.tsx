@@ -163,6 +163,16 @@ describe('GisementGeographique', () => {
     expect(screen.queryByText('Cap Janet')).not.toBeInTheDocument()
   })
 
+  it('affiche "X sites sélectionnés sur X sites enregistrés", narrowed by the status filter', () => {
+    render(<GisementGeographique />)
+
+    selectDirectionAndService()
+    expect(screen.getByText('2 sites sélectionnés sur 2 sites enregistrés.')).toBeInTheDocument()
+
+    selectComboboxOption('Filtrer les sites par statut', 'Actifs')
+    expect(screen.getByText('1 sites sélectionnés sur 2 sites enregistrés.')).toBeInTheDocument()
+  })
+
   it('filtre en cascade : la combo Service ne propose que les services de la direction choisie', () => {
     render(<GisementGeographique />)
 

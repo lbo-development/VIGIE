@@ -10,6 +10,7 @@ import cellulesRoutes from './cellules.routes.js'
 import seuilValidationDsRoutes from './seuilValidationDs.routes.js'
 import fournisseursRoutes from './fournisseur.routes.js'
 import cugRoutes from './cug.routes.js'
+import libelleReferentielRoutes from './libelleReferentiel.routes.js'
 import marcheRoutes from './marche.routes.js'
 import marcheImportRoutes from './marcheImport.routes.js'
 import marcheTiersRoutes from './marcheTiers.routes.js'
@@ -19,6 +20,9 @@ import commandePgiImportRoutes from './commandePgiImport.routes.js'
 import investissementRoutes from './investissement.routes.js'
 import investissementImportRoutes from './investissementImport.routes.js'
 import investissementPieceRoutes from './investissementPiece.routes.js'
+import demandeAchatRoutes from './demandeAchat.routes.js'
+import acteurRoutes from './acteur.routes.js'
+import roleAttributionRoutes from './roleAttribution.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -37,6 +41,7 @@ router.use('/cellules', cellulesRoutes)
 router.use('/seuils-validation-ds', seuilValidationDsRoutes)
 router.use('/fournisseurs', fournisseursRoutes)
 router.use('/cug', cugRoutes)
+router.use('/libelles-referentiel', libelleReferentielRoutes)
 router.use('/marches', marcheRoutes)
 router.use('/marches/import', marcheImportRoutes)
 router.use('/marches/tiers', marcheTiersRoutes)
@@ -46,5 +51,8 @@ router.use('/commandes/import', commandePgiImportRoutes)
 router.use('/investissements', investissementRoutes)
 router.use('/investissements/import', investissementImportRoutes)
 router.use('/investissements/pieces', investissementPieceRoutes)
+router.use('/demandes-achat', demandeAchatRoutes)
+router.use('/acteurs', acteurRoutes)
+router.use('/role-attributions', roleAttributionRoutes)
 
 export default router

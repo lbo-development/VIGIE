@@ -3,6 +3,8 @@ export interface NavItem {
   label: string
   /** id du symbole dans icons.svg, sans le "#" (ex: "i-home") */
   icon: string
+  /** Affiche un séparateur (`<hr class="divider">`, gpmm.css) juste avant cet item dans la sidebar — voir Sidebar.tsx. Ordre demandé par l'utilisateur pour PARAMETRES_ITEMS (05/09/2026). */
+  separatorBefore?: boolean
 }
 
 /**
@@ -10,7 +12,12 @@ export interface NavItem {
  * filtrées par filterNavItems ci-dessous).
  *
  * "Fournisseurs" déplacé ici depuis le groupe sidebar "Paramètres" (décision
- * du 29/08/2026) — juste après "Accueil".
+ * du 29/08/2026).
+ *
+ * "Suivi des DA" ajouté le 07/09/2026, juste après "Accueil" — écran de
+ * suivi des demandes d'achat (module DA/FAD, cf. ForClaude/CDC), pas encore
+ * implémenté (placeholder "en cours de développement" dans DemandeAchat.tsx
+ * en attendant).
  *
  * "Marchés" ajouté le 30/08/2026, juste avant "Fournisseurs" — section à part :
  * sa sélection bascule tout le contenu de la sidebar sur `MARCHES_SIDEBAR_ITEMS`
@@ -30,8 +37,9 @@ export interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', icon: 'i-home' },
+  { to: '/demandes-achat', label: 'Suivi des DA', icon: '' },
   { to: '/marches', label: 'Marchés', icon: '' },
-  { to: '/commandes', label: 'Commandes', icon: '' },
+  { to: '/commandes', label: 'Commandes PGI', icon: '' },
   { to: '/investissements', label: 'Investissements', icon: '' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: '' },
 ]
@@ -87,21 +95,21 @@ export function filterMarchesSidebarItems(
 
 /**
  * Racine de la section "Commandes" — sert à la fois de route par défaut
- * (page de consultation "État des commandes PGI du service", voir App.tsx)
+ * (page de consultation "État des commandes PGI", voir App.tsx)
  * et de préfixe pour détecter que cette section est active (voir
  * `isCommandesSection`), même mécanique que MARCHES_SECTION_PATH.
  */
 export const COMMANDES_SECTION_PATH = '/commandes'
 
 /**
- * "État des commandes PGI du service" (03/09/2026, CommandesPGI.tsx) reste
+ * "État des commandes PGI" (03/09/2026, CommandesPGI.tsx) reste
  * toujours visible — lecture ouverte à tout utilisateur authentifié, même
- * principe que "États des marchés du service". "Importation commandes PGI"
+ * principe que "États des marchés du service". "Importation des commandes PGI"
  * est réservée ADMIN_APP/ADMIN_SERVICE/CB (voir filterCommandesSidebarItems).
  */
 export const COMMANDES_SIDEBAR_ITEMS: NavItem[] = [
-  { to: '/commandes', label: 'État des commandes PGI du service', icon: '' },
-  { to: '/commandes/import', label: 'Importation commandes PGI', icon: '' },
+  { to: '/commandes', label: 'État des commandes PGI', icon: '' },
+  { to: '/commandes/import', label: 'Importation des commandes PGI', icon: '' },
 ]
 
 /** Vrai si la route courante appartient à la section "Commandes" (voir AppShell.tsx). */
@@ -110,7 +118,7 @@ export function isCommandesSection(pathname: string): boolean {
 }
 
 /**
- * "État des commandes PGI du service" reste toujours visible (lecture ouverte
+ * "État des commandes PGI" reste toujours visible (lecture ouverte
  * à tous, voir commandePgi.service.ts#listCommandesPgi). "Importation
  * commandes PGI" est réservée à ADMIN_APP (transverse), ADMIN_SERVICE et CB
  * (scopés à leur service) — même triplet que "Importation marchés service"
@@ -121,7 +129,7 @@ export function filterCommandesSidebarItems(
   { isAdminApp, isAdminService, isCB }: { isAdminApp: boolean; isAdminService: boolean; isCB: boolean },
 ): NavItem[] {
   if (isAdminApp || isAdminService || isCB) return items
-  return items.filter((item) => item.label !== 'Importation commandes PGI')
+  return items.filter((item) => item.label !== 'Importation des commandes PGI')
 }
 
 /**
@@ -152,7 +160,7 @@ export function isInvestissementsSection(pathname: string): boolean {
  * "État des investissements PGI du service" reste toujours visible (lecture ouverte à tous, voir
  * investissement.service.ts#listInvestissements). "Importation investissements PGI" est réservée
  * à ADMIN_APP (transverse), ADMIN_SERVICE et CB (scopés à leur service) — même triplet que
- * "Importation commandes PGI" (filterCommandesSidebarItems).
+ * "Importation des commandes PGI" (filterCommandesSidebarItems).
  */
 export function filterInvestissementsSidebarItems(
   items: NavItem[],
@@ -171,16 +179,28 @@ export const PARAMETRES_SECTION_PATH = '/parametres'
  * sous-menu dépliable — remplace l'ancien groupe SIDEBAR_GROUPS/NavGroup).
  * Le point d'entrée de la section est le bouton dédié en pied de sidebar
  * (voir Sidebar.tsx), visible pour ADMIN_APP/ADMIN_SERVICE uniquement.
+ *
+ * Ordre et séparateurs (`separatorBefore`) fixés par l'utilisateur le
+ * 05/09/2026 : référentiel organisationnel (Directions/Services/Cellules),
+ * puis CUG et les deux gisements, un trait, les deux référentiels de
+ * paramétrage transverses (Seuils de validation DS / Référentiel libellé),
+ * un trait, puis Réglages seul en dernier.
  */
 export const PARAMETRES_ITEMS: NavItem[] = [
-  { to: '/parametres/gisement-geographique', label: 'Gisement géographique', icon: '' },
-  { to: '/parametres/gisement-technique', label: 'Gisement technique', icon: '' },
-  { to: '/parametres/reglages', label: 'Réglages', icon: '' },
   { to: '/parametres/directions', label: 'Directions', icon: '' },
   { to: '/parametres/services', label: 'Services', icon: '' },
   { to: '/parametres/cellules', label: 'Cellules', icon: '' },
-  { to: '/parametres/seuils-validation-ds', label: 'Seuils de validation DS', icon: '' },
   { to: '/parametres/cug', label: 'CUG', icon: '' },
+  { to: '/parametres/gisement-geographique', label: 'Gisement géographique', icon: '' },
+  { to: '/parametres/gisement-technique', label: 'Gisement technique', icon: '' },
+  { to: '/parametres/seuils-validation-ds', label: 'Seuils de validation DS', icon: '', separatorBefore: true },
+  { to: '/parametres/libelle-referentiel', label: 'Référentiel libellé', icon: '' },
+  // Utilisateurs (fiche acteur + compte, ADMIN_APP seul) et Rôles (attribution
+  // de rôle, ADMIN_APP + ADMIN_SERVICE scopé à son service) — décision du
+  // 10/09/2026, ForClaude/CDC/mot-phases-1-2.md.
+  { to: '/parametres/utilisateurs', label: 'Utilisateurs', icon: '', separatorBefore: true },
+  { to: '/parametres/roles', label: 'Rôles', icon: '' },
+  { to: '/parametres/reglages', label: 'Réglages', icon: '', separatorBefore: true },
 ]
 
 /** Vrai si la route courante appartient à la section "Paramètres" (voir AppShell.tsx). */
@@ -194,11 +214,13 @@ export function isParametresSection(pathname: string): boolean {
  * organisationnel Direction/Service/Cellule — DIRECTION/SERVICE/CELLULE
  * forment la hiérarchie elle-même, leur gestion est nécessairement
  * transverse (pas de périmètre ADMIN_SERVICE possible, contrairement à
- * SITE/SECTEUR). "Seuils de validation DS" et "CUG" sont accessibles à
- * ADMIN_SERVICE (scopé à son service) : ils ne sont donc pas dans cet
- * ensemble.
+ * SITE/SECTEUR). "Référentiel libellé" (05/09/2026) rejoint cet ensemble :
+ * référentiel générique transverse (finances.libelle_referentiel), sans
+ * notion de service propriétaire, contrairement à CUG. "Seuils de validation
+ * DS" et "CUG" sont accessibles à ADMIN_SERVICE (scopé à son service) : ils
+ * ne sont donc pas dans cet ensemble.
  */
-const ADMIN_APP_ONLY_LABELS = new Set(['Réglages', 'Directions', 'Services', 'Cellules'])
+const ADMIN_APP_ONLY_LABELS = new Set(['Réglages', 'Directions', 'Services', 'Cellules', 'Référentiel libellé', 'Utilisateurs'])
 
 /**
  * Filtre les pages de "Paramètres" selon les rôles courants : section

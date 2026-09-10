@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 import { supabase } from '../config/supabaseClient.js'
 import * as authRepository from '../repositories/auth.repository.js'
+import * as acteurRepository from '../repositories/acteur.repository.js'
 import { AppError } from './errorHandler.js'
 
 /**
@@ -18,6 +19,13 @@ import { AppError } from './errorHandler.js'
  *
  * Renseigne req.matricule et req.user (voir types/express.d.ts) pour les
  * handlers en aval.
+ *
+ * ACTEUR.ACTIF (ajouté le 10/09/2026) est vérifié ici : un acteur désactivé
+ * par ADMIN_APP (acteur.service.ts#updateActeur) retombe à matricule=null au
+ * prochain appel, exactement comme un compte jamais rattaché — effet
+ * immédiat sur une session déjà active, sans attendre l'expiration du JWT.
+ * Complète, sans remplacer, le bannissement du compte Auth (bloque une
+ * NOUVELLE connexion) — défense en profondeur, ForClaude/SECURITY.md.
  */
 export async function requireAuth(req: Request, _res: Response, next: NextFunction) {
   try {
@@ -29,7 +37,15 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     if (error || !data.user) throw new AppError('Session invalide ou expirée', 401)
 
     req.user = { id: data.user.id, email: data.user.email }
-    req.matricule = await authRepository.findMatriculeByUserId(data.user.id)
+    const matricule = await authRepository.findMatriculeByUserId(data.user.id)
+
+    if (matricule) {
+      const acteur = await acteurRepository.findByMatricule(matricule)
+      req.matricule = acteur?.actif ? matricule : null
+    } else {
+      req.matricule = null
+    }
+
     next()
   } catch (err) {
     next(err)

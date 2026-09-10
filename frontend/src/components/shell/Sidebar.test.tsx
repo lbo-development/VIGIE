@@ -39,6 +39,23 @@ describe('Sidebar — liste plate contextuelle (pas de sous-menu)', () => {
     expect(nav.getByRole('link', { name: 'Gisement géographique' })).not.toHaveClass('is-active')
   })
 
+  it('affiche un trait séparateur (.divider) avant un item marqué separatorBefore, pas devant les autres', () => {
+    const items: NavItem[] = [
+      { to: '/parametres/cug', label: 'CUG', icon: '' },
+      { to: '/parametres/seuils-validation-ds', label: 'Seuils de validation DS', icon: '', separatorBefore: true },
+    ]
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Sidebar items={items} parametresLink={null} hidden={false} theme="light" onToggleTheme={() => {}} />
+      </MemoryRouter>,
+    )
+
+    const separators = document.querySelectorAll('.sidebar-nav hr.divider')
+    expect(separators).toHaveLength(1)
+    // Le trait précède directement l'item "Seuils de validation DS" (son conteneur), pas "CUG".
+    expect(separators[0].nextElementSibling).toHaveAttribute('href', '/parametres/seuils-validation-ds')
+  })
+
   it("ne marque pas actif un item dont la route n'est qu'un préfixe littéral de la page courante (régression 30/08/2026 — ex. \"/marches\" vs \"/marches/import\")", () => {
     const items: NavItem[] = [
       { to: '/marches', label: 'États des marchés', icon: '' },

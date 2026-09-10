@@ -18,7 +18,16 @@ function selectFile(file: File) {
 }
 
 beforeEach(() => {
-  vi.mocked(api.get).mockResolvedValue([])
+  vi.mocked(api.get)
+    .mockReset()
+    .mockImplementation((path: string) =>
+      path.startsWith('/libelles-referentiel')
+        ? Promise.resolve([
+            { domaine: 'TYPE_PIECE_INVESTISSEMENT', code: 'RAPPORT_CODIR', libelle: 'RAPPORT_CODIR', ordre: 1, actif: true },
+            { domaine: 'TYPE_PIECE_INVESTISSEMENT', code: 'AUTRE', libelle: 'Autre', ordre: 16, actif: true },
+          ])
+        : Promise.resolve([]),
+    )
   vi.mocked(api.postForm).mockReset()
 })
 
@@ -39,6 +48,7 @@ describe('AddPieceInvestissementModal', () => {
     render(<AddPieceInvestissementModal numeroOperation="IN025393" label="IN025393" onClose={vi.fn()} onSaved={onSaved} />)
 
     selectFile(makeFile('rapport-codir.pdf', 'application/pdf', 1000))
+    await screen.findByText('RAPPORT_CODIR')
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }))
 
     await waitFor(() => expect(api.postForm).toHaveBeenCalledTimes(1))
@@ -59,6 +69,7 @@ describe('AddPieceInvestissementModal', () => {
     render(<AddPieceInvestissementModal numeroOperation="IN025393" label="IN025393" onClose={vi.fn()} onSaved={vi.fn()} />)
 
     selectFile(makeFile('rapport.pdf', 'application/pdf', 1000))
+    await screen.findByText('RAPPORT_CODIR')
     fireEvent.click(screen.getByRole('button', { name: 'Ajouter' }))
 
     expect(await screen.findByText('Droits insuffisants pour ce service')).toBeInTheDocument()

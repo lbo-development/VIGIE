@@ -92,10 +92,9 @@ export function Cug() {
   // Direction ET service obligatoires pour afficher la liste (même système
   // que Cellules.tsx) : pas d'option "Toutes les directions" ni "Tous les
   // services".
-  const displayedCug =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : cug.filter((c) => c.id_service === Number(filterIdService)).filter((c) => matchesStatusFilter(c.actif, statusFilter))
+  const cugEnregistres =
+    filterIdDirection === null || filterIdService === null ? [] : cug.filter((c) => c.id_service === Number(filterIdService))
+  const displayedCug = cugEnregistres.filter((c) => matchesStatusFilter(c.actif, statusFilter))
 
   return (
     <div className="stack">
@@ -152,6 +151,12 @@ export function Cug() {
           />
         </div>
       </div>
+
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {displayedCug.length} CUG sélectionnés sur {cugEnregistres.length} CUG enregistrés.
+        </p>
+      )}
 
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
@@ -393,6 +398,7 @@ function CugFormModal({
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

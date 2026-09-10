@@ -1,16 +1,8 @@
 import { useState } from 'react'
 import { usePiecesMarche, type MarchePiece, type MarcheRef, type TypePiece } from '../hooks/usePiecesMarche'
+import { useLibelleReferentiel } from '../hooks/useLibelleReferentiel'
 import { Combobox } from './Combobox'
 import { SpinButton } from './SpinButton'
-
-const TYPE_PIECE_OPTIONS: { value: TypePiece; label: string }[] = [
-  { value: 'CCAP', label: 'CCAP' },
-  { value: 'CCTP', label: 'CCTP' },
-  { value: 'AE', label: 'AE' },
-  { value: 'AVENANT', label: 'AVENANT' },
-  { value: 'BPU', label: 'BPU' },
-  { value: 'AUTRE', label: 'Autre' },
-]
 
 function formatTaille(octets: number): string {
   if (octets < 1024) return `${octets} o`
@@ -39,8 +31,11 @@ interface PiecesMarcheModalProps {
  */
 export function PiecesMarcheModal({ marcheRef, label, canManage, onClose }: PiecesMarcheModalProps) {
   const { pieces, loading, error, mutation, updatePieceMetadata, deletePiece, downloadPiece } = usePiecesMarche(marcheRef)
+  const { items: typesPiece } = useLibelleReferentiel('TYPE_PIECE_MARCHE')
+  const typePieceOptions = typesPiece.filter((t) => t.actif).map((t) => ({ value: t.code, label: t.libelle }))
+  const libelleTypePiece = (code: TypePiece) => typesPiece.find((t) => t.code === code)?.libelle ?? code
   const [editingId, setEditingId] = useState<number | null>(null)
-  const [editTypePiece, setEditTypePiece] = useState<TypePiece>('AUTRE')
+  const [editTypePiece, setEditTypePiece] = useState<TypePiece>('')
   const [editNumeroAvenant, setEditNumeroAvenant] = useState('0')
   const [pieceToDelete, setPieceToDelete] = useState<MarchePiece | null>(null)
 
@@ -84,10 +79,10 @@ export function PiecesMarcheModal({ marcheRef, label, canManage, onClose }: Piec
                   {editingId === piece.id_marche_piece ? (
                     <div className="row" style={{ gap: 10, flex: 1, flexWrap: 'wrap' }}>
                       <Combobox
-                        options={TYPE_PIECE_OPTIONS}
+                        options={typePieceOptions}
                         value={editTypePiece}
                         onChange={(v) => {
-                          if (v) setEditTypePiece(v as TypePiece)
+                          if (v) setEditTypePiece(v)
                         }}
                         placeholder="Type de pièce"
                         ariaLabel="Type de pièce"
@@ -108,7 +103,7 @@ export function PiecesMarcheModal({ marcheRef, label, canManage, onClose }: Piec
                   ) : (
                     <>
                       <div className="marche-piece-row__info">
-                        <span className="gp-badge">{piece.type_piece}</span>
+                        <span className="gp-badge">{libelleTypePiece(piece.type_piece)}</span>
                         <span>Avenant {piece.numero_avenant}</span>
                         <span className="marche-piece-row__filename">{piece.nom_fichier_original}</span>
                         <span className="gp-help">

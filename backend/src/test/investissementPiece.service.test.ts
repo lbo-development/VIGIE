@@ -13,6 +13,7 @@ const findByNumeroOperation = vi.fn()
 const findIdServiceByMatricule = vi.fn()
 const findActiveByMatricule = vi.fn()
 const assertManagesServiceOrHasRoleCb = vi.fn()
+const findAllByDomaine = vi.fn()
 
 vi.mock('../repositories/investissementPiece.repository.js', () => ({
   findAllByOperation: (...args: unknown[]) => findAllByOperation(...args),
@@ -35,6 +36,9 @@ vi.mock('../repositories/roleAttribution.repository.js', () => ({
 }))
 vi.mock('../services/authorization.service.js', () => ({
   assertManagesServiceOrHasRoleCb: (...args: unknown[]) => assertManagesServiceOrHasRoleCb(...args),
+}))
+vi.mock('../repositories/libelleReferentiel.repository.js', () => ({
+  findAllByDomaine: (...args: unknown[]) => findAllByDomaine(...args),
 }))
 
 const { listPieces, uploadPiece, updatePieceMetadata, deletePiece, downloadPiece } = await import(
@@ -81,6 +85,10 @@ beforeEach(() => {
   findIdServiceByMatricule.mockReset().mockResolvedValue(ID_SERVICE)
   findActiveByMatricule.mockReset().mockResolvedValue([])
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
+  findAllByDomaine.mockReset().mockResolvedValue([
+    { domaine: 'TYPE_PIECE_INVESTISSEMENT', code: 'RAPPORT_CODIR', libelle: 'RAPPORT_CODIR', ordre: 1, actif: true },
+    { domaine: 'TYPE_PIECE_INVESTISSEMENT', code: 'AUTRE', libelle: 'Autre', ordre: 16, actif: true },
+  ])
 })
 
 describe('listPieces', () => {

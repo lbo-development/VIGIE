@@ -70,7 +70,7 @@ export function AppShell() {
   // du service" et "Marchés d'un service tiers" restent visibles pour tous.
   const marchesItems = filterMarchesSidebarItems(MARCHES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
 
-  // "Importation commandes PGI" (unique entrée de la section) réservée
+  // "Importation des commandes PGI" (unique entrée de la section) réservée
   // ADMIN_APP/ADMIN_SERVICE/CB — même triplet que l'import marchés.
   const commandesItems = filterCommandesSidebarItems(COMMANDES_SIDEBAR_ITEMS, { isAdminApp, isAdminService, isCB })
 

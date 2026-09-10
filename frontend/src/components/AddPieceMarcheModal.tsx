@@ -1,17 +1,9 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { usePiecesMarche, type MarcheRef, type TypePiece } from '../hooks/usePiecesMarche'
+import { useLibelleReferentiel } from '../hooks/useLibelleReferentiel'
 import { Combobox } from './Combobox'
 import { SpinButton } from './SpinButton'
 import { FileDropzone } from './FileDropzone'
-
-const TYPE_PIECE_OPTIONS: { value: TypePiece; label: string }[] = [
-  { value: 'CCAP', label: 'CCAP' },
-  { value: 'CCTP', label: 'CCTP' },
-  { value: 'AE', label: 'AE' },
-  { value: 'AVENANT', label: 'AVENANT' },
-  { value: 'BPU', label: 'BPU' },
-  { value: 'AUTRE', label: 'Autre' },
-]
 
 const MAX_TAILLE_OCTETS = 10 * 1024 * 1024
 
@@ -31,16 +23,26 @@ interface AddPieceMarcheModalProps {
  */
 export function AddPieceMarcheModal({ marcheRef, label, onClose, onSaved }: AddPieceMarcheModalProps) {
   const { uploadPiece, mutation } = usePiecesMarche(marcheRef)
-  const [typePiece, setTypePiece] = useState<TypePiece>('CCAP')
+  const { items: typesPiece } = useLibelleReferentiel('TYPE_PIECE_MARCHE')
+  const typePieceOptions = typesPiece.filter((t) => t.actif).map((t) => ({ value: t.code, label: t.libelle }))
+  const [typePiece, setTypePiece] = useState<TypePiece>('')
   const [numeroAvenant, setNumeroAvenant] = useState('0')
   const [file, setFile] = useState<File | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!typePiece && typePieceOptions.length > 0) setTypePiece(typePieceOptions[0].value)
+  }, [typePiece, typePieceOptions])
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setFormError(null)
     if (!file) {
       setFormError('Un fichier est requis.')
+      return
+    }
+    if (!typePiece) {
+      setFormError('Type de pièce requis.')
       return
     }
     const ok = await uploadPiece(file, typePiece, Number(numeroAvenant))
@@ -66,10 +68,10 @@ export function AddPieceMarcheModal({ marcheRef, label, onClose, onSaved }: AddP
               <div className="gp-field" style={{ flex: 1 }}>
                 <label className="gp-label">Type de pièce</label>
                 <Combobox
-                  options={TYPE_PIECE_OPTIONS}
+                  options={typePieceOptions}
                   value={typePiece}
                   onChange={(v) => {
-                    if (v) setTypePiece(v as TypePiece)
+                    if (v) setTypePiece(v)
                   }}
                   placeholder="Type de pièce"
                   ariaLabel="Type de pièce"

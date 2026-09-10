@@ -113,10 +113,8 @@ export function GisementTechnique() {
   // Direction ET service obligatoires pour afficher la liste (décision
   // utilisateur, comme Cellules.tsx) : pas d'option "Toutes les directions"
   // ni "Tous les services".
-  const filteredSecteurs =
-    filterIdDirection === null || filterIdService === null
-      ? []
-      : secteurs.filter((s) => matchesStatusFilter(s.actif, secteurStatusFilter))
+  const secteursEnregistres = filterIdDirection === null || filterIdService === null ? [] : secteurs
+  const filteredSecteurs = secteursEnregistres.filter((s) => matchesStatusFilter(s.actif, secteurStatusFilter))
   const displayedSecteurs = sortRows(filteredSecteurs, secteurSort, (secteur, column) =>
     column === 'service'
       ? serviceLabel(secteur.id_service)
@@ -197,10 +195,17 @@ export function GisementTechnique() {
         </p>
       )}
 
+      {filterIdDirection !== null && filterIdService !== null && !loading && (
+        <p className="gp-help">
+          {filteredSecteurs.length} secteurs sélectionnés sur {secteursEnregistres.length} secteurs enregistrés.
+        </p>
+      )}
+
       <div className="gp-table-wrap gp-scroll">
         <table className="gp-table">
           <thead>
             <tr>
+              <th aria-label="Réordonner" style={{ width: 32 }} />
               <SortableTh label="Service" column="service" sort={secteurSort} onSort={toggleSecteurSort} />
               <SortableTh label="Libellé" column="lib_secteur" sort={secteurSort} onSort={toggleSecteurSort} />
               <SortableTh label="Statut" column="actif" sort={secteurSort} onSort={toggleSecteurSort} />
@@ -210,12 +215,12 @@ export function GisementTechnique() {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={4}>Chargement…</td>
+                <td colSpan={5}>Chargement…</td>
               </tr>
             )}
             {!loading && displayedSecteurs.length === 0 && (
               <tr>
-                <td colSpan={4}>
+                <td colSpan={5}>
                   {filterIdDirection === null || filterIdService === null
                     ? 'Sélectionne une direction et un service pour afficher les secteurs.'
                     : 'Aucun secteur pour ce filtre.'}
@@ -224,6 +229,22 @@ export function GisementTechnique() {
             )}
             {displayedSecteurs.map((secteur) => (
               <tr key={secteur.code_secteur}>
+                <td>
+                  <div className="gp-rowacts">
+                    <span className="gp-tip" data-tip="Réordonner les secteurs">
+                      <button
+                        aria-label="Réordonner les secteurs"
+                        onClick={() => {
+                          if (secteur.id_service !== null) setReorderModalIdService(secteur.id_service)
+                        }}
+                      >
+                        <svg className="ti">
+                          <use href="#i-grip-vertical" />
+                        </svg>
+                      </button>
+                    </span>
+                  </div>
+                </td>
                 <td>{serviceLabel(secteur.id_service)}</td>
                 <td>{secteur.lib_secteur}</td>
                 <td>
@@ -252,18 +273,6 @@ export function GisementTechnique() {
                       >
                         <svg className="ti">
                           <use href="#i-pencil" />
-                        </svg>
-                      </button>
-                    </span>
-                    <span className="gp-tip" data-tip="Réordonner les secteurs">
-                      <button
-                        aria-label="Réordonner les secteurs"
-                        onClick={() => {
-                          if (secteur.id_service !== null) setReorderModalIdService(secteur.id_service)
-                        }}
-                      >
-                        <svg className="ti">
-                          <use href="#i-grip-vertical" />
                         </svg>
                       </button>
                     </span>
@@ -445,6 +454,7 @@ function SecteurFormModal({
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">
@@ -808,6 +818,7 @@ function SousSecteurFormModal({ mode, codeSecteur, sousSecteur, onClose, onSaved
                 <span className="track" />
               </span>
             </label>
+            <p className="gp-help">Décoché, cet élément disparaît des listes de sélection ; les données déjà liées ne sont pas supprimées.</p>
             {error && (
               <p className="gp-errmsg">
                 <svg className="ti">

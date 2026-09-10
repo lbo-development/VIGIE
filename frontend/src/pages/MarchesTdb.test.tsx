@@ -48,6 +48,7 @@ function makeMarche(overrides: Partial<Marche>): Marche {
     mt_solde: 50000,
     alertemt: 0.8,
     alertedate: 30,
+    nombre_pieces: 0,
     ...overrides,
   }
 }
@@ -70,6 +71,7 @@ function makeMarcheTiers(overrides: Partial<MarcheTiers>): MarcheTiers {
     commentaire: null,
     created_at: '2026-01-01T00:00:00Z',
     updated_at: '2026-01-01T00:00:00Z',
+    nombre_pieces: 0,
     ...overrides,
   }
 }

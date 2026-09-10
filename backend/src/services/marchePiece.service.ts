@@ -8,11 +8,12 @@ import * as fournisseurRepository from '../repositories/fournisseur.repository.j
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
 import { assertManagesServiceOrHasRoleCb } from './authorization.service.js'
+import * as libelleReferentielService from './libelleReferentiel.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { Marche } from '../repositories/marche.repository.js'
 import type { MarchePiece, TypeMarchePiece } from '../repositories/marchePiece.repository.js'
 
-const TYPE_PIECE_VALUES = ['CCAP', 'CCTP', 'AE', 'AVENANT', 'BPU', 'AUTRE'] as const
+const DOMAINE_TYPE_PIECE = 'TYPE_PIECE_MARCHE' as const
 const MAX_TAILLE_OCTETS = 10 * 1024 * 1024
 const PDF_MAGIC_BYTES = Buffer.from('%PDF')
 
@@ -107,7 +108,7 @@ const uploadPieceSchema = z
     typeMarche: z.enum(['SERVICE', 'TIERS']),
     nummarche: z.string().trim().min(1).optional(),
     idMarcheTiers: z.coerce.number().int().optional(),
-    typePiece: z.enum(TYPE_PIECE_VALUES),
+    typePiece: z.string().trim().min(1, 'Type de pièce requis.'),
     numeroAvenant: z.coerce.number().int().nonnegative(),
   })
   .superRefine((data, ctx) => {
@@ -141,6 +142,7 @@ export async function uploadPiece(matricule: string | null, input: unknown, file
   const result = uploadPieceSchema.safeParse(input)
   if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
   const data = result.data
+  await libelleReferentielService.assertCodeActif(DOMAINE_TYPE_PIECE, data.typePiece)
 
   const ref: MarcheRef = { typeMarche: data.typeMarche, nummarche: data.nummarche, idMarcheTiers: data.idMarcheTiers }
   const idService = await resolveTargetIdService(ref)
@@ -178,7 +180,7 @@ export async function uploadPiece(matricule: string | null, input: unknown, file
 }
 
 const updateMetadataSchema = z.object({
-  typePiece: z.enum(TYPE_PIECE_VALUES),
+  typePiece: z.string().trim().min(1, 'Type de pièce requis.'),
   numeroAvenant: z.number().int().nonnegative(),
 })
 
@@ -186,6 +188,7 @@ const updateMetadataSchema = z.object({
 export async function updatePieceMetadata(matricule: string | null, idMarchePiece: number, input: unknown): Promise<MarchePiece> {
   const result = updateMetadataSchema.safeParse(input)
   if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+  await libelleReferentielService.assertCodeActif(DOMAINE_TYPE_PIECE, result.data.typePiece)
 
   const existing = await marchePieceRepository.findById(idMarchePiece)
   if (!existing) throw new AppError('Pièce de marché introuvable', 404)

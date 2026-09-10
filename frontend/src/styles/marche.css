@@ -50,10 +50,23 @@
 .marche-card__dots {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
   flex: none;
   padding-top: 3px;
+}
+
+/* Libellé affiché en permanence devant la pastille plutôt qu'un tooltip au survol
+   (décision utilisateur, 05/09/2026) — accessible sans interaction, visible aussi au tactile. */
+.marche-card__dot-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.marche-card__dot-label {
+  font-size: 11px;
+  color: var(--gp-text-secondary);
+  white-space: nowrap;
 }
 
 .marche-dot {
