@@ -76,8 +76,19 @@ export async function listActeurs(matricule: string | null, query: ListActeursQu
  * tâche « Gérer les comptes utilisateurs »).
  */
 
+// Format imposé à exactement 6 chiffres (décision du 10/09/2026) : complété
+// par des zéros à gauche si l'ADMIN_APP saisit moins de 6 chiffres (ex. 600
+// -> 000600) — voir la contrainte CHECK acteur_matricule_format_check
+// (supabase/migrations/20260910100000_acteur_matricule_6_digits.sql), qui
+// n'est qu'un filet de sécurité base, ce transform est le mécanisme réel.
+const matriculeField = z
+  .string()
+  .trim()
+  .regex(/^[0-9]{1,6}$/, 'Le matricule doit être composé uniquement de chiffres (6 maximum).')
+  .transform((v) => v.padStart(6, '0'))
+
 const createActeurSchema = z.object({
-  matricule: z.string().trim().min(1).max(20),
+  matricule: matriculeField,
   nom: z.string().trim().min(1).max(200),
   prenom: z.string().trim().min(1).max(200),
   fonction: z.string().trim().min(1).max(200),
@@ -121,7 +132,24 @@ export async function createActeur(input: unknown): Promise<CreatedActeur> {
   if (!cellule) throw new AppError('Cellule introuvable', 404)
 
   const temporaryPassword = generateTemporaryPassword()
-  const userId = await authAdminRepository.createAuthUser(result.data.email, temporaryPassword)
+  let userId: string
+  try {
+    userId = await authAdminRepository.createAuthUser(result.data.email, temporaryPassword)
+  } catch (err) {
+    // SECURITY.md §8 : ne jamais laisser une erreur technique (ici l'API Auth
+    // Supabase) atteindre le client brute — cas prévisible (compte déjà
+    // existant, ex. créé via database/seeds/createAuthUsers.ts ou directement
+    // dans le dashboard) traduit en message métier 409, même principe que
+    // libelleReferentiel.service.ts#deleteLibelle pour une contrainte Postgres.
+    const code = (err as { code?: string })?.code
+    if (code === 'email_exists') {
+      throw new AppError(
+        `Un compte existe déjà pour l'adresse "${result.data.email}" — supprimez-le dans Supabase (Authentication → Users) avant de réessayer, ou utilisez une autre adresse.`,
+        409,
+      )
+    }
+    throw err
+  }
   await authRepository.linkProfile(userId, result.data.matricule)
 
   const acteur = await acteurRepository.create({

@@ -4,3 +4,7 @@ dist
 .env.local
 *.log
 .DS_Store
+
+# Liste d'emails fournie ponctuellement pour database/seeds/createAuthUsers.ts
+# — jamais de données personnelles réelles (RGPD) committées dans le dépôt.
+database/seeds/auth-users-emails.txt

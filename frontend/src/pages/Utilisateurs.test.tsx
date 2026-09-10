@@ -63,6 +63,17 @@ describe('Utilisateurs', () => {
     expect(within(dialog).getByLabelText('Adresse e-mail (compte)')).toBeInTheDocument()
   })
 
+  it('filtre le matricule aux chiffres et le limite à 6 caractères', () => {
+    render(<Utilisateurs />)
+
+    fireEvent.click(screen.getByRole('button', { name: /nouvel utilisateur/i }))
+    const input = within(screen.getByRole('dialog')).getByLabelText('Matricule')
+
+    fireEvent.change(input, { target: { value: 'ab12cd3456789' } })
+
+    expect(input).toHaveValue('123456')
+  })
+
   it('ouvre le formulaire de modification pré-rempli, sans champ email, matricule non modifiable', () => {
     render(<Utilisateurs />)
 

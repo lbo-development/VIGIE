@@ -71,7 +71,7 @@ vi.mock('../repositories/historiqueStatut.repository.js', () => ({
 
 const { listActeurs, createActeur, updateActeur, deleteActeur } = await import('../services/acteur.service.js')
 
-const MATRICULE = '12520'
+const MATRICULE = '000600'
 const ID_CELLULE = 7
 const ID_SERVICE = 1
 const ACTEUR = { matricule: MATRICULE, nom: 'DUPONT', prenom: 'Jean', fonction: 'Agent', id_cellule: ID_CELLULE, actif: true }
@@ -128,6 +128,25 @@ describe('createActeur', () => {
     expect(createAuthUser).not.toHaveBeenCalled()
   })
 
+  it('rejette un matricule non numérique ou trop long (400)', async () => {
+    await expect(createActeur({ ...INPUT, matricule: 'ABC123' })).rejects.toMatchObject({ status: 400 })
+    await expect(createActeur({ ...INPUT, matricule: '1234567' })).rejects.toMatchObject({ status: 400 })
+    expect(createAuthUser).not.toHaveBeenCalled()
+  })
+
+  it('complète le matricule à 6 chiffres avec des zéros à gauche (600 -> 000600)', async () => {
+    findByMatricule.mockResolvedValue(null)
+    findCelluleById.mockResolvedValue({ id_cellule: ID_CELLULE, id_service: ID_SERVICE })
+    createAuthUser.mockResolvedValue('auth-user-1')
+    create.mockResolvedValue({ ...ACTEUR, matricule: '000600' })
+
+    await createActeur({ ...INPUT, matricule: '600' })
+
+    expect(findByMatricule).toHaveBeenCalledWith('000600')
+    expect(linkProfile).toHaveBeenCalledWith('auth-user-1', '000600')
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ matricule: '000600' }))
+  })
+
   it('rejette un matricule déjà existant (409)', async () => {
     findByMatricule.mockResolvedValue(ACTEUR)
 
@@ -141,6 +160,16 @@ describe('createActeur', () => {
 
     await expect(createActeur(INPUT)).rejects.toMatchObject({ status: 404 })
     expect(createAuthUser).not.toHaveBeenCalled()
+  })
+
+  it("rejette (409, message clair) si un compte Auth existe déjà pour cet email", async () => {
+    findByMatricule.mockResolvedValue(null)
+    findCelluleById.mockResolvedValue({ id_cellule: ID_CELLULE, id_service: ID_SERVICE })
+    createAuthUser.mockRejectedValue(Object.assign(new Error('...'), { code: 'email_exists', status: 422 }))
+
+    await expect(createActeur(INPUT)).rejects.toMatchObject({ status: 409 })
+    expect(linkProfile).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
   })
 
   it('crée le compte Auth, lie le profil, crée la fiche acteur et renvoie le mot de passe une seule fois', async () => {

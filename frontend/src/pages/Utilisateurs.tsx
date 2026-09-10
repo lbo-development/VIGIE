@@ -9,6 +9,11 @@ const STATUS_OPTIONS = [
   { value: 'inactive', label: 'Inactif' },
 ]
 
+/** Matricule : identifiant numérique sur 6 chiffres (complété par le backend avec des zéros à gauche, ex. 600 -> 000600) — même principe que `sanitizeInteger` ailleurs dans l'app, jamais `type="number"` natif. */
+function sanitizeMatricule(raw: string): string {
+  return raw.replace(/[^0-9]/g, '').slice(0, 6)
+}
+
 function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
   if (filter === null) return true
   return filter === 'active' ? actif : !actif
@@ -340,12 +345,17 @@ function UtilisateurFormModal({ mode, acteur, onClose, onSaved }: UtilisateurFor
               <input
                 id="utilisateur-matricule"
                 className="gp-input"
+                inputMode="numeric"
+                pattern="[0-9]*"
                 value={matricule}
-                onChange={(e) => setMatricule(e.target.value)}
+                onChange={(e) => setMatricule(sanitizeMatricule(e.target.value))}
                 required
-                maxLength={20}
+                maxLength={6}
                 disabled={mode === 'edit'}
               />
+              {mode === 'create' && (
+                <p className="gp-help">Complété automatiquement à 6 chiffres avec des zéros à gauche (ex. 600 → 000600).</p>
+              )}
             </div>
             <div className="gp-field">
               <label className="gp-label" htmlFor="utilisateur-nom">
