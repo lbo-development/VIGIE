@@ -89,11 +89,11 @@ beforeEach(() => {
   hasActiveRole.mockReset()
   findUserIdByMatricule.mockReset()
   linkProfile.mockReset()
-  deleteProfile.mockReset()
+  deleteProfile.mockReset().mockResolvedValue(undefined)
   createAuthUser.mockReset()
   banAuthUser.mockReset()
   unbanAuthUser.mockReset()
-  deleteAuthUser.mockReset()
+  deleteAuthUser.mockReset().mockResolvedValue(undefined)
   findActiveByMatricule.mockReset()
   existsForMatricule.mockReset()
   existsForMatriculeSuppleant.mockReset()
@@ -186,6 +186,30 @@ describe('createActeur', () => {
     expect(result.acteur).toEqual(ACTEUR)
     expect(typeof result.temporaryPassword).toBe('string')
     expect(result.temporaryPassword.length).toBeGreaterThan(10)
+  })
+
+  it("supprime le compte Auth et le profil déjà créés si la création de la fiche acteur échoue ensuite (pas de compte orphelin)", async () => {
+    findByMatricule.mockResolvedValue(null)
+    findCelluleById.mockResolvedValue({ id_cellule: ID_CELLULE, id_service: ID_SERVICE })
+    createAuthUser.mockResolvedValue('auth-user-1')
+    create.mockRejectedValue(new Error('boom'))
+
+    await expect(createActeur(INPUT)).rejects.toThrow('boom')
+
+    expect(deleteProfile).toHaveBeenCalledWith('auth-user-1')
+    expect(deleteAuthUser).toHaveBeenCalledWith('auth-user-1')
+  })
+
+  it('supprime le compte Auth déjà créé si la liaison du profil échoue (pas de compte orphelin)', async () => {
+    findByMatricule.mockResolvedValue(null)
+    findCelluleById.mockResolvedValue({ id_cellule: ID_CELLULE, id_service: ID_SERVICE })
+    createAuthUser.mockResolvedValue('auth-user-1')
+    linkProfile.mockRejectedValue(new Error('boom'))
+
+    await expect(createActeur(INPUT)).rejects.toThrow('boom')
+
+    expect(create).not.toHaveBeenCalled()
+    expect(deleteAuthUser).toHaveBeenCalledWith('auth-user-1')
   })
 })
 

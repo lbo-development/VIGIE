@@ -17,6 +17,8 @@ import {
   filterCommandesSidebarItems,
   filterInvestissementsSidebarItems,
   filterNavItems,
+  getAccueilSidebarItems,
+  isHomeSection,
   isMarchesSection,
   isCommandesSection,
   isInvestissementsSection,
@@ -82,23 +84,29 @@ export function AppShell() {
     isCB,
   })
 
+  // Entrée "FAD — <cellule>" (écran de suivi RC, décision du 15/09/2026) — masquée sans rôle RC actif.
+  const accueilItems = getAccueilSidebarItems(currentUser)
+
   // Contenu de la sidebar contextuel à la section active : "en lieu et place
-  // des options présentes", pas en plus (Marchés, Commandes, Investissements
-  // et Paramètres se remplacent mutuellement selon la route courante, jamais
-  // combinés).
+  // des options présentes", pas en plus (Accueil, Marchés, Commandes,
+  // Investissements et Paramètres se remplacent mutuellement selon la route
+  // courante, jamais combinés).
+  const inHomeSection = isHomeSection(location.pathname)
   const inMarchesSection = isMarchesSection(location.pathname)
   const inCommandesSection = isCommandesSection(location.pathname)
   const inInvestissementsSection = isInvestissementsSection(location.pathname)
   const inParametresSection = isParametresSection(location.pathname)
-  const sidebarItems = inMarchesSection
-    ? marchesItems
-    : inCommandesSection
-      ? commandesItems
-      : inInvestissementsSection
-        ? investissementsItems
-        : inParametresSection
-          ? parametresItems
-          : []
+  const sidebarItems = inHomeSection
+    ? accueilItems
+    : inMarchesSection
+      ? marchesItems
+      : inCommandesSection
+        ? commandesItems
+        : inInvestissementsSection
+          ? investissementsItems
+          : inParametresSection
+            ? parametresItems
+            : []
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',

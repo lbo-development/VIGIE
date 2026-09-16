@@ -1,12 +1,16 @@
 import { useState, type FormEvent } from 'react'
-import { useRoleAttributions, type TypeRole } from '../hooks/useRoleAttributions'
+import { useRoleAttributions, type RoleAttribution, type TypeRole } from '../hooks/useRoleAttributions'
 import { useAllActeurs } from '../hooks/useAllActeurs'
-import { useCellules } from '../hooks/useCellules'
-import { useServices } from '../hooks/useServices'
-import { useDirections } from '../hooks/useDirections'
+import { useCellules, type OrgCellule } from '../hooks/useCellules'
+import { useServices, type OrgService } from '../hooks/useServices'
+import { useDirections, type OrgDirection } from '../hooks/useDirections'
 import { useCurrentUser } from '../hooks/useCurrentUser'
+import { useColumnSort, sortRows } from '../hooks/useColumnSort'
 import { Combobox } from '../components/Combobox'
+import { SortableTh } from '../components/SortableTh'
 import { api, ApiError } from '../services/api'
+
+type RoleColumn = 'utilisateur' | 'typeRole' | 'perimetre' | 'direction'
 
 const TYPE_ROLE_LABELS: Record<TypeRole, string> = {
   RC: 'RC (cellule)',
@@ -21,6 +25,36 @@ const TYPE_ROLE_LABELS: Record<TypeRole, string> = {
 const SERVICE_SCOPED_ROLES: TypeRole[] = ['RC', 'CDS', 'CB', 'ADMIN_SERVICE']
 
 /**
+ * Direction rattachée à une attribution, quel que soit le niveau de son
+ * périmètre — remonte via CELLULE → SERVICE → DIRECTION (RC) ou
+ * SERVICE → DIRECTION (CDS/CB/ADMIN_SERVICE) ; directe pour DS ; '—' pour
+ * ADMIN_APP (transverse, aucune direction). Distinct de `perimeterLabel`
+ * (qui affiche le libellé du périmètre exact — cellule/service/direction —
+ * pas nécessairement la direction elle-même).
+ */
+function resolveDirectionLabel(
+  attribution: RoleAttribution,
+  cellules: OrgCellule[],
+  services: OrgService[],
+  directions: OrgDirection[],
+): string {
+  let idDirection = attribution.idDirection
+
+  if (idDirection === null && attribution.idService !== null) {
+    idDirection = services.find((s) => s.id_service === attribution.idService)?.id_direction ?? null
+  }
+
+  if (idDirection === null && attribution.idCellule !== null) {
+    const cellule = cellules.find((c) => c.id_cellule === attribution.idCellule)
+    const service = cellule ? services.find((s) => s.id_service === cellule.id_service) : undefined
+    idDirection = service?.id_direction ?? null
+  }
+
+  if (idDirection === null) return '—'
+  return directions.find((d) => d.id_direction === idDirection)?.libelle_direction ?? '—'
+}
+
+/**
  * Attribution / clôture des rôles applicatifs (finances.role_attribution),
  * montée sur /parametres/roles — accessible à ADMIN_APP (transverse) et
  * ADMIN_SERVICE (scopé à son propre service, RC/CDS/CB/ADMIN_SERVICE
@@ -32,6 +66,16 @@ export function RolesUtilisateurs() {
   const { data: currentUser } = useCurrentUser()
   const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
   const { attributions, loading, refetch } = useRoleAttributions()
+  const { cellules } = useCellules()
+  const { services } = useServices()
+  const { directions } = useDirections()
+  const { sort, toggleSort } = useColumnSort<RoleColumn>()
+  const displayedAttributions = sortRows(attributions, sort, (a, column) => {
+    if (column === 'utilisateur') return a.nom && a.prenom ? `${a.prenom} ${a.nom}` : a.matricule
+    if (column === 'typeRole') return TYPE_ROLE_LABELS[a.typeRole]
+    if (column === 'perimetre') return a.perimeterLabel ?? '—'
+    return resolveDirectionLabel(a, cellules, services, directions)
+  })
   const [modal, setModal] = useState(false)
   const [attributionToClose, setAttributionToClose] = useState<{ idRole: number; label: string } | null>(null)
   const [closeError, setCloseError] = useState<string | null>(null)
@@ -70,35 +114,51 @@ export function RolesUtilisateurs() {
       </div>
 
       <div className="gp-table-wrap gp-scroll">
-        <table className="gp-table">
+        <table className="gp-table" style={{ tableLayout: 'fixed' }}>
           <thead>
             <tr>
-              <th>Utilisateur</th>
-              <th>Rôle</th>
-              <th>Périmètre</th>
-              <th>Depuis</th>
-              <th>Actions</th>
+              <SortableTh
+                label="Utilisateur"
+                column="utilisateur"
+                sort={sort}
+                onSort={toggleSort}
+                style={{ width: '15%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              />
+              <SortableTh
+                label="Rôle"
+                column="typeRole"
+                sort={sort}
+                onSort={toggleSort}
+                style={{ width: '14%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+              />
+              <SortableTh label="Périmètre" column="perimetre" sort={sort} onSort={toggleSort} style={{ width: '24%' }} />
+              <SortableTh label="Direction" column="direction" sort={sort} onSort={toggleSort} style={{ width: '24%' }} />
+              <th style={{ width: '9%', overflow: 'hidden', textOverflow: 'ellipsis' }}>Depuis</th>
+              <th style={{ width: 53 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={5}>Chargement…</td>
+                <td colSpan={6}>Chargement…</td>
               </tr>
             )}
             {!loading && attributions.length === 0 && (
               <tr>
-                <td colSpan={5}>Aucune attribution active.</td>
+                <td colSpan={6}>Aucune attribution active.</td>
               </tr>
             )}
-            {attributions.map((a) => (
+            {displayedAttributions.map((a) => (
               <tr key={a.idRole}>
-                <td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {a.nom && a.prenom ? `${a.prenom} ${a.nom}` : a.matricule} <span className="mono">({a.matricule})</span>
                 </td>
-                <td>{TYPE_ROLE_LABELS[a.typeRole]}</td>
+                <td style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{TYPE_ROLE_LABELS[a.typeRole]}</td>
                 <td>{a.perimeterLabel ?? '—'}</td>
-                <td className="mono">{new Date(a.dateDebut).toLocaleDateString('fr-FR')}</td>
+                <td>{resolveDirectionLabel(a, cellules, services, directions)}</td>
+                <td className="mono" style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {new Date(a.dateDebut).toLocaleDateString('fr-FR')}
+                </td>
                 <td>
                   <div className="gp-rowacts">
                     <span className="gp-tip" data-tip="Clôturer l'attribution">

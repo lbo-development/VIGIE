@@ -108,6 +108,16 @@ button,input{font:inherit;} a{color:inherit;text-decoration:none;}
 .header-tabs .gp-tab[aria-selected="true"]{color:var(--gp-primary);font-weight:500;border-bottom-color:var(--gp-primary);}
 .tabs-scroll-btn{position:absolute;top:0;bottom:0;width:32px;border:0;z-index:4;display:flex;align-items:center;justify-content:center;color:var(--gp-primary);background:linear-gradient(to right,var(--gp-surface) 65%,transparent);cursor:pointer;}
 .tabs-scroll-btn[hidden]{display:none;} .tabs-scroll-btn--left{left:0;} .tabs-scroll-btn--right{right:0;transform:none;background:linear-gradient(to left,var(--gp-surface) 65%,transparent);}
+
+/* Bloc d'actions à l'extrême droite du header (décision utilisateur, 11/09/2026) — .icon-btn
+   était déjà référencé dans la règle focus-visible juste en dessous sans jamais avoir été défini
+   (reliquat du template d'origine) : complété ici plutôt que dupliqué sous un autre nom, dérivé
+   uniquement des jetons --gp-* déjà en place (même traitement de survol que .sidebar-item). */
+.header-actions{flex:none;display:flex;align-items:center;gap:4px;padding:0 14px;}
+.icon-btn{width:36px;height:36px;border:0;border-radius:var(--gp-radius);background:transparent;color:var(--gp-text-secondary);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s,color .12s;}
+.icon-btn:hover{background:var(--gp-surface-sunken);color:var(--gp-primary);}
+.icon-btn .ti{font-size:18px;}
+
 .header-tabs .gp-tab:focus-visible,.icon-btn:focus-visible,.sidebar-item:focus-visible,.sidebar-footer-action:focus-visible,.sidebar-rail-toggle:focus-visible{outline:none;box-shadow:0 0 0 3px var(--gp-focus);}
 
 /* Sidebar à gauche */

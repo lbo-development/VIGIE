@@ -257,6 +257,26 @@ describe('InvestissementsPGI', () => {
     expect(screen.getByText('SU010096')).toBeInTheDocument()
   })
 
+  it('une pastille apparaît sur "Filtrer" dès qu\'un critère de la modale est actif, disparaît avec "Supprimer les filtres"', () => {
+    render(<InvestissementsPGI />)
+
+    selectComboboxOption('Filtrer par direction', 'Direction Générale')
+    selectComboboxOption('Filtrer par service', 'Maintenance')
+
+    const filtrerBtn = screen.getByRole('button', { name: 'Filtrer' })
+    expect(filtrerBtn.querySelector('.filter-active-dot')).not.toBeInTheDocument()
+
+    fireEvent.click(filtrerBtn)
+    const modal = screen.getByRole('dialog', { name: 'Filtrer les investissements' })
+    fireEvent.click(within(modal).getByRole('radio', { name: 'Actif : Non' }))
+    fireEvent.click(within(modal).getByRole('button', { name: 'Filtrer' }))
+
+    expect(filtrerBtn.querySelector('.filter-active-dot')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer les filtres' }))
+    expect(filtrerBtn.querySelector('.filter-active-dot')).not.toBeInTheDocument()
+  })
+
   it('bouton "Filtrer" : la modale filtre sur Statut (Activée/Future/Toutes, sur A/F)', () => {
     render(<InvestissementsPGI />)
 
@@ -306,7 +326,7 @@ describe('InvestissementsPGI', () => {
   })
 
   it("ADMIN_SERVICE : direction et service pré-remplis sur son propre service", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<InvestissementsPGI />)
 
     expect(screen.getByRole('button', { name: 'Filtrer par direction' })).toHaveTextContent('Direction Générale')
@@ -384,7 +404,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('icône Ajouter une pièce présente et active pour ADMIN_SERVICE', () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       render(<InvestissementsPGI />)
 
       const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
@@ -422,7 +442,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('Ajouter une pièce ouvre la modale de dépôt et envoie le fichier via postForm (ADMIN_SERVICE)', async () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       vi.mocked(api.postForm).mockResolvedValue({ id_investissement_piece: 1 })
       render(<InvestissementsPGI />)
 
@@ -443,7 +463,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('icône Modifier visible pour ADMIN_SERVICE', () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       render(<InvestissementsPGI />)
 
       const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement
@@ -471,7 +491,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('Modifier permet de changer Libellé (service) et enregistre via PUT /investissements/:numeroOperation', async () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       vi.mocked(api.put).mockResolvedValue({})
       render(<InvestissementsPGI />)
 
@@ -494,7 +514,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('Modifier permet de basculer Actif et Utilisable', async () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       vi.mocked(api.put).mockResolvedValue({})
       render(<InvestissementsPGI />)
 
@@ -517,7 +537,7 @@ describe('InvestissementsPGI', () => {
     })
 
     it('Modifier : refuse un libellé vide, sans appeler PUT', () => {
-      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+      currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
       render(<InvestissementsPGI />)
 
       const card = screen.getByText('VN000203').closest('.investissement-card') as HTMLElement

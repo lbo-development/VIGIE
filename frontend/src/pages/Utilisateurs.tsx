@@ -1,6 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useRef, useState, type FormEvent } from 'react'
 import { useAllActeurs, type AdminActeur } from '../hooks/useAllActeurs'
-import { useCellules } from '../hooks/useCellules'
+import { useCellules, type OrgCellule } from '../hooks/useCellules'
+import { useServices, type OrgService } from '../hooks/useServices'
+import { useDirections } from '../hooks/useDirections'
 import { Combobox } from '../components/Combobox'
 import { api, ApiError } from '../services/api'
 
@@ -20,6 +22,44 @@ function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
 }
 
 /**
+ * Filtre organisationnel en cascade — au niveau le plus précis renseigné
+ * (Cellule > Service > Direction), les autres sont ignorés. Contrairement au
+ * même filtre sur Fournisseurs.tsx/MarchesPGI.tsx (qui verrouille l'affichage
+ * tant que Direction+Service ne sont pas choisis, car l'API sous-jacente
+ * exige un périmètre), ici la liste complète est déjà chargée par
+ * useAllActeurs — chaque niveau est une simple narrowing optionnelle, pas un
+ * verrou d'accès.
+ */
+function matchesOrgFilter(
+  acteur: AdminActeur,
+  filters: { idDirection: string | null; idService: string | null; idCellule: string | null },
+  cellules: OrgCellule[],
+  services: OrgService[],
+): boolean {
+  if (filters.idCellule !== null) return acteur.id_cellule === Number(filters.idCellule)
+
+  const cellule = cellules.find((c) => c.id_cellule === acteur.id_cellule)
+  if (filters.idService !== null) return cellule?.id_service === Number(filters.idService)
+
+  if (filters.idDirection !== null) {
+    const service = cellule ? services.find((s) => s.id_service === cellule.id_service) : undefined
+    return service?.id_direction === Number(filters.idDirection)
+  }
+
+  return true
+}
+
+function matchesSearch(acteur: AdminActeur, search: string): boolean {
+  if (!search.trim()) return true
+  const needle = search.trim().toLowerCase()
+  return (
+    acteur.nom.toLowerCase().includes(needle) ||
+    acteur.prenom.toLowerCase().includes(needle) ||
+    acteur.matricule.toLowerCase().includes(needle)
+  )
+}
+
+/**
  * Administration des ACTEUR (fiche + compte Supabase Auth + rattachement
  * CELLULE), montée sur /parametres/utilisateurs. Réservée ADMIN_APP
  * (contrôle réel côté backend, requireRole('ADMIN_APP') sur POST/PUT/DELETE
@@ -36,7 +76,13 @@ function matchesStatusFilter(actif: boolean, filter: string | null): boolean {
 export function Utilisateurs() {
   const { acteurs, loading, refetch } = useAllActeurs()
   const { cellules } = useCellules()
+  const { services } = useServices()
+  const { directions } = useDirections()
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [filterIdDirection, setFilterIdDirection] = useState<string | null>(null)
+  const [filterIdService, setFilterIdService] = useState<string | null>(null)
+  const [filterIdCellule, setFilterIdCellule] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
   const [modal, setModal] = useState<{ mode: 'create' | 'edit'; acteur: AdminActeur | null } | null>(null)
   const [acteurToDelete, setActeurToDelete] = useState<AdminActeur | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
@@ -44,7 +90,20 @@ export function Utilisateurs() {
 
   const celluleLabel = (idCellule: number) => cellules.find((c) => c.id_cellule === idCellule)?.libelle_cellule ?? String(idCellule)
 
-  const filtered = acteurs.filter((a) => matchesStatusFilter(a.actif, statusFilter))
+  const directionOptions = directions.map((d) => ({ value: String(d.id_direction), label: d.libelle_direction }))
+  const serviceOptions =
+    filterIdDirection === null
+      ? []
+      : services.filter((s) => s.id_direction === Number(filterIdDirection)).map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
+  const celluleOptions =
+    filterIdService === null
+      ? []
+      : cellules.filter((c) => c.id_service === Number(filterIdService)).map((c) => ({ value: String(c.id_cellule), label: c.libelle_cellule }))
+
+  const filtered = acteurs
+    .filter((a) => matchesStatusFilter(a.actif, statusFilter))
+    .filter((a) => matchesOrgFilter(a, { idDirection: filterIdDirection, idService: filterIdService, idCellule: filterIdCellule }, cellules, services))
+    .filter((a) => matchesSearch(a, search))
 
   async function confirmDelete() {
     if (!acteurToDelete) return
@@ -78,16 +137,84 @@ export function Utilisateurs() {
         </div>
       </div>
 
-      <div className="gp-field" style={{ maxWidth: 200 }}>
-        <label className="gp-label">Statut</label>
-        <Combobox
-          options={STATUS_OPTIONS}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          placeholder="Tous"
-          clearLabel="Tous"
-          ariaLabel="Filtrer les utilisateurs par statut"
-        />
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="gp-field" style={{ flex: '1 1 260px' }}>
+          <label className="gp-label">Direction</label>
+          <Combobox
+            options={directionOptions}
+            value={filterIdDirection}
+            onChange={(value) => {
+              setFilterIdDirection(value)
+              setFilterIdService(null)
+              setFilterIdCellule(null)
+            }}
+            placeholder="Choisir une direction…"
+            clearLabel="Toutes"
+            ariaLabel="Direction"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
+
+        <div className="gp-field" style={{ flex: '1 1 260px' }}>
+          <label className="gp-label">Service</label>
+          <Combobox
+            options={serviceOptions}
+            value={filterIdService}
+            onChange={(value) => {
+              setFilterIdService(value)
+              setFilterIdCellule(null)
+            }}
+            placeholder="Choisir un service…"
+            clearLabel="Tous"
+            ariaLabel="Service"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
+
+        <div className="gp-field" style={{ flex: '0 0 234px' }}>
+          <label className="gp-label">Cellule</label>
+          <Combobox
+            options={celluleOptions}
+            value={filterIdCellule}
+            onChange={setFilterIdCellule}
+            placeholder="Choisir une cellule…"
+            clearLabel="Toutes"
+            ariaLabel="Cellule"
+            style={{ maxWidth: 'none' }}
+          />
+        </div>
+      </div>
+
+      <div className="row" style={{ flexWrap: 'wrap' }}>
+        <div className="gp-field" style={{ width: 200 }}>
+          <label className="gp-label">Statut</label>
+          <Combobox
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            placeholder="Tous"
+            clearLabel="Tous"
+            ariaLabel="Filtrer les utilisateurs par statut"
+          />
+        </div>
+
+        <div className="gp-field" style={{ width: 260 }}>
+          <label className="gp-label" htmlFor="utilisateurs-search">
+            Recherche
+          </label>
+          <div className="gp-inputgroup">
+            <svg className="ti">
+              <use href="#i-search" />
+            </svg>
+            <input
+              id="utilisateurs-search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Nom, prénom, matricule…"
+              aria-label="Rechercher un utilisateur"
+            />
+          </div>
+        </div>
       </div>
 
       {!loading && (
@@ -242,14 +369,22 @@ function UtilisateurFormModal({ mode, acteur, onClose, onSaved }: UtilisateurFor
   const [error, setError] = useState<string | null>(null)
   const [temporaryPassword, setTemporaryPassword] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  // Verrou synchrone contre la double soumission (double-clic, ou Entrée puis
+  // clic sur le bouton) — `submitting` (état React) ne suffit pas : son
+  // re-rendu n'est pas garanti avant qu'un second événement de soumission
+  // n'arrive, ce qui a déjà provoqué la création d'un compte Auth orphelin
+  // (voir acteur.service.ts#createActeur, incident du 10/09/2026).
+  const submittingRef = useRef(false)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
+    if (submittingRef.current) return
     setError(null)
     if (!idCellule) {
       setError('Choisissez une cellule.')
       return
     }
+    submittingRef.current = true
     setSubmitting(true)
     try {
       if (mode === 'create') {
@@ -271,6 +406,7 @@ function UtilisateurFormModal({ mode, acteur, onClose, onSaved }: UtilisateurFor
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
     } finally {
       setSubmitting(false)
+      submittingRef.current = false
     }
   }
 

@@ -43,7 +43,7 @@ vi.mock('../hooks/useDirections', () => ({
 let isAdminApp = false
 vi.mock('../hooks/useCurrentUser', () => ({
   useCurrentUser: () => ({
-    data: { matricule: '12520', nom: 'X', prenom: 'Y', idService: 1, idCellule: 7, roles: isAdminApp ? [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }] : [] },
+    data: { matricule: '12520', nom: 'X', prenom: 'Y', idService: 1, idCellule: 7, roles: isAdminApp ? [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }] : [] },
     loading: false,
   }),
 }))
@@ -63,6 +63,82 @@ describe('RolesUtilisateurs', () => {
     const row = screen.getByText(/DUPONT/).closest('tr')!
     expect(within(row).getByText('CDS (service)')).toBeInTheDocument()
     expect(within(row).getByText('Service Achats')).toBeInTheDocument()
+    // Direction résolue via SERVICE (idDirection null sur l'attribution elle-même, remontée par idService).
+    expect(within(row).getByText('Direction Générale')).toBeInTheDocument()
+  })
+
+  it('trie par Utilisateur au clic sur l\'en-tête (asc puis desc)', () => {
+    isAdminApp = false
+    ATTRIBUTIONS.push({
+      idRole: 4,
+      matricule: '77777',
+      nom: 'AAAAA',
+      prenom: 'Alice',
+      typeRole: 'RC',
+      perimeterLabel: 'Cellule Achats',
+      idCellule: 7,
+      idService: null,
+      idDirection: null,
+      dateDebut: '2026-02-01',
+    })
+
+    render(<RolesUtilisateurs />)
+    const firstDataRow = () => screen.getAllByRole('row')[1]
+
+    fireEvent.click(screen.getByRole('button', { name: 'Utilisateur' }))
+    expect(within(firstDataRow()).getByText(/AAAAA/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Utilisateur' }))
+    expect(within(firstDataRow()).getByText(/DUPONT/)).toBeInTheDocument()
+
+    ATTRIBUTIONS.pop()
+  })
+
+  it('résout la direction via CELLULE -> SERVICE pour une attribution RC', () => {
+    isAdminApp = false
+    ATTRIBUTIONS.push({
+      idRole: 2,
+      matricule: '55555',
+      nom: 'MOREL',
+      prenom: 'Paul',
+      typeRole: 'RC',
+      perimeterLabel: 'Cellule Achats',
+      idCellule: 7,
+      idService: null,
+      idDirection: null,
+      dateDebut: '2026-02-01',
+    })
+
+    render(<RolesUtilisateurs />)
+
+    const row = screen.getByText(/MOREL/).closest('tr')!
+    expect(within(row).getByText('Direction Générale')).toBeInTheDocument()
+
+    ATTRIBUTIONS.pop()
+  })
+
+  it('affiche "—" pour une attribution ADMIN_APP (transverse, aucune direction)', () => {
+    isAdminApp = false
+    ATTRIBUTIONS.push({
+      idRole: 3,
+      matricule: '11111',
+      nom: 'ADMIN',
+      prenom: 'App',
+      typeRole: 'ADMIN_APP',
+      perimeterLabel: null,
+      idCellule: null,
+      idService: null,
+      idDirection: null,
+      dateDebut: '2026-01-01',
+    })
+
+    render(<RolesUtilisateurs />)
+
+    const row = screen.getByText(/ADMIN/).closest('tr')!
+    const cells = within(row).getAllByRole('cell')
+    expect(cells[3]).toHaveTextContent('—')
+
+    ATTRIBUTIONS.pop()
   })
 
   it('ADMIN_SERVICE ne voit pas DS/ADMIN_APP dans le choix de rôle', () => {
@@ -70,7 +146,8 @@ describe('RolesUtilisateurs', () => {
     render(<RolesUtilisateurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouvelle attribution/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rôle' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rôle' }))
     const menu = document.querySelector('.gp-menu') as HTMLElement
 
     expect(within(menu).queryByText('DS (direction)')).not.toBeInTheDocument()
@@ -83,7 +160,8 @@ describe('RolesUtilisateurs', () => {
     render(<RolesUtilisateurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouvelle attribution/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rôle' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rôle' }))
     const menu = document.querySelector('.gp-menu') as HTMLElement
 
     expect(within(menu).getByText('DS (direction)')).toBeInTheDocument()
@@ -94,10 +172,11 @@ describe('RolesUtilisateurs', () => {
     render(<RolesUtilisateurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouvelle attribution/i }))
-    fireEvent.click(screen.getByRole('button', { name: 'Rôle' }))
+    const dialog = screen.getByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Rôle' }))
     fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('CDS (service)'))
 
-    expect(screen.getByRole('button', { name: 'Service' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Service' })).toBeInTheDocument()
   })
 
   it('clôture une attribution après confirmation', async () => {

@@ -216,7 +216,7 @@ describe('GisementTechnique', () => {
   })
 
   it('ADMIN_SERVICE : la modale de création pré-sélectionne son service et affiche sa direction', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<GisementTechnique />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau secteur/i }))
@@ -288,7 +288,7 @@ describe('GisementTechnique', () => {
   })
 
   it('ADMIN_SERVICE : direction et service se positionnent automatiquement sur son propre périmètre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<GisementTechnique />)
 
     // Pas besoin de choisir quoi que ce soit : la liste est déjà affichée.
@@ -304,7 +304,7 @@ describe('GisementTechnique', () => {
   })
 
   it('ADMIN_APP voit tous les services de la direction choisie dans la combobox de filtre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<GisementTechnique />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')

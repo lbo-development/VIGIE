@@ -10,8 +10,13 @@ import * as authRepository from '../repositories/auth.repository.js'
 import * as marcheRepository from '../repositories/marche.repository.js'
 import * as marcheTiersRepository from '../repositories/marcheTiers.repository.js'
 import * as fournisseurRepository from '../repositories/fournisseur.repository.js'
+import * as serviceRepository from '../repositories/service.repository.js'
+import * as seuilValidationDsRepository from '../repositories/seuilValidationDs.repository.js'
+import * as statutRepository from '../repositories/statut.repository.js'
+import * as suppleanceRepository from '../repositories/suppleance.repository.js'
 import { resolveMarcheIdService } from './marche.service.js'
 import * as libelleReferentielService from './libelleReferentiel.service.js'
+import * as roleEffectifService from './roleEffectif.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { DemandeAchat, DemandeAchatUpdate } from '../repositories/demandeAchat.repository.js'
 import type { PieceJointe } from '../repositories/pieceJointe.repository.js'
@@ -20,17 +25,115 @@ import type { PieceJointe } from '../repositories/pieceJointe.repository.js'
  * Statuts pour lesquels la page DemandeAchat reste pertinente (décision du
  * 07/09/2026) : le Demandeur/RC/ADMIN_SERVICE n'agit plus sur la DA une fois
  * transmise — voir ForClaude/CDC/mot-phases-1-2.md OP1.1.
+ *
+ * Correction du 15/09/2026 (chantier écran d'accueil/workflow FAD) :
+ * 'DA_A_COMPLETER_RC' est le code réel du référentiel finances.statut
+ * (25 codes, migration 20260914100000_rebuild_statut_depuis_code_statut_pdf.sql)
+ * — 'DA_A_COMPLETER' (sans suffixe) n'a jamais existé en base depuis cette
+ * refonte, bug resté dormant tant qu'OP1.2 (seule opération capable de
+ * produire cette transition) n'était pas implémentée.
  */
-const STATUTS_PAGE_DEMANDE_ACHAT = ['DA_EN_PREPARATION', 'DA_A_COMPLETER']
+const STATUTS_PAGE_DEMANDE_ACHAT = ['DA_EN_PREPARATION', 'DA_A_COMPLETER_RC']
 
 /** Seul ce statut autorise la suppression physique (décision du 07/09/2026). */
 const STATUT_SUPPRESSIBLE = 'DA_EN_PREPARATION'
 
 /**
  * Statuts encore éditables par le Demandeur/RC (Modifier une DA) — la
- * reprise DA_A_COMPLETER est un retour en place, pas un statut figé.
+ * reprise DA_A_COMPLETER_RC est un retour en place, pas un statut figé.
  */
-const STATUTS_MODIFIABLES = ['DA_EN_PREPARATION', 'DA_A_COMPLETER']
+const STATUTS_MODIFIABLES = ['DA_EN_PREPARATION', 'DA_A_COMPLETER_RC']
+
+export type AccueilScope =
+  | 'A_FINALISER'
+  | 'SUIVI_FAD'
+  | 'A_TRAITER'
+  | 'EN_COURS'
+  | 'FAD_COMMANDEES'
+  | 'REJETEES_ANNULEES'
+
+/** Tous les statuts terminaux "rejeté"/"annulé" (DA et FAD mélangés) — onglet "Rejetées / Annulées" de l'écran d'accueil (décision du 15/09/2026). */
+const STATUTS_REJETEES_ANNULEES = [
+  'DA_REJETEE_RC',
+  'DA_ANNULEE_RC',
+  'FAD_REJETEE_CDS',
+  'FAD_ANNULEE_CDS',
+  'FAD_REJETEE_CB',
+  'FAD_REJETEE_DS',
+  'FAD_ANNULEE_DS',
+]
+
+const STATUTS_FAD_COMMANDEES = ['FAD_COMMANDEE']
+
+/**
+ * Onglet "À traiter" de l'écran de suivi RC (décision du 15/09/2026) — les
+ * statuts où le RC est « pour action » : statuer sur l'opportunité d'une DA
+ * fraîchement transmise, ou compléter/transmettre une FAD (première
+ * complétion ou reprise après demande de modification de la CB).
+ */
+const STATUTS_A_TRAITER_RC = ['DA_TRANSMISE_DEM_RC', 'DA_VALIDEE_RC', 'FAD_A_COMPLETER_CDS', 'FAD_A_MODIFIER_CB']
+
+/**
+ * Onglet "En cours" de l'écran de suivi RC — tout le reste du cycle non
+ * terminal, hors "À traiter". `DA_EN_PREPARATION` en est volontairement
+ * exclu (bug corrigé le 15/09/2026, signalé par l'utilisateur) : ce
+ * brouillon reste entre les mains du demandeur, jamais transmis — le RC n'a
+ * encore rien à en faire, contrairement à `DA_A_COMPLETER_RC` (le RC a déjà
+ * statué « Compléter », la DA lui revient donc légitimement en « en cours »
+ * de son point de vue). Cette DA n'apparaît alors dans aucun onglet RC —
+ * comportement voulu, pas un trou de couverture (voir le test de couverture,
+ * qui exclut spécifiquement ce code pour le regroupement RC).
+ */
+const STATUTS_EN_COURS_RC = [
+  'DA_A_COMPLETER_RC',
+  'FAD_TRANSMISE_RC_CDS',
+  'FAD_MODIFIEE_TRANSMISE_RC_CB',
+  'FAD_VALIDEE_CDS',
+  'FAD_TRANSMISE_CDS_CB',
+  'FAD_VALIDEE_CB',
+  'FAD_TRANSMISE_CB_DS',
+  'FAD_VALIDEE_DS',
+  'FAD_VALIDEE_DS_SEUIL',
+  'FAD_A_COMPLETER_CB',
+  'FAD_TRANSMISE_DS_CB',
+  'FAD_A_COMMANDER',
+]
+
+/**
+ * Onglet "Suivre & gérer les FAD" — tous les statuts non terminaux entre
+ * DA_VALIDEE_RC et FAD_COMMANDEE exclus (le demandeur n'est jamais "pour
+ * action" à ce stade, cf. matrice EN_TRANSIT/POUR_ACTION de finances.statut).
+ * Complémentaire exacte de STATUTS_PAGE_DEMANDE_ACHAT ∪ STATUTS_FAD_COMMANDEES
+ * ∪ STATUTS_REJETEES_ANNULEES sur les 25 codes du référentiel — voir le test
+ * de couverture demandeAchat.service.test.ts (garde-fou anti-dérive).
+ */
+const STATUTS_SUIVI_FAD = [
+  'DA_TRANSMISE_DEM_RC',
+  'DA_VALIDEE_RC',
+  'FAD_TRANSMISE_RC_CDS',
+  'FAD_MODIFIEE_TRANSMISE_RC_CB',
+  'FAD_VALIDEE_CDS',
+  'FAD_A_COMPLETER_CDS',
+  'FAD_TRANSMISE_CDS_CB',
+  'FAD_VALIDEE_CB',
+  'FAD_A_MODIFIER_CB',
+  'FAD_TRANSMISE_CB_DS',
+  'FAD_VALIDEE_DS',
+  'FAD_VALIDEE_DS_SEUIL',
+  'FAD_A_COMPLETER_CB',
+  'FAD_TRANSMISE_DS_CB',
+  'FAD_A_COMMANDER',
+]
+
+/** Exporté pour le test de couverture (garde-fou anti-dérive) — voir demandeAchat.service.test.ts. */
+export const ACCUEIL_SCOPE_STATUTS: Record<AccueilScope, string[]> = {
+  A_FINALISER: STATUTS_PAGE_DEMANDE_ACHAT,
+  SUIVI_FAD: STATUTS_SUIVI_FAD,
+  A_TRAITER: STATUTS_A_TRAITER_RC,
+  EN_COURS: STATUTS_EN_COURS_RC,
+  FAD_COMMANDEES: STATUTS_FAD_COMMANDEES,
+  REJETEES_ANNULEES: STATUTS_REJETEES_ANNULEES,
+}
 
 type Role = 'ADMIN_APP' | 'ADMIN_SERVICE' | 'RC' | 'DEMANDEUR'
 
@@ -49,23 +152,31 @@ interface AccessContext {
  * Voir la matrice validée le 07/09/2026 (conversation DA.pdf) : Direction/
  * Service/Cellule figés pour RC, Direction/Service figés + Cellule
  * sélectionnable pour ADMIN_SERVICE, tout sélectionnable pour ADMIN_APP.
+ *
+ * Correction du 15/09/2026 (écran de suivi RC) : source des rôles basculée
+ * sur roleEffectifService.findEffectiveRoles (titulaire + suppléance RC/CDS/
+ * DS) — roleAttributionRepository.findActiveByMatricule seul ne voyait
+ * jamais un suppléant pur (aucune ligne role_attribution à son nom), qui
+ * retombait donc à tort en DEMANDEUR et ne voyait jamais la cellule qu'il
+ * supplée. Même correctif que les actions (decisionRc/transmettreFad/
+ * retransmettreCb), qui utilisaient déjà findEffectiveRoles.
  */
 async function resolveAccessContext(matricule: string): Promise<AccessContext> {
   if (await authRepository.hasActiveRole(matricule, 'ADMIN_APP')) {
     return { role: 'ADMIN_APP', ownIdService: null, ownIdCellule: null }
   }
 
-  const roles = await roleAttributionRepository.findActiveByMatricule(matricule)
+  const roles = await roleEffectifService.findEffectiveRoles(matricule)
 
-  const adminService = roles.find((r) => r.type_role === 'ADMIN_SERVICE' && r.id_service !== null)
+  const adminService = roles.find((r) => r.typeRole === 'ADMIN_SERVICE' && r.idService !== null)
   if (adminService) {
-    return { role: 'ADMIN_SERVICE', ownIdService: adminService.id_service, ownIdCellule: null }
+    return { role: 'ADMIN_SERVICE', ownIdService: adminService.idService, ownIdCellule: null }
   }
 
-  const rc = roles.find((r) => r.type_role === 'RC' && r.id_cellule !== null)
+  const rc = roles.find((r) => r.typeRole === 'RC' && r.idCellule !== null)
   if (rc) {
-    const cellule = await celluleRepository.findById(rc.id_cellule as number)
-    return { role: 'RC', ownIdService: cellule?.id_service ?? null, ownIdCellule: rc.id_cellule }
+    const cellule = await celluleRepository.findById(rc.idCellule as number)
+    return { role: 'RC', ownIdService: cellule?.id_service ?? null, ownIdCellule: rc.idCellule }
   }
 
   const ownIdService = await acteurRepository.findIdServiceByMatricule(matricule)
@@ -131,30 +242,101 @@ export async function getDemandeAchat(matricule: string | null, idDemandeAchat: 
   return demandeAchat
 }
 
+/** Vue frontend d'une ligne d'historique (modale « Historique des statuts », écran d'accueil). */
+export interface HistoriqueStatutView {
+  idHisto: number
+  codeStatut: string
+  libelleStatut: string
+  dateHeure: string
+  matriculeActeur: string
+  acteurNomPrenom: string | null
+  /** ex. "en suppléance de Jean Dupont" — `null` si l'acteur a agi en tant que titulaire. */
+  suppleanceLabel: string | null
+  commentaireStatut: string | null
+}
+
+/**
+ * Historique des transitions de statut d'une DA/FAD (icône calendrier, écran
+ * d'accueil) — même règle d'accès que getDemandeAchat. Simple liste
+ * chronologique, aucune action possible dessus (historique_statut est
+ * immuable en base, voir historiqueStatut.repository.ts).
+ */
+export async function getHistoriqueStatuts(matricule: string | null, idDemandeAchat: number): Promise<HistoriqueStatutView[]> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  await assertCanActFor(matricule, existing.matricule_demandeur)
+
+  const rows = await historiqueStatutRepository.findAllByDemandeAchat(idDemandeAchat)
+  if (rows.length === 0) return []
+
+  const acteurs = await acteurRepository.findByMatricules([...new Set(rows.map((r) => r.matricule_acteur))])
+  const acteurByMatricule = new Map(acteurs.map((a) => [a.matricule, a]))
+
+  const statuts = await statutRepository.findAll()
+  const statutByCode = new Map(statuts.map((s) => [s.code_statut, s]))
+
+  const idsSuppleance = [...new Set(rows.map((r) => r.id_suppleance).filter((id): id is number => id !== null))]
+  const suppleanceLabels = new Map<number, string>()
+  for (const idSuppleance of idsSuppleance) {
+    const suppleance = await suppleanceRepository.findById(idSuppleance)
+    if (!suppleance) continue
+    const role = await roleAttributionRepository.findById(suppleance.id_role)
+    if (!role) continue
+    const titulaire = await acteurRepository.findByMatricule(role.matricule)
+    if (titulaire) suppleanceLabels.set(idSuppleance, `en suppléance de ${titulaire.prenom} ${titulaire.nom}`)
+  }
+
+  return rows.map((row) => {
+    const acteur = acteurByMatricule.get(row.matricule_acteur)
+    return {
+      idHisto: row.id_histo,
+      codeStatut: row.code_statut,
+      libelleStatut: statutByCode.get(row.code_statut)?.libelle ?? row.code_statut,
+      dateHeure: row.date_heure,
+      matriculeActeur: row.matricule_acteur,
+      acteurNomPrenom: acteur ? `${acteur.prenom} ${acteur.nom}` : null,
+      suppleanceLabel: row.id_suppleance !== null ? (suppleanceLabels.get(row.id_suppleance) ?? null) : null,
+      commentaireStatut: row.commentaire_statut,
+    }
+  })
+}
+
 export interface ListQuery {
   idCellule?: number
   matriculeDemandeur?: string
   statut?: string
+  /** Onglet de l'écran d'accueil (décision du 15/09/2026) — prioritaire sur `statut` si fourni, voir ACCUEIL_SCOPE_STATUTS. */
+  scope?: AccueilScope
   search?: string
+  /** Filtre "Fournisseurs" des onglets de l'écran d'accueil — correspondance exacte sur ID_FOURNISSEUR_RETENU. */
+  idFournisseurRetenu?: number
 }
 
 /**
- * Liste filtrée de la page DemandeAchat — portée par rôle (voir
- * resolveAccessContext) : Demandeur = uniquement lui-même ; RC = sa cellule
- * par défaut, ou le demandeur choisi (n'importe lequel du service) si
- * précisé ; ADMIN_SERVICE = tout son service par défaut, ou une cellule/un
- * demandeur choisi ; ADMIN_APP = sans restriction (filtres appliqués tels
- * quels s'ils sont fournis).
+ * Liste filtrée de la page DemandeAchat / des onglets de l'écran d'accueil —
+ * portée par rôle (voir resolveAccessContext) : Demandeur = uniquement
+ * lui-même ; RC = sa cellule par défaut, ou le demandeur choisi (n'importe
+ * lequel du service) si précisé ; ADMIN_SERVICE = tout son service par
+ * défaut, ou une cellule/un demandeur choisi ; ADMIN_APP = sans restriction
+ * (filtres appliqués tels quels s'ils sont fournis).
  */
 export async function listDemandeAchat(matricule: string | null, query: ListQuery): Promise<DemandeAchat[]> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const context = await resolveAccessContext(matricule)
-  const statuts = query.statut ? [query.statut] : STATUTS_PAGE_DEMANDE_ACHAT
+  // Bug corrigé le 15/09/2026 : `statut` (choix précis de l'utilisateur dans le filtre Statut d'un
+  // onglet) doit l'emporter sur `scope` (la liste complète des statuts de l'onglet) — sinon le
+  // filtre Statut de l'écran d'accueil n'avait aucun effet, `scope` étant toujours fourni par
+  // Home.tsx. Le frontend ne propose de toute façon que des codes appartenant au scope actif
+  // (voir ACCUEIL_SCOPE_STATUTS côté frontend), donc `statut` reste cohérent avec `scope` ici.
+  const statuts = query.statut ? [query.statut] : query.scope ? ACCUEIL_SCOPE_STATUTS[query.scope] : STATUTS_PAGE_DEMANDE_ACHAT
   // Résolu une seule fois (décision du 09/09/2026) : la recherche texte porte aussi sur le
   // fournisseur retenu (ID_FOURNISSEUR_RETENU), pas seulement NUMERO/OBJET — voir
   // fournisseur.repository.ts#findIdsByRaisonSociale et demandeAchat.repository.ts#findAll.
   const idFournisseurIn = query.search ? await fournisseurRepository.findIdsByRaisonSociale(query.search) : undefined
+  const idFournisseurRetenu = query.idFournisseurRetenu
 
   if (context.role === 'DEMANDEUR') {
     return demandeAchatRepository.findAll({
@@ -162,13 +344,20 @@ export async function listDemandeAchat(matricule: string | null, query: ListQuer
       statuts,
       search: query.search,
       idFournisseurIn,
+      idFournisseurRetenu,
     })
   }
 
   if (query.matriculeDemandeur) {
     // Vérifie que le demandeur ciblé appartient bien au service géré par l'appelant (RC/ADMIN_SERVICE) — ADMIN_APP non concerné (transverse).
     if (context.role !== 'ADMIN_APP') await assertCanActFor(matricule, query.matriculeDemandeur)
-    return demandeAchatRepository.findAll({ matriculeDemandeurIn: [query.matriculeDemandeur], statuts, search: query.search, idFournisseurIn })
+    return demandeAchatRepository.findAll({
+      matriculeDemandeurIn: [query.matriculeDemandeur],
+      statuts,
+      search: query.search,
+      idFournisseurIn,
+      idFournisseurRetenu,
+    })
   }
 
   if (query.idCellule !== undefined) {
@@ -183,6 +372,7 @@ export async function listDemandeAchat(matricule: string | null, query: ListQuer
       statuts,
       search: query.search,
       idFournisseurIn,
+      idFournisseurRetenu,
     })
   }
 
@@ -194,15 +384,108 @@ export async function listDemandeAchat(matricule: string | null, query: ListQuer
       statuts,
       search: query.search,
       idFournisseurIn,
+      idFournisseurRetenu,
     })
   }
 
   if (context.role === 'ADMIN_SERVICE') {
-    return demandeAchatRepository.findAll({ idService: context.ownIdService ?? undefined, statuts, search: query.search, idFournisseurIn })
+    return demandeAchatRepository.findAll({
+      idService: context.ownIdService ?? undefined,
+      statuts,
+      search: query.search,
+      idFournisseurIn,
+      idFournisseurRetenu,
+    })
   }
 
   // ADMIN_APP sans filtre : transverse, aucune restriction.
-  return demandeAchatRepository.findAll({ statuts, search: query.search, idFournisseurIn })
+  return demandeAchatRepository.findAll({ statuts, search: query.search, idFournisseurIn, idFournisseurRetenu })
+}
+
+export interface SyntheseBucket {
+  nombre: number
+  montant: number
+}
+
+export interface AccueilSynthese {
+  enTransit: Record<'RC' | 'CDS' | 'DS' | 'CB', SyntheseBucket>
+  mesDemandes: { enCours: SyntheseBucket; commande: SyntheseBucket }
+}
+
+function nouvelleSyntheseBucket(): SyntheseBucket {
+  return { nombre: 0, montant: 0 }
+}
+
+/**
+ * Tuiles de synthèse de l'écran d'accueil (décision du 15/09/2026) et de
+ * l'écran de suivi RC (décision du 15/09/2026, second chantier) — deux vues
+ * du même calcul, distinguées par le rôle effectif de l'appelant :
+ *
+ * - **Demandeur** (par défaut, y compris tout rôle sans branche dédiée
+ *   ci-dessous) : DA/FAD du connecté lui-même (jamais un tiers). "En
+ *   transit" : 4 compartiments RC/CDS/DS/CB (colonne EN_TRANSIT de
+ *   finances.statut). "Mes demandes" : En cours / Commande (FAD_COMMANDEE
+ *   uniquement).
+ * - **RC** (titulaire ou suppléant) : DA/FAD de sa cellule. "En transit" ne
+ *   porte alors que 3 compartiments (CDS/DS/CB) — le compartiment RC reste à
+ *   zéro : une DA encore chez le RC lui-même n'est pas "en transit" de son
+ *   point de vue, déjà visible dans ses propres onglets "À traiter"/"En
+ *   cours" (le champ existe toujours dans la réponse pour garder un type de
+ *   retour unique, simplement jamais alimenté ni affiché côté RC). "Mes
+ *   demandes" devient "Demandes de la cellule" côté frontend (même champ
+ *   `mesDemandes`, seul le libellé change).
+ *
+ * **DA_EN_PREPARATION exclue de "En cours" dans les deux vues** (bug corrigé
+ * le 15/09/2026, signalé par l'utilisateur pour la vue RC puis étendu à la
+ * vue Demandeur par cohérence) : un brouillon jamais transmis reste la
+ * propriété du demandeur, pas encore engagé dans le circuit d'approbation —
+ * il ne doit compter ni dans "Mes demandes : En cours" (Demandeur) ni dans
+ * "Demandes de la cellule : En cours" (RC), même si le champ EN_TRANSIT de
+ * finances.statut ne le concerne de toute façon jamais (DEM, pas RC/CDS/DS/CB).
+ */
+export async function getSynthese(matricule: string | null): Promise<AccueilSynthese> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const context = await resolveAccessContext(matricule)
+  const isRc = context.role === 'RC'
+
+  const [acteurs, statuts] = await Promise.all([
+    isRc
+      ? context.ownIdCellule !== null
+        ? acteurRepository.findAllByCellule(context.ownIdCellule)
+        : Promise.resolve([])
+      : Promise.resolve(null),
+    statutRepository.findAll(),
+  ])
+  const rows = await demandeAchatRepository.findAll({
+    matriculeDemandeurIn: isRc ? acteurs!.map((a) => a.matricule) : [matricule],
+  })
+  const enTransitByCode = new Map(statuts.map((s) => [s.code_statut, s.en_transit]))
+
+  const enTransit: AccueilSynthese['enTransit'] = { RC: nouvelleSyntheseBucket(), CDS: nouvelleSyntheseBucket(), DS: nouvelleSyntheseBucket(), CB: nouvelleSyntheseBucket() }
+  const mesDemandes: AccueilSynthese['mesDemandes'] = { enCours: nouvelleSyntheseBucket(), commande: nouvelleSyntheseBucket() }
+
+  for (const row of rows) {
+    if (row.code_statut === 'DA_EN_PREPARATION') continue
+
+    const role = enTransitByCode.get(row.code_statut)
+    const roleCompteRc = role === 'CDS' || role === 'DS' || role === 'CB'
+    const roleCompteDemandeur = role === 'RC' || role === 'CDS' || role === 'DS' || role === 'CB'
+    if ((isRc && roleCompteRc) || (!isRc && roleCompteDemandeur)) {
+      enTransit[role as 'RC' | 'CDS' | 'DS' | 'CB'].nombre += 1
+      enTransit[role as 'RC' | 'CDS' | 'DS' | 'CB'].montant += row.montant_demande
+    }
+
+    if (row.code_statut === 'FAD_COMMANDEE') {
+      mesDemandes.commande.nombre += 1
+      mesDemandes.commande.montant += row.montant_demande
+    } else if (!STATUTS_REJETEES_ANNULEES.includes(row.code_statut)) {
+      mesDemandes.enCours.nombre += 1
+      mesDemandes.enCours.montant += row.montant_demande
+    }
+  }
+
+  return { enTransit, mesDemandes }
 }
 
 const updateSchema = z.object({
@@ -222,7 +505,7 @@ const updateSchema = z.object({
 /**
  * Édition d'un brouillon (CreationDA et sous-écrans) — accès identique à la
  * création, en plus gardé par le statut : seuls DA_EN_PREPARATION et
- * DA_A_COMPLETER restent modifiables (décision du 07/09/2026). Ne
+ * DA_A_COMPLETER_RC restent modifiables (décision du 07/09/2026). Ne
  * différencie pas encore les champs propres au RC (OP1.2b, pas encore
  * implémenté) des champs du Demandeur — à affiner quand cet écran existera.
  */
@@ -258,8 +541,14 @@ export async function updateDemandeAchat(matricule: string | null, idDemandeAcha
   }
 
   const patch: DemandeAchatUpdate = {
-    objet: data.objet,
-    description: data.description,
+    // Décision du 15/09/2026 (double objet/description) : tant que la DA reste éditable par le
+    // demandeur (ce guard STATUTS_MODIFIABLES ci-dessus), OBJET_RC/DESCRIPTION_RC restent
+    // synchronisés sur OBJET_DEMANDEUR/DESCRIPTION_DEMANDEUR — la divergence ne commence qu'à
+    // OP1.2b (transmettreFad), qui écrit *_rc seul.
+    objet_demandeur: data.objet,
+    objet_rc: data.objet,
+    description_demandeur: data.description,
+    description_rc: data.description,
     procedure_achat: data.procedureAchat,
     imputation_comptable: data.imputationComptable,
     type_achat: data.typeAchat,
@@ -288,6 +577,608 @@ export async function updateDemandeAchat(matricule: string | null, idDemandeAcha
   }
   // Ne transmet que les clés réellement fournies (un champ omis du body ne doit pas écraser sa valeur existante avec `undefined` — supabase-js ignore déjà les clés `undefined`, gardé explicite pour la lisibilité).
   return demandeAchatRepository.update(idDemandeAchat, patch)
+}
+
+/**
+ * OP1.1 (résultat final) — transmission de la DA au RC (croquis DA.pdf, bouton
+ * « Transmettre au RC »). Règles d'émission (ForClaude/CDC/mct-phases-1-2.md
+ * OP1.1) : demande complète — objet/description/montant renseignés, un
+ * fournisseur retenu désigné (marché sélectionné ou candidat retenu en Hors
+ * marché), un numéro de marché identifié en procédure MARCHE, et en
+ * HORS_MARCHE au moins une entreprise consultée dont **toutes** ont un devis
+ * déposé (fichier PDF, décision du 15/09/2026 — le devis reste facultatif en
+ * procédure MARCHE, cf. décision du 07/09/2026, inchangée). Même règle
+ * d'accès que la création (assertCanActFor) — un Demandeur transmet pour
+ * lui-même, RC/ADMIN_SERVICE/ADMIN_APP peuvent transmettre pour un tiers
+ * (même principe qu'OP1.1 création). Le Demandeur n'a pas de rôle dédié
+ * (ROLE_ATTRIBUTION) : jamais de suppléance à tracer ici (ID_SUPPLEANCE=null).
+ */
+export async function transmettreRc(matricule: string | null, idDemandeAchat: number): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+
+  await assertCanActFor(matricule, existing.matricule_demandeur)
+  if (!['DA_EN_PREPARATION', 'DA_A_COMPLETER_RC'].includes(existing.code_statut)) {
+    throw new AppError('Cette demande ne peut pas être transmise au RC à ce stade.', 409)
+  }
+
+  if (existing.objet_demandeur.trim().length < 15) throw new AppError('L\'objet est obligatoire (15 caractères minimum).', 409)
+  if (!existing.description_demandeur?.trim()) throw new AppError('La description est obligatoire.', 409)
+  if (!(existing.montant_demande > 0)) throw new AppError('Le montant de la demande doit être renseigné.', 409)
+  if (existing.id_fournisseur_retenu === null) {
+    throw new AppError('Sélectionnez un marché ou consultez des fournisseurs avant de transmettre.', 409)
+  }
+  if (existing.procedure_achat === 'MARCHE' && existing.nummarche === null && existing.id_marche_tiers === null) {
+    throw new AppError('Le numéro de marché est obligatoire en procédure Marché.', 409)
+  }
+  if (existing.procedure_achat === 'HORS_MARCHE') {
+    const candidats = await devisConsulteRepository.findAllByDemandeAchat(idDemandeAchat)
+    if (candidats.length === 0) throw new AppError('Au moins une entreprise consultée est requise.', 409)
+    if (candidats.some((c) => c.nom_fichier_original === null)) {
+      throw new AppError('Chaque entreprise consultée doit avoir un devis déposé.', 409)
+    }
+  }
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'DA_TRANSMISE_DEM_RC',
+    matricule_acteur: matricule,
+    id_suppleance: null,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const decisionSchema = z
+  .object({
+    decision: z.enum(['VALIDER', 'REJETER', 'ANNULER', 'COMPLEMENT']),
+    commentaireStatut: z.string().trim().min(1).max(500).optional(),
+  })
+  .refine((d) => d.decision === 'VALIDER' || !!d.commentaireStatut, {
+    message: 'Un commentaire est requis pour justifier ce choix.',
+  })
+
+const DECISION_RC_CODES: Record<string, string> = {
+  VALIDER: 'DA_VALIDEE_RC',
+  REJETER: 'DA_REJETEE_RC',
+  ANNULER: 'DA_ANNULEE_RC',
+  COMPLEMENT: 'DA_A_COMPLETER_RC',
+}
+
+/**
+ * OP1.2 — Statuer sur l'opportunité d'achat (RC, ou son suppléant) — file RC
+ * de la cellule du demandeur. Un commentaire est obligatoire pour toute
+ * décision autre que VALIDER (motif de rejet/annulation/complément,
+ * consultable ensuite via l'historique des statuts).
+ */
+export async function decisionRc(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = decisionSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'DA_TRANSMISE_DEM_RC') {
+    throw new AppError('Cette demande n\'est plus au statut attendu.', 409)
+  }
+
+  const demandeur = await acteurRepository.findByMatricule(existing.matricule_demandeur)
+  if (!demandeur) throw new AppError('Demandeur introuvable.', 404)
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'RC', demandeur.id_cellule)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: DECISION_RC_CODES[result.data.decision],
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: result.data.commentaireStatut ?? null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const transmettreFadSchema = z
+  .object({
+    objet: z.string().trim().min(15).max(75).optional(),
+    description: z.string().trim().min(1).max(256).optional(),
+    codeSite: z.string().trim().min(1),
+    codeSousSite: z.string().trim().min(1).nullable().optional(),
+    codeSecteur: z.string().trim().min(1),
+    codeSousSecteur: z.string().trim().min(1).nullable().optional(),
+    codeCug: z.string().trim().min(1),
+    typeAchat: z.enum(['TRAVAUX', 'FOURNITURES', 'SERVICES']),
+    imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']),
+    numeroOperation: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
+    message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
+  })
+
+/**
+ * OP1.2b — Finaliser et transmettre la FAD au CDS (RC, ou son suppléant) —
+ * bascule DA → FAD (ForClaude/CDC/mct-phases-1-2.md). Écrit la localisation
+ * et l'imputation (jamais saisies par le Demandeur à OP1.1, décision du
+ * 07/09/2026), transmet ensuite systématiquement au CDS — pas de nouvelle
+ * décision à cette étape (enchaînement RC : mise en forme puis envoi, même
+ * acteur). Réutilisée aussi bien pour la transmission initiale
+ * (DA_VALIDEE_RC) que pour la retransmission après complément demandé par le
+ * CDS (FAD_A_COMPLETER_CDS) — même code de résultat dans les deux cas.
+ */
+export async function transmettreFad(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = transmettreFadSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (!['DA_VALIDEE_RC', 'FAD_A_COMPLETER_CDS'].includes(existing.code_statut)) {
+    throw new AppError('Cette FAD ne peut pas être transmise au CDS à ce stade.', 409)
+  }
+
+  const demandeur = await acteurRepository.findByMatricule(existing.matricule_demandeur)
+  if (!demandeur) throw new AppError('Demandeur introuvable.', 404)
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'RC', demandeur.id_cellule)
+
+  const data = result.data
+  await demandeAchatRepository.update(idDemandeAchat, {
+    // OBJET_RC/DESCRIPTION_RC seuls — OBJET_DEMANDEUR/DESCRIPTION_DEMANDEUR ne sont plus jamais
+    // réécrits à partir d'ici (décision du 15/09/2026), la reformulation du RC diverge du texte
+    // d'origine du demandeur.
+    objet_rc: data.objet,
+    description_rc: data.description,
+    code_site: data.codeSite,
+    code_sous_site: data.codeSousSite ?? null,
+    code_secteur: data.codeSecteur,
+    code_sous_secteur: data.codeSousSecteur ?? null,
+    code_cug: data.codeCug,
+    type_achat: data.typeAchat,
+    imputation_comptable: data.imputationComptable,
+    numero_operation: data.imputationComptable === 'INVESTISSEMENT' ? data.numeroOperation : null,
+  })
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_TRANSMISE_RC_CDS',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const DECISION_CDS_CODES: Record<string, string> = {
+  VALIDER: 'FAD_VALIDEE_CDS',
+  REJETER: 'FAD_REJETEE_CDS',
+  ANNULER: 'FAD_ANNULEE_CDS',
+  COMPLEMENT: 'FAD_A_COMPLETER_CDS',
+}
+
+/**
+ * OP1.3 — Statuer sur la FAD (CDS, ou son suppléant) — file CDS du service de
+ * la FAD. Même schéma de décision qu'OP1.2 (decisionRc) — commentaire
+ * obligatoire hors VALIDER. Périmètre CDS = ID_SERVICE de la FAD directement
+ * (contrairement à RC, scopé sur la cellule du demandeur).
+ */
+export async function decisionCds(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = decisionSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_TRANSMISE_RC_CDS') {
+    throw new AppError('Cette FAD n\'est plus au statut attendu.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CDS', existing.id_service)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: DECISION_CDS_CODES[result.data.decision],
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: result.data.commentaireStatut ?? null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+/**
+ * OP1.3b — Transmettre la FAD à la CB (CDS, ou son suppléant) — enchaînée
+ * sans coupure après OP1.3 dans le geste métier, mais un appel HTTP distinct
+ * (décision du 14/09/2026 : la validation n'entraîne plus la transmission
+ * garantie-atomique, le CDS peut décliner et retrouver la FAD dans sa propre
+ * file). Transmission systématique une fois déclenchée — pas de nouvelle
+ * décision, aucun champ à écrire.
+ */
+export async function transmettreCb(matricule: string | null, idDemandeAchat: number): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_VALIDEE_CDS') {
+    throw new AppError('Cette FAD ne peut pas être transmise à la CB à ce stade.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CDS', existing.id_service)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_TRANSMISE_CDS_CB',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const decisionCbSchema = z
+  .object({
+    decision: z.enum(['VALIDER', 'REJETER', 'MODIFIER']),
+    commentaireStatut: z.string().trim().min(1).max(500).optional(),
+    // Décision validée le 15/09/2026 : la CB peut aussi corriger les champs budgétaires/
+    // comptables en plus de sa décision (contrairement à OP1.3/OP1.5, purement décisionnelles).
+    codeCug: z.string().trim().min(1).optional(),
+    typeAchat: z.enum(['TRAVAUX', 'FOURNITURES', 'SERVICES']).optional(),
+    imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']).optional(),
+    numeroOperation: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine((d) => d.decision === 'VALIDER' || !!d.commentaireStatut, {
+    message: 'Un commentaire est requis pour justifier ce choix.',
+  })
+  .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
+    message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
+  })
+
+const DECISION_CB_CODES: Record<string, string> = {
+  VALIDER: 'FAD_VALIDEE_CB',
+  REJETER: 'FAD_REJETEE_CB',
+  MODIFIER: 'FAD_A_MODIFIER_CB',
+}
+
+/**
+ * OP1.4 — Contrôle financier et budgétaire (CB, collectif service — jamais de
+ * suppléance, exclue en base). File CB du service de la FAD. Contrairement à
+ * OP1.2/OP1.3/OP1.5 (purement décisionnelles), la CB peut aussi corriger les
+ * champs budgétaires/comptables (CUG, type d'achat, imputation, numéro
+ * d'opération) au même geste que sa décision — décision validée le
+ * 15/09/2026. Pas d'issue « annulé » (la CB ne juge jamais l'opportunité de
+ * l'achat, seulement crédits/marché/plafond, ForClaude/CDC/code_statut.pdf).
+ * Accepte les deux statuts d'entrée nominal (FAD_TRANSMISE_CDS_CB) et reprise
+ * directe du RC (FAD_MODIFIEE_TRANSMISE_RC_CB, sans repasser par le CDS).
+ */
+export async function decisionCb(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = decisionCbSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (!['FAD_TRANSMISE_CDS_CB', 'FAD_MODIFIEE_TRANSMISE_RC_CB'].includes(existing.code_statut)) {
+    throw new AppError('Cette FAD n\'est plus au statut attendu.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
+
+  const data = result.data
+  if (data.codeCug !== undefined || data.typeAchat !== undefined || data.imputationComptable !== undefined) {
+    await demandeAchatRepository.update(idDemandeAchat, {
+      code_cug: data.codeCug,
+      type_achat: data.typeAchat,
+      imputation_comptable: data.imputationComptable,
+      numero_operation: data.imputationComptable === undefined ? undefined : data.imputationComptable === 'INVESTISSEMENT' ? data.numeroOperation : null,
+    })
+  }
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: DECISION_CB_CODES[data.decision],
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: data.commentaireStatut ?? null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const retransmettreCbSchema = z
+  .object({
+    objet: z.string().trim().min(15).max(75).optional(),
+    description: z.string().trim().min(1).max(256).optional(),
+    codeSite: z.string().trim().min(1).optional(),
+    codeSousSite: z.string().trim().min(1).nullable().optional(),
+    codeSecteur: z.string().trim().min(1).optional(),
+    codeSousSecteur: z.string().trim().min(1).nullable().optional(),
+    codeCug: z.string().trim().min(1).optional(),
+    typeAchat: z.enum(['TRAVAUX', 'FOURNITURES', 'SERVICES']).optional(),
+    imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']).optional(),
+    numeroOperation: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
+    message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
+  })
+
+/**
+ * Reprise OP1.4 — FAD à modifier (RC, ou son suppléant) : le RC apporte les
+ * modifications demandées par la CB et retransmet **directement à la CB**
+ * (FAD_MODIFIEE_TRANSMISE_RC_CB), sans repasser par le CDS
+ * (ForClaude/CDC/mct-phases-1-2.md). Tous les champs sont optionnels
+ * (contrairement à transmettreFad/OP1.2b) : le RC ne corrige que ce que la
+ * CB a demandé, le reste reste inchangé.
+ */
+export async function retransmettreCb(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = retransmettreCbSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_A_MODIFIER_CB') {
+    throw new AppError('Cette FAD ne peut pas être retransmise à la CB à ce stade.', 409)
+  }
+
+  const demandeur = await acteurRepository.findByMatricule(existing.matricule_demandeur)
+  if (!demandeur) throw new AppError('Demandeur introuvable.', 404)
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'RC', demandeur.id_cellule)
+
+  const data = result.data
+  if (Object.values(data).some((v) => v !== undefined)) {
+    await demandeAchatRepository.update(idDemandeAchat, {
+      objet_rc: data.objet,
+      description_rc: data.description,
+      code_site: data.codeSite,
+      code_sous_site: data.codeSousSite,
+      code_secteur: data.codeSecteur,
+      code_sous_secteur: data.codeSousSecteur,
+      code_cug: data.codeCug,
+      type_achat: data.typeAchat,
+      imputation_comptable: data.imputationComptable,
+      numero_operation: data.imputationComptable === undefined ? undefined : data.imputationComptable === 'INVESTISSEMENT' ? data.numeroOperation : null,
+    })
+  }
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_MODIFIEE_TRANSMISE_RC_CB',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+/**
+ * Insère une ligne FAD_A_COMMANDER immédiatement après une transition qui y
+ * mène automatiquement (OP1.4b sous seuil, OP1.5b) — « simple indicateur de
+ * tâche pour la CB, sans impact sur le reste du workflow »
+ * (ForClaude/CDC/mct-phases-1-2.md OP1.5c/OP1.6, décision du 15/09/2026 sur
+ * le chaînage automatique). Tracée sous l'identité de l'acteur qui a
+ * déclenché la transition parente (CB ou DS), jamais de suppléance : ce
+ * n'est pas une décision de sa part sur ce statut précis, une simple
+ * conséquence système.
+ */
+async function chainerFadACommander(idDemandeAchat: number, matricule: string): Promise<void> {
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_A_COMMANDER',
+    matricule_acteur: matricule,
+    id_suppleance: null,
+    commentaire_statut: null,
+  })
+}
+
+/**
+ * OP1.4b — Router selon le seuil (déclenché par la CB, automatique et
+ * synchrone dans le même appel — ForClaude/CDC/mct-phases-1-2.md : « sans
+ * intervention humaine [...] instantanée »). Compare MONTANT_DEMANDE au
+ * seuil du service pour l'imputation de la FAD (absence de ligne
+ * SEUIL_VALIDATION_DS = seuils à 0, voir seuilValidationDs.repository.ts) :
+ * seuil atteint → transmission humaine au DS (FAD_TRANSMISE_CB_DS) ; sinon
+ * exemption automatique (FAD_VALIDEE_DS_SEUIL) qui enchaîne aussitôt sur
+ * FAD_A_COMMANDER (décision du 15/09/2026).
+ */
+export async function transmettreDsOuSeuil(matricule: string | null, idDemandeAchat: number): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_VALIDEE_CB') {
+    throw new AppError('Cette FAD ne peut pas être routée à ce stade.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
+
+  const seuils = await seuilValidationDsRepository.findByService(existing.id_service)
+  const seuil =
+    existing.imputation_comptable === 'INVESTISSEMENT' ? (seuils?.seuil_investissement ?? 0) : (seuils?.seuil_fonctionnement ?? 0)
+
+  if (existing.montant_demande >= seuil) {
+    await historiqueStatutRepository.create({
+      id_demande_achat: idDemandeAchat,
+      code_statut: 'FAD_TRANSMISE_CB_DS',
+      matricule_acteur: matricule,
+      id_suppleance: role.idSuppleance,
+      commentaire_statut: null,
+    })
+  } else {
+    await historiqueStatutRepository.create({
+      id_demande_achat: idDemandeAchat,
+      code_statut: 'FAD_VALIDEE_DS_SEUIL',
+      matricule_acteur: matricule,
+      id_suppleance: role.idSuppleance,
+      commentaire_statut: null,
+    })
+    await chainerFadACommander(idDemandeAchat, matricule)
+  }
+
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const DECISION_DS_CODES: Record<string, string> = {
+  VALIDER: 'FAD_VALIDEE_DS',
+  REJETER: 'FAD_REJETEE_DS',
+  ANNULER: 'FAD_ANNULEE_DS',
+  // Reprise par la CB (pas le RC) — seule boucle qui ne remonte pas jusqu'au RC (décision du 14/09/2026).
+  COMPLEMENT: 'FAD_A_COMPLETER_CB',
+}
+
+/**
+ * OP1.5 — Statuer sur la FAD (DS, ou son suppléant), uniquement si
+ * FAD_TRANSMISE_CB_DS. File DS de la direction du service de la FAD. Même
+ * schéma de décision qu'OP1.2/OP1.3 — commentaire obligatoire hors VALIDER.
+ * La reprise « complément demandé » diffère des autres boucles : elle
+ * revient à la CB, pas au RC (ForClaude/CDC/mct-phases-1-2.md).
+ */
+export async function decisionDs(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = decisionSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_TRANSMISE_CB_DS') {
+    throw new AppError('Cette FAD n\'est plus au statut attendu.', 409)
+  }
+
+  const service = await serviceRepository.findById(existing.id_service)
+  if (!service) throw new AppError('Service introuvable.', 404)
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'DS', service.id_direction)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: DECISION_DS_CODES[result.data.decision],
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: result.data.commentaireStatut ?? null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+/**
+ * OP1.5b — Donner l'ordre de commande à la CB (DS, ou son suppléant),
+ * uniquement si FAD_VALIDEE_DS. Symétrique d'OP1.2b/OP1.3b : le DS enchaîne
+ * validation puis transmission de l'ordre, comme RC et CDS avant lui.
+ * Transmission systématique (FAD_TRANSMISE_DS_CB) qui enchaîne aussitôt sur
+ * FAD_A_COMMANDER (décision du 15/09/2026, même principe que la branche sous
+ * seuil d'OP1.4b — convergence des deux chemins vers le même indicateur de
+ * tâche pour la CB).
+ */
+export async function transmettreOrdreCb(matricule: string | null, idDemandeAchat: number): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_VALIDEE_DS') {
+    throw new AppError('Cette FAD ne peut pas être transmise à ce stade.', 409)
+  }
+
+  const service = await serviceRepository.findById(existing.id_service)
+  if (!service) throw new AppError('Service introuvable.', 404)
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'DS', service.id_direction)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_TRANSMISE_DS_CB',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  await chainerFadACommander(idDemandeAchat, matricule)
+
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const completerCbSchema = z
+  .object({
+    codeCug: z.string().trim().min(1).optional(),
+    typeAchat: z.enum(['TRAVAUX', 'FOURNITURES', 'SERVICES']).optional(),
+    imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']).optional(),
+    numeroOperation: z.string().trim().min(1).nullable().optional(),
+  })
+  .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
+    message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
+  })
+
+/**
+ * Reprise OP1.5 — FAD à compléter par la CB (CB, uniquement si
+ * FAD_A_COMPLETER_CB) : seule boucle de reprise qui ne remonte pas jusqu'au
+ * RC — la CB apporte elle-même le complément sur la nature de l'achat ou les
+ * aspects budgétaires/comptables et retransmet **directement au DS**, en
+ * réutilisant le statut nominal FAD_TRANSMISE_CB_DS (pas de duplication).
+ */
+export async function completerCb(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = completerCbSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_A_COMPLETER_CB') {
+    throw new AppError('Cette FAD ne peut pas être complétée à ce stade.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
+
+  const data = result.data
+  if (data.codeCug !== undefined || data.typeAchat !== undefined || data.imputationComptable !== undefined) {
+    await demandeAchatRepository.update(idDemandeAchat, {
+      code_cug: data.codeCug,
+      type_achat: data.typeAchat,
+      imputation_comptable: data.imputationComptable,
+      numero_operation: data.imputationComptable === undefined ? undefined : data.imputationComptable === 'INVESTISSEMENT' ? data.numeroOperation : null,
+    })
+  }
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_TRANSMISE_CB_DS',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const commanderSchema = z.object({
+  montantCommande: z.number().nonnegative(),
+})
+
+/**
+ * OP1.6 — Élaborer et constater la commande (CB), uniquement si
+ * FAD_A_COMMANDER. La saisie du BON dans le PGI est une tâche manuelle hors
+ * application (TM, ForClaude/CDC/mot-phases-1-2.md) — cette fonction
+ * n'enregistre que le constat côté VIGIE : MONTANT_COMMANDE puis
+ * FAD_COMMANDEE.
+ */
+export async function commander(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = commanderSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_A_COMMANDER') {
+    throw new AppError('Cette FAD ne peut pas être commandée à ce stade.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
+
+  await demandeAchatRepository.update(idDemandeAchat, { montant_commande: result.data.montantCommande })
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_COMMANDEE',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: null,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }
 
 const selectMarcheSchema = z
@@ -933,7 +1824,7 @@ export async function downloadPieceDemandeAchat(matricule: string | null, idDema
 
 /**
  * Suppression physique — autorisée uniquement à DA_EN_PREPARATION (jamais
- * DA_A_COMPLETER, déjà transmise une première fois — décision du
+ * DA_A_COMPLETER_RC, déjà transmise une première fois — décision du
  * 07/09/2026). Cascade applicative dans l'ordre documenté au MLD §4 :
  * PIECE_JOINTE → DEVIS_CONSULTE → HISTORIQUE_STATUT → DEMANDE_ACHAT (les FK
  * restent ON DELETE RESTRICT, pas de CASCADE en base) — fichiers Storage

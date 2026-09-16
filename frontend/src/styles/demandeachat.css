@@ -112,6 +112,16 @@
   table-layout: fixed;
 }
 
+/* Numéro marché (1re colonne) — centré (décision du 09/09/2026). L'en-tête
+   triable (SortableTh) place son contenu dans .gp-th, un flex row : centrer
+   le <th> lui-même (text-align) ne suffit pas, il faut recentrer ce flex. */
+.da-marche-table td:nth-child(1) {
+  text-align: center;
+}
+.da-marche-table th:nth-child(1) .gp-th {
+  justify-content: center;
+}
+
 /* Colonne Fournisseur (2e colonne) : retour à la ligne (au lieu de nowrap
    hérité de .gp-table) et police réduite à 12px (au lieu de 13px). */
 .da-marche-table td:nth-child(2) {

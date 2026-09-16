@@ -22,102 +22,111 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 # PROCESSUS 1 — DEMANDE D'ACHAT (DA → autorisation/commande)
 ═══════════════════════════════════════════
 
-> **Refonte du 06/09/2026 (validation client du cycle DA/FAD).** Les opérations du Processus 1 ci-dessous remplacent intégralement la version précédente, pour coller au tableau détaillé « Cycle de vie d'une FAD » validé par le client (20 indices numérotés — le renvoi `n°X` dans chaque opération pointe vers ce tableau). Changements structurants : distinction explicite Rejeté/Annulé à chaque palier (sauf CB, qui n'a pas d'Annulé) ; trois mécaniques de reprise **en place, sans duplication** (à compléter / à compléter / à modifier, chacune avec son acteur et sa destination propres) ; nouvelles opérations OP1.2b, OP1.3b, OP1.4b isolant des actions auparavant fusionnées avec une décision. Voir Historique en fin de document et MCD §8.
+> **Refonte du 14/09/2026 (nomenclature à 25 statuts et nouvelles mécaniques, cf. `ForClaude/CDC/code_statut.xlsx` et `cycle-da-fad.html`).** Les opérations du Processus 1 ci-dessous remplacent la version issue de la refonte du 06/09/2026 (22 statuts, colonnes EMMETTEUR/RECEPTEUR/ACTION). Changements structurants : (i) les statuts « validé » à un palier qui enchaînait auparavant automatiquement sur la transmission suivante (DA_VALIDEE_RC, FAD_VALIDEE_CDS, FAD_VALIDEE_CB, FAD_VALIDEE_DS) ouvrent désormais une question explicite « transmettre maintenant ? » posée à l'acteur qui vient de valider — un refus laisse l'objet en attente dans sa propre file de travail, ce n'est plus un enchaînement implicite garanti dans le même geste ; (ii) une quatrième boucle de reprise apparaît, DS → CB (FAD_A_COMPLETER_CB), seule à ne pas remonter jusqu'au RC ; (iii) la reprise CB → RC gagne un statut de retransmission dédié (FAD_MODIFIEE_TRANSMISE_RC_CB), distinct du statut nominal utilisé par le CDS, précisément parce que l'émetteur réel diffère ; (iv) l'autorisation de commande se scinde en deux temps (FAD_TRANSMISE_DS_CB puis FAD_A_COMMANDER, ce dernier un simple indicateur de tâche pour la CB, sans impact sur la suite du cycle). Les indices numériques du tableau source (n°X) ont disparu du référentiel (décision du 14/09/2026, colonne INDICE retirée) — les renvois ci-dessous citent directement les codes de statut. Voir Historique en fin de document, MCD (Cœur métier / Statuts) et MLD §2.5.
 
 ## OP1.1 — Créer, finaliser et transmettre la demande d'achat (Demandeur)
-- **Événements** : « Besoin d'achat exprimé » (externe, Demandeur) ; *ou* « DA à compléter, reprise après demande du RC » (depuis DA_A_COMPLETER).
+- **Événements** : « Besoin d'achat exprimé » (externe, Demandeur) ; *ou* « DA à compléter, reprise après demande du RC » (depuis DA_A_COMPLETER_RC).
 - **Synchronisation** : si PROCEDURE_ACHAT = MARCHE, sélection restreinte aux marchés UTILISABLE (ACTIF ET COMPLETUDE — voir MCD, entité MARCHE ; décision du 30/08/2026, `ForClaude/Importation-marches/import-marches-pgi.md` Historique).
-- **Actions** — *(modèle de création progressive, décision du 07/09/2026, remplace l'idée d'une écriture unique et atomique en fin de parcours)* : dès le clic « Nouvelle demande », un brouillon DEMANDE_ACHAT est créé **immédiatement** (état DA_EN_PREPARATION, NUMERO alloué à ce moment, PROCEDURE_ACHAT par défaut MARCHE) — pas d'attente d'un « Enregistrer » final ; CreationDA n'est ensuite qu'un écran d'édition de ce brouillon déjà existant, comme le sera plus tard « Modifier une DA ». Saisie ensuite, à mesure que l'utilisateur remplit l'écran : objet, description, montant demandé, procédure (marché/hors marché) — chaque écran fille (MarcheDA, FournisseurDA, PiecesDevisDA, PiecesComplementairesDA) écrit sa donnée immédiatement à son propre « Enregistrer » (DEVIS_CONSULTE, PIECE_JOINTE et dépôt de fichier compris), pas en différé ni en une seule transaction globale. Transmission au RC (n°3, ou n°5 après complément). *(Correction du 07/09/2026 : « imputation » retiré de cette liste — le Demandeur ne saisit ni CODE_SITE, ni CODE_SECTEUR, ni CODE_CUG, ni IMPUTATION_COMPTABLE/NUMERO_OPERATION, ni TYPE_ACHAT, tous saisis par le RC à OP1.2b ; la mention ici était une redondance jamais corrigée depuis la refonte du 06/09/2026.)* *(Décision du 07/09/2026)* Si HORS_MARCHE : à l'action « Fournisseurs consultés », dépôt de 1 à 5 DEVIS_CONSULTE (une entreprise consultée par devis) avec référence fournisseur et montant ; classement des candidats par glisser-déposer du meilleur au moins bon (ORDRE) — le candidat en position 1 devient le RETENU, re-désignable à tout moment tant que la DA n'est pas transmise ; motif du choix (MOTIF_CHOIX/LIBELLE_MOTIF_CHOIX) saisi à cette même action, réellement écrit en base. *(Refonte du 09/09/2026, annule la mention initiale d'écrans filles PiecesDevisDA/PiecesComplementairesDA dédiés)* Le PDF de chaque devis et les pièces complémentaires par fournisseur se déposent depuis l'écran unique « Gestion documentaire » (ouvert depuis CreationDA une fois un fournisseur identifié), à mesure de la saisie — plus « après création de la DA » au sens d'une étape séparée, puisque la DA existe déjà dès le premier écran. Si MARCHE : montant du devis BPU du titulaire **facultatif** (0 ou 1 DEVIS_CONSULTE, MONTANT_DEVIS non significatif — NULL) saisi dans « Marché concerné » ; motif du choix systématiquement `Prix`, écrit en base au même titre que le cas Hors marché. **MONTANT_DEMANDE (renversement du 09/09/2026, annule la correction du 07/09/2026 ci-dessous conservée pour mémoire)** : saisi directement par l'utilisateur sur MarcheDA pour MARCHE ; pour HORS_MARCHE, désormais **dérivé** du MONTANT_DEVIS du candidat retenu (ORDRE=1), recopié à l'action « Fournisseurs consultés » — plus aucune saisie de montant dans CreationDA, quelle que soit la procédure. *(Ancienne version, 07/09/2026 : « saisie manuelle indépendante — sur CreationDA pour HORS_MARCHE, sur MarcheDA pour MARCHE — sans lien automatique avec MONTANT_DEVIS dans aucun des deux cas ; incohérence assumée par le client entre MONTANT_DEMANDE et le montant du candidat retenu en HORS_MARCHE ».)*
+- **Actions** — *(modèle de création progressive, décision du 07/09/2026, remplace l'idée d'une écriture unique et atomique en fin de parcours)* : dès le clic « Nouvelle demande », un brouillon DEMANDE_ACHAT est créé **immédiatement** (état DA_EN_PREPARATION, NUMERO alloué à ce moment, PROCEDURE_ACHAT par défaut MARCHE) — pas d'attente d'un « Enregistrer » final ; CreationDA n'est ensuite qu'un écran d'édition de ce brouillon déjà existant, comme le sera plus tard « Modifier une DA ». Saisie ensuite, à mesure que l'utilisateur remplit l'écran : objet, description, montant demandé, procédure (marché/hors marché) — chaque écran fille (MarcheDA, FournisseurDA, PiecesDevisDA, PiecesComplementairesDA) écrit sa donnée immédiatement à son propre « Enregistrer » (DEVIS_CONSULTE, PIECE_JOINTE et dépôt de fichier compris), pas en différé ni en une seule transaction globale. Transmission au RC. *(Correction du 07/09/2026 : « imputation » retiré de cette liste — le Demandeur ne saisit ni CODE_SITE, ni CODE_SECTEUR, ni CODE_CUG, ni IMPUTATION_COMPTABLE/NUMERO_OPERATION, ni TYPE_ACHAT, tous saisis par le RC à OP1.2b ; la mention ici était une redondance jamais corrigée depuis la refonte du 06/09/2026.)* *(Décision du 07/09/2026)* Si HORS_MARCHE : à l'action « Fournisseurs consultés », dépôt de 1 à 5 DEVIS_CONSULTE (une entreprise consultée par devis) avec référence fournisseur et montant ; classement des candidats par glisser-déposer du meilleur au moins bon (ORDRE) — le candidat en position 1 devient le RETENU, re-désignable à tout moment tant que la DA n'est pas transmise ; motif du choix (MOTIF_CHOIX/LIBELLE_MOTIF_CHOIX) saisi à cette même action, réellement écrit en base. *(Refonte du 09/09/2026, annule la mention initiale d'écrans filles PiecesDevisDA/PiecesComplementairesDA dédiés)* Le PDF de chaque devis et les pièces complémentaires par fournisseur se déposent depuis l'écran unique « Gestion documentaire » (ouvert depuis CreationDA une fois un fournisseur identifié), à mesure de la saisie — plus « après création de la DA » au sens d'une étape séparée, puisque la DA existe déjà dès le premier écran. Si MARCHE : montant du devis BPU du titulaire **facultatif** (0 ou 1 DEVIS_CONSULTE, MONTANT_DEVIS non significatif — NULL) saisi dans « Marché concerné » ; motif du choix systématiquement `Prix`, écrit en base au même titre que le cas Hors marché. **MONTANT_DEMANDE (renversement du 09/09/2026, annule la correction du 07/09/2026 ci-dessous conservée pour mémoire)** : saisi directement par l'utilisateur sur MarcheDA pour MARCHE ; pour HORS_MARCHE, désormais **dérivé** du MONTANT_DEVIS du candidat retenu (ORDRE=1), recopié à l'action « Fournisseurs consultés » — plus aucune saisie de montant dans CreationDA, quelle que soit la procédure. *(Ancienne version, 07/09/2026 : « saisie manuelle indépendante — sur CreationDA pour HORS_MARCHE, sur MarcheDA pour MARCHE — sans lien automatique avec MONTANT_DEVIS dans aucun des deux cas ; incohérence assumée par le client entre MONTANT_DEMANDE et le montant du candidat retenu en HORS_MARCHE ».)*
 - **Règles d'émission** : demande complète transmise au RC — HORS_MARCHE exige au moins 1 (et au plus 5) DEVIS_CONSULTE et un candidat retenu désigné ; MARCHE n'exige aucun devis.
-- **Résultat** : **DA_TRANSMISE_RC** *(remplace DA_ENREGISTREE)*. *(Précision du 07/09/2026)* Le NUMERO généré à la création (AAAA-MM-JJ-XXX) n'est unique que **par service** — le SERVICE de la DA est celui du demandeur cible (soi-même, ou un tiers choisi par un RC/ADMIN_SERVICE créant pour son compte), figé dès cet instant, cf. MCD/MLD.
+- **Résultat** : **DA_TRANSMISE_DEM_RC** *(remplace DA_TRANSMISE_RC de la refonte du 06/09/2026)*. *(Précision du 07/09/2026)* Le NUMERO généré à la création (AAAA-MM-JJ-XXX) n'est unique que **par service** — le SERVICE de la DA est celui du demandeur cible (soi-même, ou un tiers choisi par un RC/ADMIN_SERVICE créant pour son compte), figé dès cet instant, cf. MCD/MLD.
 
 ## OP1.2 — Statuer sur l'opportunité d'achat (RC)
-- **Événement** : DA_TRANSMISE_RC (n°6).
+- **Événement** : DA_TRANSMISE_DEM_RC.
 - **Synchronisation** : —
 - **Actions** : contrôle de l'objet, de la description, des pièces jointes et du montant demandé ; décision.
 - **Règles d'émission** :
-  - validé → le RC enchaîne avec OP1.2b (finalisation de la FAD) ;
+  - validé → DA_VALIDEE_RC ; le RC est alors invité à transmettre immédiatement au CDS (bascule en FAD, OP1.2b) — s'il décline, la DA reste en DA_VALIDEE_RC dans sa propre file de travail jusqu'à ce qu'il déclenche lui-même OP1.2b *(nouveau, décision du 14/09/2026 — auparavant enchaînement automatique implicite dans le même geste)* ;
   - rejeté (achat jugé non pertinent) → DA rejetée, **terminal** ;
   - annulé (opportunité d'achat devenue caduque) → DA annulée, **terminal** ;
-  - complément demandé (information manquante) → DA à compléter, reprise en place par le Demandeur (retour à OP1.1, n°4-5) — **pas de duplication**.
-- **Résultats** : **DA_VALIDEE_RC** | **DA_REJETEE_RC** | **DA_ANNULEE_RC** | **DA_A_COMPLETER**.
+  - complément demandé (information manquante) → DA à compléter, reprise en place par le Demandeur (retour à OP1.1) — **pas de duplication**.
+- **Résultats** : **DA_VALIDEE_RC** | **DA_REJETEE_RC** | **DA_ANNULEE_RC** | **DA_A_COMPLETER_RC**.
 
 ## OP1.2b — Finaliser et transmettre la FAD au CDS (RC) — bascule DA → FAD
-- **Événement** : DA_VALIDEE_RC (n°7).
+- **Événement** : DA_VALIDEE_RC (transmission acceptée immédiatement à OP1.2, ou déclenchée plus tard depuis la file de travail du RC) ; *ou* « FAD à compléter, reprise après demande du CDS » (depuis FAD_A_COMPLETER_CDS, complétée par le RC).
 - **Synchronisation** : —
-- **Actions** : reformulation de l'objet et de la description, définition des critères de choix du fournisseur, saisie de la localisation (CODE_SITE/CODE_SOUS_SITE, CODE_SECTEUR/CODE_SOUS_SECTEUR) et de l'imputation (CODE_CUG ; TYPE_ACHAT : travaux/fournitures/services ; IMPUTATION_COMPTABLE : fonctionnement/investissement, avec NUMERO_OPERATION si investissement) — *(précisé le 07/09/2026 : ces quatre champs, absents du Demandeur à OP1.1, sont exclusivement saisis ici)* ; transmission au CDS avec les pièces associées (n°8).
-- **Règles d'émission** : transmission systématique — pas de décision à cette étape (mise en forme puis envoi, même acteur).
-- **Résultat** : **FAD_TRANSMISE_CDS**. *(À partir d'ici l'enregistrement DEMANDE_ACHAT est qualifié de FAD — même ligne, pas de nouvelle entité ni de nouveau statut pour la bascule elle-même : DA_VALIDEE_RC est le statut porté pendant toute cette opération.)*
-- *(Nouvelle opération, auparavant fusionnée avec OP1.2.)*
+- **Actions** : reformulation de l'objet et de la description *(depuis le 15/09/2026 : écrite dans OBJET_RC/DESCRIPTION_RC, distinctes d'OBJET_DEMANDEUR/DESCRIPTION_DEMANDEUR qui restent figées — voir MLD §2.4)*, définition des critères de choix du fournisseur, saisie de la localisation (CODE_SITE/CODE_SOUS_SITE, CODE_SECTEUR/CODE_SOUS_SECTEUR) et de l'imputation (CODE_CUG ; TYPE_ACHAT : travaux/fournitures/services ; IMPUTATION_COMPTABLE : fonctionnement/investissement, avec NUMERO_OPERATION si investissement) — *(précisé le 07/09/2026 : ces quatre champs, absents du Demandeur à OP1.1, sont exclusivement saisis ici)* ; transmission au CDS avec les pièces associées.
+- **Règles d'émission** : transmission systématique une fois déclenchée — pas de nouvelle décision à cette étape (mise en forme puis envoi, même acteur).
+- **Résultat** : **FAD_TRANSMISE_RC_CDS** *(remplace FAD_TRANSMISE_CDS de la refonte du 06/09/2026 ; même code que la retransmission après complément — l'émetteur reste le RC dans les deux cas)*. C'est cette transmission — pas une étape séparée — qui fait basculer l'objet de DA à FAD : DA_VALIDEE_RC est le statut porté pendant toute la finalisation.
+- *(Auparavant fusionnée avec OP1.2.)*
 
 ## OP1.3 — Statuer sur la FAD (CDS)
-- **Événements** : FAD_TRANSMISE_CDS (n°8, ou n°10 après complément) ; *ou* « FAD à compléter, reprise après demande du CDS » (depuis FAD_A_COMPLETER, complétée par le **RC** — pas par le CDS lui-même, n°9-10).
+- **Événement** : FAD_TRANSMISE_RC_CDS (transmission initiale ou après complément — même code dans les deux cas).
 - **Synchronisation** : —
-- **Actions** : contrôle de la FAD ; décision (n°13).
+- **Actions** : contrôle de la FAD ; décision.
 - **Règles d'émission** :
-  - validé → le CDS enchaîne avec OP1.3b (transmission à la CB) ;
+  - validé → FAD_VALIDEE_CDS ; le CDS est alors invité à transmettre immédiatement à la CB (OP1.3b) — s'il décline, la FAD reste en FAD_VALIDEE_CDS dans sa file de travail jusqu'à déclenchement manuel *(nouveau, décision du 14/09/2026)* ;
   - rejeté → FAD rejetée, **terminal** ;
   - annulé → FAD annulée, **terminal** ;
   - complément demandé → FAD à compléter, reprise en place **par le RC** — **pas de duplication**.
-- **Résultats** : **FAD_VALIDEE_CDS** | **FAD_REJETEE_CDS** | **FAD_ANNULEE_CDS** | **FAD_A_COMPLETER**.
+- **Résultats** : **FAD_VALIDEE_CDS** | **FAD_REJETEE_CDS** | **FAD_ANNULEE_CDS** | **FAD_A_COMPLETER_CDS**.
 
 ## OP1.3b — Transmettre la FAD à la CB (CDS)
-- **Événement** : FAD_VALIDEE_CDS (n°14).
+- **Événement** : FAD_VALIDEE_CDS (transmission acceptée immédiatement à OP1.3, ou déclenchée plus tard depuis la file de travail du CDS).
 - **Synchronisation** : —
 - **Actions** : transmission de la FAD et de ses pièces à la CB.
-- **Règles d'émission** : transmission systématique.
-- **Résultat** : **FAD_TRANSMISE_CB**.
-- *(Nouvelle opération. FAD_TRANSMISE_CB est aussi atteint directement par le RC depuis FAD_A_MODIFIER (n°11-12), sans repasser par cette opération ni par le CDS — voir OP1.4.)*
+- **Règles d'émission** : transmission systématique une fois déclenchée.
+- **Résultat** : **FAD_TRANSMISE_CDS_CB** *(remplace FAD_TRANSMISE_CB de la refonte du 06/09/2026)*.
+- *(FAD_TRANSMISE_CDS_CB n'est atteint que par ce chemin nominal CDS → CB. La reprise directe du RC depuis FAD_A_MODIFIER_CB — voir OP1.4 — utilise désormais un statut de transmission dédié, FAD_MODIFIEE_TRANSMISE_RC_CB, distinct précisément parce que l'émetteur réel diffère, sans repasser par cette opération ni par le CDS.)*
 
 ## OP1.4 — Contrôler les éléments financiers et budgétaires, statuer (CB)
-- **Événements** : FAD_TRANSMISE_CB (n°14) ; *ou* « FAD modifiée, retransmise directement par le RC » (depuis FAD_A_MODIFIER, n°11-12 — **sans repasser par le CDS**).
+- **Événements** : FAD_TRANSMISE_CDS_CB ; *ou* « FAD modifiée, retransmise directement par le RC » — FAD_MODIFIEE_TRANSMISE_RC_CB (depuis FAD_A_MODIFIER_CB, **sans repasser par le CDS**).
 - **Synchronisation** : —
-- **Actions** : ajout et validation des éléments comptables — imputation budgétaire, mise en place des crédits (n°15) ; contrôle des budgets alloués, de la validité/du plafond du marché mentionné, cohérence de l'imputation ; décision (n°16).
+- **Actions** : ajout et validation des éléments comptables — imputation budgétaire, mise en place des crédits ; contrôle des budgets alloués, de la validité/du plafond du marché mentionné, cohérence de l'imputation ; décision.
 - **Règles d'émission** :
-  - validé → le CB enchaîne avec OP1.4b (routage selon le seuil) ;
+  - validé → FAD_VALIDEE_CB ; la CB est alors invitée à transmettre immédiatement (OP1.4b : au DS, ou exemption automatique de seuil) — si elle décline, la FAD reste en FAD_VALIDEE_CB dans sa file de travail jusqu'à déclenchement manuel *(nouveau, décision du 14/09/2026)* ;
   - rejeté (crédits insuffisants, marché inactif, plafond atteint) → FAD rejetée, **terminal** — la CB ne juge jamais l'opportunité de l'achat, uniquement la conformité budgétaire/comptable : elle ne dispose donc **pas** d'issue « annulé » ;
-  - modification demandée → FAD à modifier, reprise en place **par le RC**, qui retransmet **directement à la CB** (pas de nouveau passage par le CDS) — **pas de duplication**.
-- **Résultats** : **FAD_VALIDEE_CB** | **FAD_REJETEE_CB** | **FAD_A_MODIFIER**.
+  - modification demandée → FAD à modifier, reprise en place **par le RC**, qui retransmet **directement à la CB** via FAD_MODIFIEE_TRANSMISE_RC_CB (pas de nouveau passage par le CDS) — **pas de duplication**.
+- **Résultats** : **FAD_VALIDEE_CB** | **FAD_REJETEE_CB** | **FAD_A_MODIFIER_CB**.
 
 ## OP1.4b — Router selon le seuil de validation DS (automatique)
-- **Événement** : FAD_VALIDEE_CB (n°17).
+- **Événement** : FAD_VALIDEE_CB (transmission acceptée immédiatement à OP1.4, ou déclenchée plus tard depuis la file de travail de la CB).
 - **Synchronisation** : lecture du SEUIL_VALIDATION_DS du service de la FAD, colonne correspondant à l'imputation (SEUIL_FONCTIONNEMENT ou SEUIL_INVESTISSEMENT) — plus de notion de date/historique depuis le 28/08/2026 (MCD/MLD). **Absence de ligne pour ce service = seuil considéré à 0** pour les deux imputations (donc `montant ≥ seuil` presque toujours vrai en pratique → transmission systématique au DS tant qu'aucun seuil n'a été paramétré, jamais d'exemption par défaut).
-- **Actions** : évaluation automatique, immédiatement après la validation CB — aucune saisie, aucune décision humaine.
+- **Actions** : évaluation automatique, dès que la CB déclenche la transmission — aucune saisie, aucune décision humaine à cette étape précise (la décision budgétaire elle-même a déjà eu lieu à OP1.4 ; seul le choix du *moment* de la transmission relève de la CB, cf. ci-dessus).
 - **Règles d'émission** :
   - montant ≥ seuil → transmission au DS ;
-  - montant < seuil → exemption automatique, la FAD est réputée autorisée sans intervention du DS.
-- **Résultats** : **FAD_TRANSMISE_DS** | **FAD_VALIDEE_DS_SEUIL**.
-- *(Nouvelle opération, isole le routage automatique auparavant imbriqué dans la décision de la CB. FAD_VALIDEE_DS_SEUIL remplace la précédente notion, non nommée dans le référentiel STATUT, d'« exemption ».)*
+  - montant < seuil → validation et transmission à la CB combinées automatiquement, sans intervention du DS.
+- **Résultats** : **FAD_TRANSMISE_CB_DS** *(remplace FAD_TRANSMISE_DS de la refonte du 06/09/2026)* | **FAD_VALIDEE_DS_SEUIL** *(inchangé — émetteur symbolique DS, transmission automatique à la CB elle-même)*.
 
-## OP1.5 — Autoriser la commande (DS) — uniquement si FAD_TRANSMISE_DS
-- **Événement** : FAD_TRANSMISE_DS (n°20).
+## OP1.5 — Statuer sur la FAD (DS) — uniquement si FAD_TRANSMISE_CB_DS
+- **Événement** : FAD_TRANSMISE_CB_DS.
 - **Synchronisation** : —
 - **Actions** : examen de la FAD ; décision.
 - **Règles d'émission** :
-  - validé → FAD renvoyée à la CB pour élaboration de la commande ;
+  - validé → FAD_VALIDEE_DS ; le DS est alors invité à donner immédiatement l'ordre de commande à la CB (OP1.5b) — s'il décline, la FAD reste en FAD_VALIDEE_DS dans sa file de travail jusqu'à déclenchement manuel *(nouveau, décision du 14/09/2026)* ;
   - rejeté (achat jugé non pertinent) → FAD rejetée, **terminal** ;
-  - annulé (opportunité d'achat devenue caduque) → FAD annulée, **terminal**.
-- **Résultats** : **FAD_VALIDEE_DS** | **FAD_REJETEE_DS** | **FAD_ANNULEE_DS**.
+  - annulé (opportunité d'achat devenue caduque) → FAD annulée, **terminal** ;
+  - complément demandé *(nouveau, décision du 14/09/2026)* → FAD à compléter, reprise **par la CB** — seule boucle de reprise qui ne remonte pas jusqu'au RC : la CB apporte le complément sur la nature de l'achat ou les aspects budgétaires/comptables et retransmet **directement au DS**, en réutilisant le même statut que la transmission nominale (FAD_TRANSMISE_CB_DS, OP1.4b) — **pas de duplication**.
+- **Résultats** : **FAD_VALIDEE_DS** | **FAD_REJETEE_DS** | **FAD_ANNULEE_DS** | **FAD_A_COMPLETER_CB**.
 
-## OP1.5b — Générer la fiche récapitulative de la FAD (PDF) — automatique
-- **Événement** : « FAD autorisée » — FAD_VALIDEE_DS (circuit complet) *ou* FAD_VALIDEE_DS_SEUIL (exemption automatique, cf. OP1.4b).
+## OP1.5b — Donner l'ordre de commande à la CB (DS)
+- **Événement** : FAD_VALIDEE_DS (transmission acceptée immédiatement à OP1.5, ou déclenchée plus tard depuis la file de travail du DS).
+- **Synchronisation** : —
+- **Actions** : transmission de l'ordre de commande à la CB.
+- **Règles d'émission** : transmission systématique une fois déclenchée.
+- **Résultat** : **FAD_TRANSMISE_DS_CB** *(nouveau, décision du 14/09/2026 — la refonte du 06/09/2026 reliait FAD_VALIDEE_DS directement à l'élaboration de la commande, sans ce palier intermédiaire)*.
+- *(Nouvelle opération, symétrique d'OP1.2b/OP1.3b : le DS enchaîne validation puis transmission de l'ordre, comme RC et CDS avant lui. N'existe que pour le chemin avec étude humaine — le chemin automatique sous seuil, FAD_VALIDEE_DS_SEUIL/OP1.4b, combine déjà validation et transmission en une seule action.)*
+
+## OP1.5c — Générer la fiche récapitulative de la FAD (PDF) — automatique
+- **Événement** : FAD_A_COMMANDER *(convergence des deux chemins — validation avec étude humaine du DS via FAD_TRANSMISE_DS_CB/OP1.5b, ou validation automatique sous seuil via FAD_VALIDEE_DS_SEUIL/OP1.4b ; remplace le déclenchement direct sur FAD_VALIDEE_DS/FAD_VALIDEE_DS_SEUIL de la refonte du 06/09/2026 — renommée OP1.5c, ex-OP1.5b)*.
 - **Synchronisation** : —
 - **Actions** : génération automatique d'un PDF récapitulant les éléments de la FAD ; ajout en PIECE_JOINTE (ORIGINE=SYSTEME, TYPE_PIECE=FICHE_FAD), non supprimable par l'utilisateur.
 - **Règles d'émission** : —
 - **Résultat** : **fiche récapitulative FAD attachée**.
 
 ## OP1.6 — Élaborer et constater la commande (CB)
-- **Événement** : « FAD autorisée » — FAD_VALIDEE_DS *ou* FAD_VALIDEE_DS_SEUIL.
+- **Événement** : FAD_A_COMMANDER *(remplace le déclenchement direct sur FAD_VALIDEE_DS/FAD_VALIDEE_DS_SEUIL — statut purement indicateur de tâche pour la CB, sans impact sur le reste du workflow, décision du 14/09/2026)*.
 - **Synchronisation** : —
-- **Actions** : saisie des informations de la FAD dans le PGI (**TM**, hors application, n°18) ; puis édition du bon de commande et saisie du MONTANT_COMMANDE dans l'application (**TI**, n°19).
+- **Actions** : saisie des informations de la FAD dans le PGI (**TM**, hors application) ; puis édition du bon de commande et saisie du MONTANT_COMMANDE dans l'application (**TI**).
 - **Règles d'émission** : —
 - **Résultat** : **FAD_COMMANDEE**. *(Message sortant vers le PGI = émission effective de la commande, réalisée dans le PGI, hors application.)*
 
 ## OP1.7 — Clôturer / rouvrir la FAD (indicateur réversible)
+> **Point ouvert, non résolu par cette révision (14/09/2026).** `FAD_CLOTUREE` ne fait plus partie des 25 statuts du référentiel (`code_statut.xlsx`/`cycle-da-fad.html`) — retirée lors de la refonte du 14/09/2026, décision explicite prise pendant la conception des statuts DA/FAD : la clôture relève exclusivement du circuit CSF (`STATUT_CSF.CSF_LIQUIDE`, Processus 2), hors périmètre de ce chantier. L'opération ci-dessous, héritée de la refonte du 06/09/2026, n'a donc plus de statut à produire côté DA/FAD. Conservée à titre de mémoire de l'intention initiale — **ne pas s'appuyer dessus telle quelle** : le mécanisme de fin d'attente de CSF (indicateur porté par DEMANDE_ACHAT ? condition dérivée du dernier CSF ? autre ?) reste à reconcevoir avant toute implémentation Phase 2, de même que l'enchaînement inter-processus P1 → P2 ci-dessous, qui référence encore FAD_CLOTUREE.
 - **Événement** : décision de (dé)clôture (Demandeur ou CB).
 - **Synchronisation** : FAD au statut FAD_COMMANDEE.
 - **Actions** : pose/retrait de l'indicateur « aucun CSF supplémentaire attendu ».
-- **Résultat** : **FAD_CLOTUREE** (réversible). Lien avec le processus 2 : conditionne la fin d'attente de CSF.
+- **Résultat** : ~~FAD_CLOTUREE~~ *(statut retiré du référentiel, voir avertissement ci-dessus)*.
 
 ═══════════════════════════════════════════
 # PROCESSUS 2 — SERVICE FAIT (CSF → liquidation/paiement)
@@ -173,7 +182,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 # ENCHAÎNEMENT INTER-PROCESSUS
 ═══════════════════════════════════════════
 
-- **P1 → P2** : le résultat **FAD_COMMANDEE** (OP1.6) est la précondition d'entrée de l'élaboration du CSF (OP2.1, garde R1). Une FAD peut donner lieu à 0..N CSF ; FAD_CLOTUREE (OP1.7) borne cette attente.
+- **P1 → P2** : le résultat **FAD_COMMANDEE** (OP1.6) est la précondition d'entrée de l'élaboration du CSF (OP2.1, garde R1). Une FAD peut donner lieu à 0..N CSF ; l'ancien mécanisme de borne (FAD_CLOTUREE, OP1.7) ne fait plus partie du référentiel de statuts — **point ouvert**, voir avertissement OP1.7 ci-dessus.
 - **P3 → P1/P2** : OP3.1 alimente les référentiels (MARCHE, FOURNISSEUR, CUG, OPERATION_INVESTISSEMENT) consommés par OP1.1–OP1.5. Processus autonome, déclenché à la demande.
 - **Frontière PGI** : messages sortants (émission de commande après OP1.6 ; paiement après OP2.3) et événements externes de retour (OP1.6, OP2.4).
 
@@ -182,7 +191,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 Chaque opération dispose des données requises dans le MCD consolidé :
 - OP1.4b (seuil) : SEUIL_VALIDATION_DS (service, SEUIL_FONCTIONNEMENT/SEUIL_INVESTISSEMENT — plus d'historisation depuis le 28/08/2026) ✔
 - OP1.6 : MONTANT_COMMANDE sur DEMANDE_ACHAT ✔
-- OP1.5b : PIECE_JOINTE.ORIGINE (SYSTEME) + TYPE_PIECE (FICHE_FAD) — support de la fiche générée ✔
+- OP1.5c : PIECE_JOINTE.ORIGINE (SYSTEME) + TYPE_PIECE (FICHE_FAD) — support de la fiche générée ✔
 - OP1.1 (devis) : DEVIS_CONSULTE (HORS_MARCHE 1-5 obligatoires, MARCHE 0-1 facultatif — décision du 07/09/2026) + PIECE_JOINTE.ID_FOURNISSEUR (documents complémentaires par fournisseur, pas par devis — décision du 07/09/2026) ✔
 - OP2.1 : rattachement FAD + rédacteur (ACTEUR) + PIECE_JOINTE (justificatif) ✔
 - OP2.3 (alerte R2) : MONTANT_CSF (cumul) vs MONTANT_COMMANDE ✔
@@ -196,6 +205,7 @@ Aucune donnée manquante identifiée à ce stade.
 - Rejet/annulation devenus terminaux sans resoumission assistée (refonte du 06/09/2026) : à confirmer que c'est bien l'intention — un nouveau besoin repart d'une DA créée manuellement (OP1.1), sans lien conservé avec la DA/FAD rejetée ou annulée.
 
 # Historique
+- 14/09/2026 (refonte de la nomenclature des statuts — 25 codes, remplace les 22 de la refonte du 06/09/2026, cf. `ForClaude/CDC/code_statut.xlsx`/`cycle-da-fad.html`) : Processus 1 entièrement mis à jour. Renommages : DA_TRANSMISE_RC → DA_TRANSMISE_DEM_RC, DA_A_COMPLETER → DA_A_COMPLETER_RC, FAD_TRANSMISE_CDS → FAD_TRANSMISE_RC_CDS, FAD_A_COMPLETER → FAD_A_COMPLETER_CDS, FAD_TRANSMISE_CB → FAD_TRANSMISE_CDS_CB, FAD_A_MODIFIER → FAD_A_MODIFIER_CB, FAD_TRANSMISE_DS → FAD_TRANSMISE_CB_DS. Nouveautés : les statuts « validé » à chaque palier (DA_VALIDEE_RC, FAD_VALIDEE_CDS, FAD_VALIDEE_CB, FAD_VALIDEE_DS) posent désormais une question explicite de transmission immédiate, avec possibilité de laisser l'objet en attente dans la file du même acteur (OP1.2/OP1.2b, OP1.3/OP1.3b, OP1.4/OP1.4b, OP1.5/OP1.5b) — auparavant enchaînement automatique implicite. Nouvelle reprise DS → CB (FAD_A_COMPLETER_CB, OP1.5), seule à ne pas remonter au RC. La reprise CB → RC (OP1.4) utilise désormais un statut de transmission dédié (FAD_MODIFIEE_TRANSMISE_RC_CB) au lieu de partager celui du CDS. Nouvelle OP1.5b (DS transmet l'ordre de commande, FAD_TRANSMISE_DS_CB) et nouveau statut de convergence FAD_A_COMMANDER (pur indicateur de tâche pour la CB, sans impact sur le workflow) avant OP1.6 ; l'ancienne OP1.5b (génération de la fiche PDF) devient OP1.5c, déclenchée sur FAD_A_COMMANDER. FAD_CLOTUREE retirée du référentiel (clôture reléguée au seul circuit CSF) — OP1.7 et l'enchaînement P1→P2 marqués comme points ouverts, non résolus ici. Les indices numériques (n°X) de la refonte du 06/09/2026 ont disparu, la colonne INDICE ayant été retirée du référentiel. Répercuté dans le MCD (Cœur métier, Rôles applicatifs), le MLD (§2.5, §4) et le MOT (suppléance, Processus 1) au fil de cette même conversation.
 - 09/09/2026 (refonte de la gestion documentaire — écran unifié dans CreationDA) : OP1.1 corrigée — toute la gestion documentaire (devis et pièces complémentaires) est retirée de MarcheDA/FournisseurDA (boutons « Ajouter Devis »/icônes « Devis »/« PC » supprimés) et centralisée dans un nouvel écran unique ouvert depuis CreationDA (bouton « Gestion documentaire », actif une fois un fournisseur identifié — marché enregistré ou premier candidat consulté). Cet écran liste, par fournisseur choisi dans un sélecteur dédié (le titulaire seul en Marché, chaque candidat consulté en Hors marché), le devis (ajout/remplacement/suppression du fichier/téléchargement) et les pièces complémentaires (ajout avec type de pièce obligatoire/suppression/téléchargement) de ce fournisseur pour cette DA. Nettoyage documentaire étendu aux pièces complémentaires (jusqu'ici seul le devis était purgé) : changement de procédure, changement de marché sélectionné et retrait d'un candidat consulté purgent désormais devis **et** pièces complémentaires, fichiers Storage compris. Voir MLD (§7) pour le détail (CRUD complet de PIECE_JOINTE, nouveau bucket Storage `piece-jointe-fad`, domaine référentiel `TYPE_PIECE_FAD` exposé).
 - 09/09/2026 (construction de PiecesDevisDA — dépôt de fichier par ligne DEVIS_CONSULTE, abandon du delete-then-recreate) : OP1.1 corrigée sur deux points, tous deux motivés par le dépôt de fichier (croquis DA.pdf page 5) : (1) MarcheDA (« Montant & marché ») ne purge plus systématiquement les candidats déjà consultés à chaque enregistrement — seulement si le marché sélectionné change réellement, pour ne pas détruire un devis déjà déposé au moindre ajustement de montant ; (2) FournisseurDA (« Éléments de consultation ») abandonne le remplacement intégral de la liste à l'« Enregistrer » — ajouter/retirer un candidat écrit désormais immédiatement en base (avant tout enregistrement), pour que le bouton « Devis » de chaque candidat fonctionne dès son ajout ; « Enregistrer » ne fait plus que fixer l'ordre final et le montant des candidats déjà existants. Voir MLD (§7) pour le détail (nouveau bucket Storage `devis-consulte-pieces`, réassignation ORDRE/RETENU par valeurs négatives temporaires).
 - 09/09/2026 (MONTANT_DEMANDE — retour à la dérivation pour HORS_MARCHE, renverse la décision du 07/09/2026 juste en dessous) : OP1.1 corrigée — pour HORS_MARCHE, MONTANT_DEMANDE est désormais recopié depuis MONTANT_DEVIS du candidat retenu (ORDRE=1) à l'action « Fournisseurs consultés », plus saisi dans CreationDA. Motivation du client : « le montant demandé pour une procédure hors marché, c'est le montant défini pour l'entreprise retenue ». CreationDA.Montant DA devient un champ d'affichage seul dans les deux procédures — la saisie a désormais toujours lieu dans l'écran dédié à la procédure (MarcheDA pour MARCHE, saisie manuelle inchangée ; FournisseurDA pour HORS_MARCHE, dérivé). Répercuté dans le MLD (§2.4).

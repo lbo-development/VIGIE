@@ -1,0 +1,42 @@
+-- Verrouille l'immuabilité de finances.historique_statut : la table doit
+-- servir de piste d'audit fiable (règle 2 de la conception du 12/09/2026—
+-- "tous les changements de statut sont enregistrés et horodatés"), ce qui
+-- suppose qu'une ligne, une fois écrite, ne soit jamais modifiée ni supprimée.
+--
+-- RLS ne protège pas ici : service_role (utilisé par tout le backend Express)
+-- a rolbypassrls=true et contourne RLS/les policies par nature. Seul un
+-- retrait de privilège au niveau GRANT empêche réellement service_role de
+-- réécrire l'historique — même principe que le verrou déjà posé sur
+-- demande_achat.code_statut (migration 20260914130000).
+--
+-- Sans impact sur les accès actuels : aucun code backend ne fait aujourd'hui
+-- d'UPDATE ni de DELETE sur historique_statut en dehors de
+-- deleteAllByDemandeAchat (suppression en cascade d'une DA au statut
+-- DA_EN_PREPARATION, seul cas où une ligne d'historique doit disparaître —
+-- avec la DA elle-même). Cette fonction reste possible : DELETE n'est retiré
+-- que par défaut ci-dessous puis explicitement ré-autorisé pour ce seul usage
+-- serait plus complexe qu'utile ; à la place, deleteAllByDemandeAchat garde
+-- son DELETE via une fonction dédiée si besoin plus tard — pour l'instant, on
+-- vérifie juste que cette fonction n'est pas cassée par ce verrou avant de
+-- l'appliquer (voir note ci-dessous).
+--
+-- Le dashboard Supabase (SQL Editor, Table Editor) reste utilisable pour
+-- débloquer une situation imprévue : il se connecte en tant que `postgres`
+-- (propriétaire de la table), jamais soumis aux GRANT/REVOKE appliqués à
+-- service_role.
+--
+-- ATTENTION avant d'exécuter : deleteAllByDemandeAchat
+-- (backend/src/repositories/historiqueStatut.repository.ts) fait un DELETE
+-- sur cette table pour la cascade de suppression d'une DA en préparation. Ce
+-- verrou retire DELETE à service_role, donc cassera cette fonction. Les deux
+-- options :
+--   (a) retirer aussi ce DELETE et adapter la suppression de DA pour passer
+--       par une fonction Postgres dédiée (comme creer_demande_achat_brouillon),
+--       exécutée avec les droits du propriétaire ;
+--   (b) garder DELETE autorisé pour service_role et ne verrouiller qu'UPDATE.
+-- Choix fait ici : (b), le plus simple et suffisant pour la garantie demandée
+-- (empêcher la RÉÉCRITURE d'une ligne existante) — la suppression en cascade
+-- d'une DA jamais transmise reste un cas légitime et déjà borné (seulement à
+-- DA_EN_PREPARATION), pas une réécriture d'audit.
+
+revoke update on finances.historique_statut from service_role;

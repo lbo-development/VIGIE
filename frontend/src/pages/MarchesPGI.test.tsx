@@ -118,7 +118,7 @@ describe('MarchesPGI', () => {
   })
 
   it("ADMIN_APP : filtre Direction/Service en cascade, obligatoire avant d'afficher le contenu", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<MarchesPGI />)
 
     expect(screen.getByText('Sélectionne une direction et un service pour afficher les marchés.')).toBeInTheDocument()
@@ -196,8 +196,28 @@ describe('MarchesPGI', () => {
     expect(within(card).queryByTitle('Fiche incomplète')).not.toBeInTheDocument()
   })
 
+  it("affiche le nom de l'agent gestionnaire au-dessus des pastilles de statut", () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', agentgestion: 'DUPONT Jean' })]
+    render(<MarchesPGI />)
+
+    const card = screen.getByText(/M0909311/).closest('.marche-card') as HTMLElement
+    expect(within(card).getByText('DUPONT Jean')).toBeInTheDocument()
+  })
+
+  it("n'affiche aucun libellé agent gestionnaire quand il n'est pas renseigné", () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M0909311', agentgestion: null })]
+    render(<MarchesPGI />)
+
+    const card = screen.getByText(/M0909311/).closest('.marche-card') as HTMLElement
+    expect(card.querySelector('.marche-card__agent')).not.toBeInTheDocument()
+  })
+
   it("libellé « État des marchés au [date] » : lit /marches/last-import pour le service filtré (idService en query, pas forcément le sien)", async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     currentUserMock.data.idService = null
     vi.mocked(api.get).mockResolvedValue({ exists: true, valeur: '2026-08-20' })
     render(<MarchesPGI />)
@@ -414,7 +434,7 @@ describe('MarchesPGI', () => {
   })
 
   it.each(['ADMIN_SERVICE', 'CB'])('Modifier est visible pour %s, y compris sans MTMAXI/MT_SOLDE (bug corrigé le 01/09/2026)', (typeRole) => {
-    currentUserMock.data.roles = [{ typeRole, perimeterLabel: null, idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole, perimeterLabel: null, idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M0909311', mtmaxi: null, mt_solde: null })]
     render(<MarchesPGI />)
@@ -424,7 +444,7 @@ describe('MarchesPGI', () => {
   })
 
   it('Modifier est visible pour ADMIN_APP', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     marchesMock.marches = [makeMarche({ nummarche: 'M0909311' })]
     render(<MarchesPGI />)
 
@@ -465,6 +485,23 @@ describe('MarchesPGI', () => {
     expect(screen.queryByText(/M_ARCHIVE/)).not.toBeInTheDocument()
   })
 
+  it('une pastille apparaît sur "Filtrer" dès qu\'un critère de la modale est actif, disparaît avec "Supprimer les filtres"', () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [makeMarche({ nummarche: 'M_ACTIF', actif: true })]
+    render(<MarchesPGI />)
+
+    const filtrerBtn = screen.getByRole('button', { name: 'Filtrer' })
+    expect(filtrerBtn.querySelector('.filter-active-dot')).not.toBeInTheDocument()
+
+    applyFilterModal({ actif: true })
+
+    expect(filtrerBtn.querySelector('.filter-active-dot')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Supprimer les filtres' }))
+    expect(filtrerBtn.querySelector('.filter-active-dot')).not.toBeInTheDocument()
+  })
+
   it('modale de filtre — "Complet" sur Oui : masque les fiches incomplètes', () => {
     currentUserMock.data.roles = []
     currentUserMock.data.idService = 1
@@ -478,6 +515,25 @@ describe('MarchesPGI', () => {
 
     expect(screen.getByText(/M_COMPLET/)).toBeInTheDocument()
     expect(screen.queryByText(/M_INCOMPLET/)).not.toBeInTheDocument()
+  })
+
+  it('modale de filtre — combobox "Agent gestionnaire" : ne garde que les marchés de l\'agent choisi', () => {
+    currentUserMock.data.roles = []
+    currentUserMock.data.idService = 1
+    marchesMock.marches = [
+      makeMarche({ nummarche: 'M_DUPONT', agentgestion: 'DUPONT Jean' }),
+      makeMarche({ nummarche: 'M_MARTIN', agentgestion: 'MARTIN Alice' }),
+    ]
+    render(<MarchesPGI />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filtrer' }))
+    const modal = screen.getByRole('dialog', { name: 'Filtrer les marchés' })
+    fireEvent.click(within(modal).getByRole('button', { name: 'Agent gestionnaire' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('DUPONT Jean'))
+    fireEvent.click(within(modal).getByRole('button', { name: 'Filtrer' }))
+
+    expect(screen.getByText(/M_DUPONT/)).toBeInTheDocument()
+    expect(screen.queryByText(/M_MARTIN/)).not.toBeInTheDocument()
   })
 
   it('modale de filtre — "Alerte date" ET "Alerte montant" sur Oui ensemble : ne garde que les marchés en alerte sur les deux critères', () => {
@@ -674,7 +730,7 @@ describe('MarchesPGI', () => {
   })
 
   it('aucun bouton "Nouveau marché" nulle part (création manuelle retirée le 01/09/2026, seul l\'import PGI crée des marchés)', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M0909311' })]
     render(<MarchesPGI />)
@@ -688,7 +744,7 @@ describe('MarchesPGI', () => {
   }
 
   it('modale de modification — ouverture, pré-remplit les champs actuels, numéro/titulaire en lecture seule', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [
       makeMarche({
@@ -724,7 +780,7 @@ describe('MarchesPGI', () => {
   })
 
   it('modale de modification — Agent gestionnaire reste "Non renseigné" si AGENTGESTION ne correspond à aucun acteur du service', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567', agentgestion: 'Agent parti depuis' })]
     render(<MarchesPGI />)
@@ -735,7 +791,7 @@ describe('MarchesPGI', () => {
   })
 
   it('modale de modification — validation : libellé obligatoire', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567', libelle_service: '' })]
     render(<MarchesPGI />)
@@ -749,7 +805,7 @@ describe('MarchesPGI', () => {
   })
 
   it('modale de modification — Alerte sur date et Alerte sur montant utilisent le composant spin button (chevrons)', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567' })]
     render(<MarchesPGI />)
@@ -764,7 +820,7 @@ describe('MarchesPGI', () => {
   })
 
   it("modale de modification — pas de champ CUG ni Montant maximum (non modifiables via « Modifier »)", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567' })]
     render(<MarchesPGI />)
@@ -776,7 +832,7 @@ describe('MarchesPGI', () => {
   })
 
   it('modale de modification — soumission : convertit Alerte sur montant (%) en ratio, résout Agent gestionnaire en texte, PUT /marches/:nummarche, ferme et rafraîchit la liste', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567', libelle_service: 'Nettoyage' })]
     vi.mocked(api.put).mockResolvedValue({ nummarche: 'M1234567' })
@@ -803,7 +859,7 @@ describe('MarchesPGI', () => {
   })
 
   it('modale de modification — le plan de prévention actif est un champ texte libre', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marchesMock.marches = [makeMarche({ nummarche: 'M1234567', planpreventionactif: null })]
     vi.mocked(api.put).mockResolvedValue({ nummarche: 'M1234567' })

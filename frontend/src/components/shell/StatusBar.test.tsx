@@ -27,4 +27,13 @@ describe('StatusBar', () => {
 
     expect(signOut).toHaveBeenCalled()
   })
+
+  it('ouvre la modale de changement de mot de passe au clic sur son bouton', () => {
+    render(<StatusBar />)
+
+    fireEvent.click(screen.getByRole('button', { name: /changer le mot de passe/i }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByText('Changer mon mot de passe')).toBeInTheDocument()
+  })
 })

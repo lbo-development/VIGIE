@@ -9,6 +9,8 @@ const hasActiveRole = vi.fn()
 const hasActiveRoleForService = vi.fn()
 
 const findActiveByMatricule = vi.fn()
+const findEffectiveRoles = vi.fn()
+const findCelluleById = vi.fn()
 
 vi.mock('../repositories/cug.repository.js', () => ({
   findAll: (...args: unknown[]) => findAll(...args),
@@ -22,6 +24,12 @@ vi.mock('../repositories/auth.repository.js', () => ({
 }))
 vi.mock('../repositories/roleAttribution.repository.js', () => ({
   findActiveByMatricule: (...args: unknown[]) => findActiveByMatricule(...args),
+}))
+vi.mock('../services/roleEffectif.service.js', () => ({
+  findEffectiveRoles: (...args: unknown[]) => findEffectiveRoles(...args),
+}))
+vi.mock('../repositories/cellule.repository.js', () => ({
+  findById: (...args: unknown[]) => findCelluleById(...args),
 }))
 
 const { listCug, createCug, updateCug } = await import('../services/cug.service.js')
@@ -39,6 +47,8 @@ beforeEach(() => {
   hasActiveRole.mockReset()
   hasActiveRoleForService.mockReset()
   findActiveByMatricule.mockReset()
+  findEffectiveRoles.mockReset().mockResolvedValue([])
+  findCelluleById.mockReset()
 })
 
 describe('listCug', () => {
@@ -46,12 +56,28 @@ describe('listCug', () => {
     await expect(listCug(null)).rejects.toMatchObject({ status: 401 })
   })
 
-  it("rejette un acteur sans ADMIN_APP ni ADMIN_SERVICE (403) — pas de périmètre Demandeur pour CUG", async () => {
+  it("rejette un acteur sans ADMIN_APP ni ADMIN_SERVICE ni RC (403) — pas de périmètre Demandeur pour CUG", async () => {
     hasActiveRole.mockResolvedValue(false)
     findActiveByMatricule.mockResolvedValue([])
 
     await expect(listCug(MATRICULE)).rejects.toMatchObject({ status: 403 })
     expect(findAll).not.toHaveBeenCalled()
+  })
+
+  // Écran de suivi RC (15/09/2026) : le RC doit pouvoir choisir un CUG à la complétion d'une FAD —
+  // resolveReadScope étendu, scopé à son propre service (résolu via sa cellule).
+  it('RC (titulaire ou suppléant) ne voit que le service de sa cellule', async () => {
+    hasActiveRole.mockResolvedValue(false)
+    findActiveByMatricule.mockResolvedValue([])
+    findEffectiveRoles.mockResolvedValue([
+      { idRole: 5, typeRole: 'RC', idCellule: 7, idService: null, idDirection: null, idSuppleance: 123 },
+    ])
+    findCelluleById.mockResolvedValue({ id_cellule: 7, id_service: ID_SERVICE })
+    findAll.mockResolvedValue([CUG])
+
+    await listCug(MATRICULE, 999)
+
+    expect(findAll).toHaveBeenCalledWith(ID_SERVICE)
   })
 
   it('ADMIN_APP voit tout (transverse), idService explicite respecté', async () => {

@@ -8,8 +8,12 @@ export interface DemandeAchat {
   id_demande_achat: number
   numero: string
   id_service: number
-  objet: string
-  description: string | null
+  /** Formulation d'origine du demandeur (OP1.1) — jamais modifiée après transmission au RC (décision du 15/09/2026). */
+  objet_demandeur: string
+  description_demandeur: string | null
+  /** Reformulation du RC (OP1.2b) — synchronisée sur *_demandeur tant que la DA reste éditable par le demandeur, fait foi ensuite. */
+  objet_rc: string
+  description_rc: string | null
   montant_demande: number
   imputation_comptable: 'FONCTIONNEMENT' | 'INVESTISSEMENT' | null
   procedure_achat: ProcedureAchat
@@ -35,14 +39,23 @@ export interface DemandeAchat {
   updated_at: string
 }
 
+/**
+ * Onglet de l'écran d'accueil (décision du 15/09/2026) — traduit côté backend en une liste
+ * fixe de statuts (voir demandeAchat.service.ts#ACCUEIL_SCOPE_STATUTS), prioritaire sur `statut`.
+ */
+export type AccueilScope = 'A_FINALISER' | 'SUIVI_FAD' | 'A_TRAITER' | 'EN_COURS' | 'FAD_COMMANDEES' | 'REJETEES_ANNULEES'
+
 export interface DemandeAchatListParams {
   idCellule?: number | null
   matriculeDemandeur?: string | null
   statut?: string | null
+  scope?: AccueilScope
   search?: string
+  /** Filtre "Fournisseurs" des onglets de l'écran d'accueil — correspondance exacte. */
+  idFournisseurRetenu?: number | null
 }
 
-/** Filtres de la page DemandeAchat — voir demandeAchat.service.ts#listDemandeAchat pour la portée exacte appliquée côté backend selon le rôle. */
+/** Filtres de la page DemandeAchat / des onglets de l'accueil — voir demandeAchat.service.ts#listDemandeAchat pour la portée exacte appliquée côté backend selon le rôle. */
 export function useDemandeAchatList(params: DemandeAchatListParams) {
   const [demandesAchat, setDemandesAchat] = useState<DemandeAchat[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,7 +68,9 @@ export function useDemandeAchatList(params: DemandeAchatListParams) {
     if (params.idCellule != null) query.set('idCellule', String(params.idCellule))
     if (params.matriculeDemandeur) query.set('matriculeDemandeur', params.matriculeDemandeur)
     if (params.statut) query.set('statut', params.statut)
+    if (params.scope) query.set('scope', params.scope)
     if (params.search) query.set('search', params.search)
+    if (params.idFournisseurRetenu != null) query.set('idFournisseurRetenu', String(params.idFournisseurRetenu))
     const qs = query.toString()
 
     return api
@@ -63,7 +78,7 @@ export function useDemandeAchatList(params: DemandeAchatListParams) {
       .then((data) => setDemandesAchat(data))
       .catch(() => setError('Impossible de charger les demandes d\'achat.'))
       .finally(() => setLoading(false))
-  }, [params.idCellule, params.matriculeDemandeur, params.statut, params.search])
+  }, [params.idCellule, params.matriculeDemandeur, params.statut, params.scope, params.search, params.idFournisseurRetenu])
 
   useEffect(() => {
     void refetch()
@@ -214,4 +229,175 @@ export async function downloadPieceDemandeAchatBlob(idDemandeAchat: number, idPi
 
 export async function deleteDemandeAchat(idDemandeAchat: number): Promise<void> {
   return api.delete(`/demandes-achat/${idDemandeAchat}`)
+}
+
+// ─── Transitions de statut OP1.1 à OP1.6 (chantier du 15/09/2026, voir
+// backend/src/services/demandeAchat.service.ts et ForClaude/CDC/mct-phases-1-2.md) ───
+
+export type DemandeAchatDecision = 'VALIDER' | 'REJETER' | 'ANNULER' | 'COMPLEMENT'
+
+export interface DecisionInput {
+  decision: DemandeAchatDecision
+  /** Obligatoire pour toute décision autre que VALIDER (motif de rejet/annulation/complément). */
+  commentaireStatut?: string
+}
+
+/** OP1.1 (résultat final) — bouton « Transmettre au RC » de l'onglet "A finaliser". */
+export async function transmettreRc(idDemandeAchat: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-rc`, {})
+}
+
+/** OP1.2 — file RC. */
+export async function decisionRc(idDemandeAchat: number, input: DecisionInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/decision-rc`, input)
+}
+
+export interface TransmettreFadInput {
+  objet?: string
+  description?: string
+  codeSite: string
+  codeSousSite?: string | null
+  codeSecteur: string
+  codeSousSecteur?: string | null
+  codeCug: string
+  typeAchat: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  imputationComptable: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
+  numeroOperation?: string | null
+}
+
+/** OP1.2b — bascule DA → FAD, transmission au CDS (et reprise depuis FAD_A_COMPLETER_CDS). */
+export async function transmettreFad(idDemandeAchat: number, input: TransmettreFadInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-fad`, input)
+}
+
+/** OP1.3 — file CDS. */
+export async function decisionCds(idDemandeAchat: number, input: DecisionInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/decision-cds`, input)
+}
+
+/** OP1.3b — transmission à la CB. */
+export async function transmettreCb(idDemandeAchat: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-cb`, {})
+}
+
+export interface DecisionCbInput {
+  decision: 'VALIDER' | 'REJETER' | 'MODIFIER'
+  commentaireStatut?: string
+  /** La CB peut corriger les champs budgétaires/comptables au même appel que sa décision (décision du 15/09/2026). */
+  codeCug?: string
+  typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
+  numeroOperation?: string | null
+}
+
+/** OP1.4 — file CB (pas d'issue "annulé"). */
+export async function decisionCb(idDemandeAchat: number, input: DecisionCbInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/decision-cb`, input)
+}
+
+export interface RetransmettreCbInput {
+  objet?: string
+  description?: string
+  codeSite?: string
+  codeSousSite?: string | null
+  codeSecteur?: string
+  codeSousSecteur?: string | null
+  codeCug?: string
+  typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
+  numeroOperation?: string | null
+}
+
+/** Reprise OP1.4 — le RC corrige (partiellement) et retransmet directement à la CB, sans repasser par le CDS. */
+export async function retransmettreCb(idDemandeAchat: number, input: RetransmettreCbInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/retransmettre-cb`, input)
+}
+
+/** OP1.4b — routage automatique selon le seuil du service (déclenché par la CB), aucune saisie. */
+export async function transmettreDsOuSeuil(idDemandeAchat: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-ds-ou-seuil`, {})
+}
+
+/** OP1.5 — file DS ; le complément revient à la CB (pas au RC). */
+export async function decisionDs(idDemandeAchat: number, input: DecisionInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/decision-ds`, input)
+}
+
+/** OP1.5b — ordre de commande à la CB. */
+export async function transmettreOrdreCb(idDemandeAchat: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-ordre-cb`, {})
+}
+
+export interface CompleterCbInput {
+  codeCug?: string
+  typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
+  numeroOperation?: string | null
+}
+
+/** Reprise OP1.5 — la CB complète et retransmet directement au DS (réutilise le statut nominal). */
+export async function completerCb(idDemandeAchat: number, input: CompleterCbInput): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/completer-cb`, input)
+}
+
+/** OP1.6 — constat de la commande (saisie du BON dans le PGI = tâche manuelle hors application). */
+export async function commander(idDemandeAchat: number, montantCommande: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/commander`, { montantCommande })
+}
+
+/** Vue d'une ligne d'historique (modale « Historique des statuts », icône calendrier — écran d'accueil). */
+export interface HistoriqueStatutView {
+  idHisto: number
+  codeStatut: string
+  libelleStatut: string
+  dateHeure: string
+  matriculeActeur: string
+  acteurNomPrenom: string | null
+  /** ex. "en suppléance de Jean Dupont" — `null` si l'acteur a agi en tant que titulaire. */
+  suppleanceLabel: string | null
+  commentaireStatut: string | null
+}
+
+export async function getHistoriqueStatuts(idDemandeAchat: number): Promise<HistoriqueStatutView[]> {
+  return api.get<HistoriqueStatutView[]>(`/demandes-achat/${idDemandeAchat}/historique`)
+}
+
+export interface SyntheseBucket {
+  nombre: number
+  montant: number
+}
+
+export interface AccueilSynthese {
+  enTransit: Record<'RC' | 'CDS' | 'DS' | 'CB', SyntheseBucket>
+  mesDemandes: { enCours: SyntheseBucket; commande: SyntheseBucket }
+}
+
+/**
+ * Tuiles de synthèse — GET /demandes-achat/synthese, dont la portée dépend du rôle effectif du
+ * connecté côté serveur (voir demandeAchat.service.ts#getSynthese) : vue Demandeur (ses propres
+ * DA/FAD) sur pages/Home.tsx, vue RC (DA/FAD de sa cellule, hors DA_EN_PREPARATION) sur
+ * pages/SuiviRc.tsx — même hook, même endpoint, réutilisé tel quel (décision du 15/09/2026, second
+ * chantier RC). Renommé depuis useAccueilDemandeurSynthese, qui ne décrivait plus que la moitié des
+ * appelants.
+ */
+export function useAccueilSynthese() {
+  const [data, setData] = useState<AccueilSynthese | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const refetch = useCallback(() => {
+    setLoading(true)
+    setError(null)
+    return api
+      .get<AccueilSynthese>('/demandes-achat/synthese')
+      .then((result) => setData(result))
+      .catch(() => setError('Impossible de charger la synthèse.'))
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    void refetch()
+  }, [refetch])
+
+  return { data, loading, error, refetch }
 }

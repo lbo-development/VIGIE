@@ -16,18 +16,35 @@ export async function postDemandeAchat(req: Request, res: Response, next: NextFu
   }
 }
 
+const ACCUEIL_SCOPES = new Set(['A_FINALISER', 'SUIVI_FAD', 'A_TRAITER', 'EN_COURS', 'FAD_COMMANDEES', 'REJETEES_ANNULEES'])
+
 export async function getDemandeAchat(req: Request, res: Response, next: NextFunction) {
   try {
     const idCelluleRaw = req.query.idCellule
     const idCellule = typeof idCelluleRaw === 'string' && idCelluleRaw.trim() !== '' ? Number(idCelluleRaw) : undefined
+    const idFournisseurRetenuRaw = req.query.idFournisseurRetenu
+    const idFournisseurRetenu = typeof idFournisseurRetenuRaw === 'string' && idFournisseurRetenuRaw.trim() !== '' ? Number(idFournisseurRetenuRaw) : undefined
+    const scopeRaw = req.query.scope
+    const scope = typeof scopeRaw === 'string' && ACCUEIL_SCOPES.has(scopeRaw) ? (scopeRaw as demandeAchatService.AccueilScope) : undefined
 
     const demandesAchat = await demandeAchatService.listDemandeAchat(req.matricule ?? null, {
       idCellule: idCellule !== undefined && Number.isFinite(idCellule) ? idCellule : undefined,
       matriculeDemandeur: typeof req.query.matriculeDemandeur === 'string' ? req.query.matriculeDemandeur : undefined,
       statut: typeof req.query.statut === 'string' ? req.query.statut : undefined,
+      scope,
       search: typeof req.query.search === 'string' ? req.query.search : undefined,
+      idFournisseurRetenu: idFournisseurRetenu !== undefined && Number.isFinite(idFournisseurRetenu) ? idFournisseurRetenu : undefined,
     })
     res.json(demandesAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getDemandeAchatSynthese(req: Request, res: Response, next: NextFunction) {
+  try {
+    const synthese = await demandeAchatService.getSynthese(req.matricule ?? null)
+    res.json(synthese)
   } catch (err) {
     next(err)
   }
@@ -48,6 +65,16 @@ export async function putDemandeAchat(req: Request, res: Response, next: NextFun
     const id = parseId(req.params.id)
     const demandeAchat = await demandeAchatService.updateDemandeAchat(req.matricule ?? null, id, req.body)
     res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function getDemandeAchatHistorique(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const historique = await demandeAchatService.getHistoriqueStatuts(req.matricule ?? null, id)
+    res.json(historique)
   } catch (err) {
     next(err)
   }
@@ -77,6 +104,126 @@ export async function putDemandeAchatConsultation(req: Request, res: Response, n
   try {
     const id = parseId(req.params.id)
     const demandeAchat = await demandeAchatService.saveConsultationDemandeAchat(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatTransmettreRc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.transmettreRc(req.matricule ?? null, id)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatDecisionRc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.decisionRc(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatTransmettreFad(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.transmettreFad(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatDecisionCds(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.decisionCds(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatTransmettreCb(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.transmettreCb(req.matricule ?? null, id)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatDecisionCb(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.decisionCb(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatRetransmettreCb(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.retransmettreCb(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatTransmettreDsOuSeuil(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.transmettreDsOuSeuil(req.matricule ?? null, id)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatDecisionDs(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.decisionDs(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatTransmettreOrdreCb(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.transmettreOrdreCb(req.matricule ?? null, id)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatCompleterCb(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.completerCb(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function postDemandeAchatCommander(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.commander(req.matricule ?? null, id, req.body)
     res.json(demandeAchat)
   } catch (err) {
     next(err)

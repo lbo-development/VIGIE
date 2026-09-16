@@ -24,8 +24,12 @@ export interface DemandeAchat {
   id_demande_achat: number
   numero: string
   id_service: number
-  objet: string
-  description: string | null
+  /** Formulation d'origine du demandeur (OP1.1) — jamais modifiée après transmission au RC (décision du 15/09/2026). */
+  objet_demandeur: string
+  description_demandeur: string | null
+  /** Reformulation du RC (OP1.2b) — synchronisée sur *_demandeur tant que la DA reste éditable par le demandeur (STATUTS_MODIFIABLES), fait foi ensuite partout ailleurs dans l'application. */
+  objet_rc: string
+  description_rc: string | null
   montant_demande: number
   imputation_comptable: ImputationComptable | null
   procedure_achat: ProcedureAchat
@@ -52,7 +56,7 @@ export interface DemandeAchat {
 }
 
 const SELECT_COLUMNS =
-  'id_demande_achat, numero, id_service, objet, description, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
+  'id_demande_achat, numero, id_service, objet_demandeur, description_demandeur, objet_rc, description_rc, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
 
 /** Crée le brouillon (NUMERO alloué, DA_EN_PREPARATION, historique posé) — voir la fonction Postgres pour le détail. */
 export async function createBrouillon(idService: number, matriculeDemandeur: string): Promise<DemandeAchat> {
@@ -82,6 +86,8 @@ export interface ListFilters {
   search?: string
   /** Résultat de fournisseur.repository.ts#findIdsByRaisonSociale pour `search` — voir demandeAchat.service.ts#listDemandeAchat. */
   idFournisseurIn?: number[]
+  /** Filtre "Fournisseurs" de l'écran d'accueil (onglets 2/3/4, chantier du 15/09/2026) — correspondance exacte, distinct de la recherche texte idFournisseurIn ci-dessus. */
+  idFournisseurRetenu?: number
 }
 
 export async function findAll(filters: ListFilters): Promise<DemandeAchat[]> {
@@ -90,6 +96,7 @@ export async function findAll(filters: ListFilters): Promise<DemandeAchat[]> {
   if (filters.idService !== undefined) query = query.eq('id_service', filters.idService)
   if (filters.matriculeDemandeurIn) query = query.in('matricule_demandeur', filters.matriculeDemandeurIn)
   if (filters.statuts && filters.statuts.length > 0) query = query.in('code_statut', filters.statuts)
+  if (filters.idFournisseurRetenu !== undefined) query = query.eq('id_fournisseur_retenu', filters.idFournisseurRetenu)
   if (filters.search) {
     const orClauses = [`numero.ilike.%${filters.search}%`, `objet.ilike.%${filters.search}%`]
     if (filters.idFournisseurIn && filters.idFournisseurIn.length > 0) {
@@ -104,8 +111,10 @@ export async function findAll(filters: ListFilters): Promise<DemandeAchat[]> {
 }
 
 export interface DemandeAchatUpdate {
-  objet?: string
-  description?: string | null
+  objet_demandeur?: string
+  description_demandeur?: string | null
+  objet_rc?: string
+  description_rc?: string | null
   montant_demande?: number
   procedure_achat?: ProcedureAchat
   imputation_comptable?: ImputationComptable | null
@@ -121,7 +130,7 @@ export interface DemandeAchatUpdate {
   id_fournisseur_retenu?: number | null
   motif_choix?: MotifChoix | null
   libelle_motif_choix?: string | null
-  code_statut?: string
+  montant_commande?: number
 }
 
 export async function update(idDemandeAchat: number, input: DemandeAchatUpdate): Promise<DemandeAchat> {

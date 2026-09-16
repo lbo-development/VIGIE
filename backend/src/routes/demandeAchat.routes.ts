@@ -20,6 +20,20 @@ import {
   deleteDemandeAchatPiece,
   getDemandeAchatPieceFichier,
   deleteDemandeAchat,
+  postDemandeAchatTransmettreRc,
+  postDemandeAchatDecisionRc,
+  postDemandeAchatTransmettreFad,
+  postDemandeAchatDecisionCds,
+  postDemandeAchatTransmettreCb,
+  postDemandeAchatDecisionCb,
+  postDemandeAchatRetransmettreCb,
+  postDemandeAchatTransmettreDsOuSeuil,
+  postDemandeAchatDecisionDs,
+  postDemandeAchatTransmettreOrdreCb,
+  postDemandeAchatCompleterCb,
+  postDemandeAchatCommander,
+  getDemandeAchatHistorique,
+  getDemandeAchatSynthese,
 } from '../controllers/demandeAchat.controller.js'
 
 // memoryStorage : le fichier ne touche jamais le disque avant l'envoi au bucket Supabase
@@ -33,7 +47,10 @@ router.use(requireAuth)
 
 router.get('/', getDemandeAchat)
 router.post('/', postDemandeAchat)
+// Doit précéder '/:id' — sinon Express matche "synthese" comme :id.
+router.get('/synthese', getDemandeAchatSynthese)
 router.get('/:id', getDemandeAchatById)
+router.get('/:id/historique', getDemandeAchatHistorique)
 router.put('/:id', putDemandeAchat)
 router.put('/:id/marche', putDemandeAchatMarche)
 router.get('/:id/consultation', getDemandeAchatConsultation)
@@ -48,6 +65,18 @@ router.get('/:id/pieces', getDemandeAchatPieces)
 router.post('/:id/pieces', upload.single('fichier'), postDemandeAchatPiece)
 router.delete('/:id/pieces/:idPiece', deleteDemandeAchatPiece)
 router.get('/:id/pieces/:idPiece/fichier', getDemandeAchatPieceFichier)
+router.post('/:id/transmettre-rc', postDemandeAchatTransmettreRc)
+router.post('/:id/decision-rc', postDemandeAchatDecisionRc)
+router.post('/:id/transmettre-fad', postDemandeAchatTransmettreFad)
+router.post('/:id/decision-cds', postDemandeAchatDecisionCds)
+router.post('/:id/transmettre-cb', postDemandeAchatTransmettreCb)
+router.post('/:id/decision-cb', postDemandeAchatDecisionCb)
+router.post('/:id/retransmettre-cb', postDemandeAchatRetransmettreCb)
+router.post('/:id/transmettre-ds-ou-seuil', postDemandeAchatTransmettreDsOuSeuil)
+router.post('/:id/decision-ds', postDemandeAchatDecisionDs)
+router.post('/:id/transmettre-ordre-cb', postDemandeAchatTransmettreOrdreCb)
+router.post('/:id/completer-cb', postDemandeAchatCompleterCb)
+router.post('/:id/commander', postDemandeAchatCommander)
 router.delete('/:id', deleteDemandeAchat)
 
 export default router

@@ -181,7 +181,7 @@ describe('Fournisseurs', () => {
   })
 
   it('ADMIN_APP : le formulaire de création garde Direction → Service en cascade', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Fournisseurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau fournisseur/i }))
@@ -201,7 +201,7 @@ describe('Fournisseurs', () => {
   })
 
   it('ADMIN_SERVICE : le formulaire de création masque Direction/Service et hérite de son propre service', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Fournisseurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau fournisseur/i }))
@@ -228,7 +228,7 @@ describe('Fournisseurs', () => {
   })
 
   it('le formulaire de création refuse un SIREN dont la clé de contrôle est incorrecte', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Fournisseurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau fournisseur/i }))
@@ -243,7 +243,7 @@ describe('Fournisseurs', () => {
   })
 
   it('le formulaire de création accepte un SIREN valide saisi avec des espaces', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Fournisseurs />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau fournisseur/i }))
@@ -511,7 +511,7 @@ describe('Fournisseurs', () => {
   })
 
   it('ADMIN_SERVICE : direction et service se positionnent automatiquement sur son propre périmètre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Fournisseurs />)
 
     expect(screen.getByText('Acme')).toBeInTheDocument()
@@ -531,7 +531,7 @@ describe('Fournisseurs', () => {
   })
 
   it('ADMIN_APP voit tous les services de la direction choisie dans la combobox de filtre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Fournisseurs />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')

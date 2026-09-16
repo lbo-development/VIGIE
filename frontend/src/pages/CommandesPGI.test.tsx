@@ -206,7 +206,7 @@ describe('CommandesPGI', () => {
   })
 
   it("ADMIN_SERVICE : direction et service pré-remplis sur son propre service", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<CommandesPGI />)
 
     expect(screen.getByRole('button', { name: 'Filtrer par direction' })).toHaveTextContent('Direction Générale')

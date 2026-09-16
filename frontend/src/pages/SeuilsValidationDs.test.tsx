@@ -163,7 +163,7 @@ describe('SeuilsValidationDs', () => {
   })
 
   it('ADMIN_SERVICE : la direction se positionne automatiquement sur son propre périmètre, et seul son service est listé', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<SeuilsValidationDs />)
 
     // Pas besoin de choisir la direction : la liste est déjà affichée.
@@ -173,7 +173,7 @@ describe('SeuilsValidationDs', () => {
   })
 
   it('ADMIN_APP voit tous les services de la direction choisie', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<SeuilsValidationDs />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')

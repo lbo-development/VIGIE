@@ -30,18 +30,20 @@
   color: var(--gp-danger);
 }
 
-/* Légère élévation au survol d'une carte indicateur — touche "tableau de
-   bord" qui n'a pas d'équivalent dans gpmm.css (la carte y est statique).
-   Décision du 02/09/2026 : pas de pastille d'icône (retirée sur retour
-   utilisateur, pas adaptée à une simple étiquette chiffrée) — seul cet effet
-   de survol reste. */
+/* Ombre légère permanente sur une carte indicateur (demande du 15/09/2026) + légère
+   élévation au survol — touche "tableau de bord" qui n'a pas d'équivalent dans gpmm.css
+   (la carte y est statique par défaut). --gp-shadow-float (noir/bleu très sombre,
+   gpmm.css) restait invisible sur le fond déjà sombre des cartes en thème sombre — ombre
+   reconstruite à partir de --gp-border-strong (jeton gris du gabarit) via color-mix,
+   plutôt qu'une couleur inventée. Décision du 02/09/2026 : pas de pastille d'icône
+   (retirée sur retour utilisateur, pas adaptée à une simple étiquette chiffrée). */
 .metric-card {
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--gp-border-strong) 55%, transparent);
   transition:
     box-shadow 0.15s ease,
     transform 0.15s ease;
 }
 .metric-card:hover {
-  box-shadow: var(--gp-shadow-float);
   transform: translateY(-2px);
 }
 
@@ -52,4 +54,27 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+/* Écran d'accueil (pages/Home.tsx) : colonne des tuiles "En transit"/"Mes demandes"
+   réduite de 30% par rapport au ratio par défaut de `.demo-grid` (gpmm.css,
+   minmax(280px,.7fr)) — pour laisser plus de largeur au tableau des demandes.
+   Repris uniquement au-dessus du même seuil que le repli mobile de `.demo-grid`
+   (1024px, gpmm.css) : en dessous, `.demo-grid` bascule déjà sur une seule
+   colonne, cette règle ne doit pas l'en empêcher. */
+@media (min-width: 1024px) {
+  /* Spécificité (0,2,0) — volontairement plus élevée que .demo-grid (0,1,0) seul, pour
+     l'emporter quel que soit l'ordre de chargement des feuilles de style. */
+  .demo-grid.accueil-tiles-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(196px, 0.49fr);
+  }
+}
+
+/* Carte DA/FAD de l'écran d'accueil (pages/Home.tsx) — remplace le tableau en colonnes par une
+   carte sur 2 lignes par demande (préférence utilisateur, 15/09/2026). Composée uniquement de
+   primitives déjà stylées par gpmm.css (.gp-panel/.gp-badge/.gp-rowacts/.gp-tip) — seul le padding
+   par défaut de .gp-panel (18px) est resserré pour tenir plus de cartes à l'écran, aucune couleur/
+   police/ombre/rayon en dur ajoutée. */
+.accueil-da-card {
+  padding: 10px 16px;
 }

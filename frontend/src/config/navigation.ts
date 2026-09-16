@@ -1,3 +1,5 @@
+import type { MeResponse } from '../hooks/useCurrentUser'
+
 export interface NavItem {
   to: string
   label: string
@@ -14,10 +16,10 @@ export interface NavItem {
  * "Fournisseurs" déplacé ici depuis le groupe sidebar "Paramètres" (décision
  * du 29/08/2026).
  *
- * "Suivi des DA" ajouté le 07/09/2026, juste après "Accueil" — écran de
- * suivi des demandes d'achat (module DA/FAD, cf. ForClaude/CDC), pas encore
- * implémenté (placeholder "en cours de développement" dans DemandeAchat.tsx
- * en attendant).
+ * "Suivi des DA" retiré le 15/09/2026 : contenu absorbé par l'onglet
+ * "A finaliser" de l'écran d'accueil (pages/Home.tsx, chantier écran
+ * d'accueil/workflow FAD) — la page /demandes-achat elle-même a été
+ * supprimée, ce n'est plus un doublon.
  *
  * "Marchés" ajouté le 30/08/2026, juste avant "Fournisseurs" — section à part :
  * sa sélection bascule tout le contenu de la sidebar sur `MARCHES_SIDEBAR_ITEMS`
@@ -37,12 +39,33 @@ export interface NavItem {
  */
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', icon: 'i-home' },
-  { to: '/demandes-achat', label: 'Suivi des DA', icon: '' },
   { to: '/marches', label: 'Marchés', icon: '' },
   { to: '/commandes', label: 'Commandes PGI', icon: '' },
   { to: '/investissements', label: 'Investissements', icon: '' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: '' },
 ]
+
+/**
+ * Contenu de la sidebar de la section "Accueil" (écran de suivi RC, décision
+ * du 15/09/2026) — construite à l'exécution plutôt que filtrée depuis un
+ * tableau statique (seule fonction de ce fichier dans ce cas) : le libellé
+ * dépend d'une donnée runtime (le nom de la cellule du rôle RC), pas
+ * seulement d'une combinaison de booléens de rôle comme les autres filtres
+ * ci-dessous. Masquée pour qui n'a pas de rôle RC actif (titulaire ou
+ * suppléant — `currentUser.roles` vient déjà de roleEffectifService côté
+ * serveur, voir me.service.ts#getCurrentUser, donc couvre la suppléance sans
+ * traitement supplémentaire ici).
+ */
+export function getAccueilSidebarItems(currentUser: MeResponse | null): NavItem[] {
+  const rcRole = currentUser?.roles.find((r) => r.typeRole === 'RC')
+  if (!rcRole) return []
+  return [{ to: '/suivi-rc', label: `FAD — ${rcRole.perimeterLabel ?? ''}`, icon: '' }]
+}
+
+/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC — voir AppShell.tsx). */
+export function isHomeSection(pathname: string): boolean {
+  return pathname === '/' || pathname.startsWith('/suivi-rc')
+}
 
 /**
  * Racine de la section "Marchés" — sert à la fois de route par défaut

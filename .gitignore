@@ -8,3 +8,7 @@ dist
 # Liste d'emails fournie ponctuellement pour database/seeds/createAuthUsers.ts
 # — jamais de données personnelles réelles (RGPD) committées dans le dépôt.
 database/seeds/auth-users-emails.txt
+
+# Idem pour database/seeds/importUtilisateurs.ts (import en masse d'acteurs) —
+# contient nom/prénom/email/mot de passe initial de personnes réelles.
+database/seeds/import-utilisateurs.json

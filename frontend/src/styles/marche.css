@@ -56,6 +56,16 @@
   padding-top: 3px;
 }
 
+/* Nom de l'agent gestionnaire (AGENTGESTION), au-dessus des pastilles de
+   statut (décision utilisateur, 11/09/2026) — masqué si non renseigné
+   (marché pas encore complété, cf. COMPLETUDE). */
+.marche-card__agent {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gp-text);
+  white-space: nowrap;
+}
+
 /* Libellé affiché en permanence devant la pastille plutôt qu'un tooltip au survol
    (décision utilisateur, 05/09/2026) — accessible sans interaction, visible aussi au tactile. */
 .marche-card__dot-row {

@@ -23,6 +23,7 @@ import investissementPieceRoutes from './investissementPiece.routes.js'
 import demandeAchatRoutes from './demandeAchat.routes.js'
 import acteurRoutes from './acteur.routes.js'
 import roleAttributionRoutes from './roleAttribution.routes.js'
+import suppleanceRoutes from './suppleance.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -54,5 +55,6 @@ router.use('/investissements/pieces', investissementPieceRoutes)
 router.use('/demandes-achat', demandeAchatRoutes)
 router.use('/acteurs', acteurRoutes)
 router.use('/role-attributions', roleAttributionRoutes)
+router.use('/suppleances', suppleanceRoutes)
 
 export default router

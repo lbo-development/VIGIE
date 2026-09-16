@@ -93,6 +93,16 @@ export function Header({ items }: { items: NavItem[] }) {
           </svg>
         </button>
       </div>
+
+      <div className="header-actions">
+        <span className="gp-tip" data-tip="Actualiser la page">
+          <button type="button" className="icon-btn" aria-label="Actualiser la page" onClick={() => window.location.reload()}>
+            <svg className="ti">
+              <use href="#i-refresh" />
+            </svg>
+          </button>
+        </span>
+      </div>
     </header>
   )
 }

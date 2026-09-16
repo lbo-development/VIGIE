@@ -64,7 +64,7 @@ describe('Cug', () => {
   })
 
   it('la liste est vide tant que direction et service ne sont pas tous les deux choisis, sans option "Tous"', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     expect(screen.getByText('Sélectionne une direction et un service pour afficher les CUG.')).toBeInTheDocument()
@@ -73,7 +73,7 @@ describe('Cug', () => {
   })
 
   it('affiche la liste une fois direction et service choisis (ADMIN_APP)', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')
@@ -86,7 +86,7 @@ describe('Cug', () => {
   })
 
   it('filtre par statut (Actif / Inactif), une fois direction et service choisis', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')
@@ -100,7 +100,7 @@ describe('Cug', () => {
   })
 
   it('affiche "X CUG sélectionnés sur X CUG enregistrés", narrowed by the status filter', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')
@@ -112,14 +112,14 @@ describe('Cug', () => {
   })
 
   it('ADMIN_SERVICE : direction et service se positionnent automatiquement sur son propre périmètre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Cug />)
 
     expect(screen.getByText('Fournitures bureau')).toBeInTheDocument()
   })
 
   it('ADMIN_SERVICE : la combobox de filtre Service ne propose pas les autres services', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Cug />)
 
     expect(screen.queryByText('Prestations voyageurs')).not.toBeInTheDocument()
@@ -127,7 +127,7 @@ describe('Cug', () => {
   })
 
   it('formulaire de création : la combo Service n\'apparaît qu\'après avoir choisi une Direction (ADMIN_APP)', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau cug/i }))
@@ -153,7 +153,7 @@ describe('Cug', () => {
   })
 
   it('ADMIN_SERVICE : le formulaire de création masque Direction/Service et hérite de son propre service', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<Cug />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau cug/i }))
@@ -166,7 +166,7 @@ describe('Cug', () => {
   })
 
   it('formulaire de modification : le code n\'est pas modifiable (clé naturelle, contrairement à Cellule)', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')
@@ -182,7 +182,7 @@ describe('Cug', () => {
   })
 
   it('formulaire de modification : enregistre le libellé et le statut via PUT /cug/:codeCug', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     vi.mocked(api.put).mockResolvedValue({ ...CUG[0], libelle_cug: 'Fournitures et consommables' })
     render(<Cug />)
 
@@ -199,7 +199,7 @@ describe('Cug', () => {
   })
 
   it('a un bouton "Modifier le CUG" avec info-bulle explicite', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<Cug />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')

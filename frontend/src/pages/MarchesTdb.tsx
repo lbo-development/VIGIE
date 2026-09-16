@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useDirections } from '../hooks/useDirections'
 import { useServices } from '../hooks/useServices'
@@ -6,6 +6,7 @@ import { useMarches } from '../hooks/useMarches'
 import { useMarcheTiers } from '../hooks/useMarcheTiers'
 import { useMarcheLastImport } from '../hooks/useMarcheLastImport'
 import { Combobox } from '../components/Combobox'
+import { MetricCard, MetricSubgroup } from '../components/MetricCard'
 import '../styles/tableauDeBord.css'
 
 function daysBetween(from: Date, to: Date): number {
@@ -38,44 +39,6 @@ const IMPORT_STALE_JOURS = 15
 
 /** Même texte que backend/src/services/marcheImport.service.ts#PARAMETRE_NON_INITIALISE — un seul message à faire évoluer des deux côtés. */
 const PARAMETRE_NON_INITIALISE = 'Paramètre "last.import.marche.pgi" non initialisé.'
-
-type MetricTone = 'info' | 'success' | 'warning' | 'danger'
-
-/**
- * Une carte indicateur (`.metric-card` de gpmm.css) — le chiffre n'est teinté
- * que pour `warning`/`danger` (un compteur "normal" reste en texte neutre,
- * même logique que `.metric-meta.success/.warning` du gabarit, qui ne teinte
- * jamais le cas "neutre"). Pas d'icône (retirée le 02/09/2026 sur retour
- * utilisateur — pas adaptée à une simple étiquette chiffrée).
- */
-function MetricCard({ label, value, tone = 'info' }: { label: string; value: number; tone?: MetricTone }) {
-  return (
-    <article className="metric-card">
-      <span className="metric-label">{label}</span>
-      <strong className={tone === 'warning' || tone === 'danger' ? `metric-value ${tone}` : 'metric-value'}>{value}</strong>
-    </article>
-  )
-}
-
-/** Sous-groupe de cartes au sein d'un `.gp-panel` — `.metrics-grid` (4 colonnes fixes, gpmm.css) pour la rangée principale, `.grid` (auto-adaptatif, gpmm.css) pour les rangées plus courtes, afin d'éviter les colonnes vides d'une grille à 4 colonnes sous-remplie. */
-function MetricSubgroup({
-  title,
-  gridClassName = 'metrics-grid',
-  children,
-}: {
-  title: string
-  gridClassName?: 'metrics-grid' | 'grid'
-  children: ReactNode
-}) {
-  return (
-    <div className="tdb-subgroup">
-      <span className="eyebrow">{title}</span>
-      <div className={gridClassName} aria-label={`Indicateurs — ${title}`}>
-        {children}
-      </div>
-    </div>
-  )
-}
 
 /**
  * Tableau de bord des marchés (/marches/tdb) — indicateurs chiffrés du

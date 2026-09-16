@@ -214,7 +214,7 @@ describe('GisementGeographique', () => {
   })
 
   it('ADMIN_SERVICE : la modale de création pré-sélectionne son service et affiche sa direction', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<GisementGeographique />)
 
     fireEvent.click(screen.getByRole('button', { name: /nouveau site/i }))
@@ -283,7 +283,7 @@ describe('GisementGeographique', () => {
   })
 
   it('ADMIN_SERVICE : direction et service se positionnent automatiquement sur son propre périmètre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<GisementGeographique />)
 
     // Pas besoin de choisir quoi que ce soit : la liste est déjà affichée.
@@ -299,7 +299,7 @@ describe('GisementGeographique', () => {
   })
 
   it('ADMIN_APP voit tous les services de la direction choisie dans la combobox de filtre', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<GisementGeographique />)
 
     selectComboboxOption('Filtrer par direction', 'Direction Générale')

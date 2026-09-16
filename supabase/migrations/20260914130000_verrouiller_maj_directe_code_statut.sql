@@ -1,0 +1,28 @@
+-- Point 2 (suite) : verrouille la seule porte de contournement restante du
+-- trigger trg_sync_statut_courant (migration 20260914120000). Sans ce verrou,
+-- rien n'empêchait un futur bout de code d'exécuter
+--   update finances.demande_achat set code_statut = ... where ...
+-- directement — un changement de statut sans aucune ligne correspondante dans
+-- historique_statut, violant silencieusement les règles 2 (tout changement est
+-- historisé) et 3 (le statut courant est toujours le dernier de l'historique).
+--
+-- Vérifié avant d'écrire cette migration :
+--   - has_column_privilege('service_role', 'finances.demande_achat',
+--     'code_statut', 'UPDATE') renvoyait true, alors qu'aucun GRANT explicite
+--     n'apparaît dans information_schema.role_table_grants pour cette table —
+--     le privilège vient des default privileges du schéma finances, pas d'un
+--     GRANT nommé. Le REVOKE ci-dessous s'applique correctement dans ce cas
+--     (Postgres calcule le privilège effectif colonne par colonne).
+--   - aucun code backend ne fait aujourd'hui d'UPDATE direct sur code_statut
+--     (seule finances.creer_demande_achat_brouillon l'insère, à la création) :
+--     ce verrou ne casse donc rien d'existant.
+--   - le trigger continue de fonctionner après ce REVOKE : sa fonction
+--     (finances.sync_statut_courant_demande_achat) est security definer,
+--     exécutée avec les droits de son propriétaire (postgres), qui n'est jamais
+--     soumis aux GRANT/REVOKE appliqués à service_role.
+--
+-- Après cette migration, le SEUL moyen de faire évoluer demande_achat.code_statut
+-- est d'insérer une ligne dans historique_statut — toute tentative de mise à
+-- jour directe échouera avec une erreur de permission Postgres (42501).
+
+revoke update (code_statut) on finances.demande_achat from service_role;

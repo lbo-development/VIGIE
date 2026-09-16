@@ -115,7 +115,7 @@ describe('MarchesTdb', () => {
   })
 
   it("aucun service sélectionné : message d'invite, pas d'indicateurs", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<MarchesTdb />)
 
     expect(screen.getByText('Sélectionne une direction et un service pour afficher le tableau de bord.')).toBeInTheDocument()
@@ -123,7 +123,7 @@ describe('MarchesTdb', () => {
   })
 
   it('ADMIN_APP : filtre Direction/Service en cascade, affiche les deux sections une fois les deux choisis', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<MarchesTdb />)
 
     expect(screen.queryByRole('button', { name: 'Service' })).not.toBeInTheDocument()

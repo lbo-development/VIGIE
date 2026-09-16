@@ -495,7 +495,16 @@ Migration : `supabase/migrations/20260905090000_create_libelle_referentiel.sql`.
   alter default privileges in schema finances grant select on tables to claude_readonly;
   alter default privileges in schema public grant select on tables to claude_readonly;
   grant select on pg_catalog.pg_policies to claude_readonly;
+  alter role claude_readonly with bypassrls;
   ```
+  **`bypassrls` obligatoire, pas optionnel** — incident du 14/09/2026 : plusieurs tables
+  `finances.*` ont RLS activée sans aucune policy (cf. §2.7). Sans `BYPASSRLS`, Postgres
+  masque alors *toutes* les lignes à `claude_readonly` (ni propriétaire, ni superutilisateur),
+  qui les voit comme vides même quand elles contiennent des données — a produit un faux
+  diagnostic de table vide lors d'une vérification. Sans danger ici : le rôle ne porte aucun
+  droit d'écriture, `BYPASSRLS` ne fait que lever le filtre de visibilité en lecture, il ne
+  débloque aucune capacité d'INSERT/UPDATE/DELETE/DDL.
+
   La chaîne de connexion (`postgresql://claude_readonly:<mot_de_passe>@<host>:5432/postgres`,
   host/port identiques à ceux affichés par le bouton "Connect" du dashboard Supabase, qui
   n'affiche que l'utilisateur `postgres` par défaut — remplacer juste l'utilisateur et le mot

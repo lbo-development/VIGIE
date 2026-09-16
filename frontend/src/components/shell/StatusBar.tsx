@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { useAuth } from '../../hooks/useAuth'
+import { ChangePasswordModal } from '../ChangePasswordModal'
 
 const APP_NAME = 'VIGIE'
 const APP_VERSION = 'v0.1.0'
@@ -6,6 +8,7 @@ const ENVIRONMENT_LABEL = import.meta.env.MODE === 'production' ? 'Production' :
 
 export function StatusBar() {
   const { session, signOut } = useAuth()
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
 
   return (
     <footer className="status-bar" role="status">
@@ -23,6 +26,12 @@ export function StatusBar() {
           <>
             <span className="status-sep">•</span>
             <span>{session.user.email}</span>
+            <button type="button" className="status-logout" onClick={() => setChangePasswordOpen(true)}>
+              <svg className="ti">
+                <use href="#i-lock" />
+              </svg>
+              Changer le mot de passe
+            </button>
             <button type="button" className="status-logout" onClick={() => void signOut()}>
               <svg className="ti">
                 <use href="#i-log-out" />
@@ -32,6 +41,7 @@ export function StatusBar() {
           </>
         )}
       </div>
+      {changePasswordOpen && <ChangePasswordModal onClose={() => setChangePasswordOpen(false)} />}
     </footer>
   )
 }

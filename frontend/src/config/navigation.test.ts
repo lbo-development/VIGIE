@@ -5,6 +5,8 @@ import {
   filterCommandesSidebarItems,
   filterInvestissementsSidebarItems,
   filterNavItems,
+  getAccueilSidebarItems,
+  isHomeSection,
   isMarchesSection,
   isCommandesSection,
   isInvestissementsSection,
@@ -15,6 +17,7 @@ import {
   INVESTISSEMENTS_SIDEBAR_ITEMS,
   NAV_ITEMS,
 } from './navigation'
+import type { MeResponse } from '../hooks/useCurrentUser'
 
 describe('filterParametresItems', () => {
   it("retourne une liste vide sans ADMIN_APP ni ADMIN_SERVICE (section masquée)", () => {
@@ -67,7 +70,7 @@ describe('filterNavItems', () => {
   it('"Accueil", "Marchés", "Commandes PGI" et "Investissements" sont toujours visibles', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Suivi des DA', 'Marchés', 'Commandes PGI', 'Investissements'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes PGI', 'Investissements'])
   })
 
   it("masque \"Fournisseurs\" pour un compte non rattaché à un ACTEUR (ni rôle d'administration, ni service propre)", () => {
@@ -81,7 +84,6 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
-      'Suivi des DA',
       'Marchés',
       'Commandes PGI',
       'Investissements',
@@ -94,7 +96,6 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
-      'Suivi des DA',
       'Marchés',
       'Commandes PGI',
       'Investissements',
@@ -107,7 +108,6 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
-      'Suivi des DA',
       'Marchés',
       'Commandes PGI',
       'Investissements',
@@ -117,6 +117,43 @@ describe('filterNavItems', () => {
 
   it('"Paramètres" ne figure pas dans les onglets du header (point d\'entrée : pied de sidebar)', () => {
     expect(NAV_ITEMS.map((i) => i.label)).not.toContain('Paramètres')
+  })
+})
+
+function meResponse(roles: MeResponse['roles']): MeResponse {
+  return { matricule: '20001', nom: 'PETIT', prenom: 'Julie', idService: 10, idCellule: 7, roles }
+}
+
+describe('getAccueilSidebarItems', () => {
+  it("retourne une liste vide sans rôle RC actif (currentUser null)", () => {
+    expect(getAccueilSidebarItems(null)).toEqual([])
+  })
+
+  it('retourne une liste vide sans rôle RC actif (autres rôles présents)', () => {
+    const currentUser = meResponse([{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Service Achats', idService: 10, idCellule: null }])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([])
+  })
+
+  it('retourne "FAD — <cellule>" pointant vers /suivi-rc avec un rôle RC (titulaire ou suppléant)', () => {
+    const currentUser = meResponse([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 }])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: '' }])
+  })
+})
+
+describe('isHomeSection', () => {
+  it('reconnaît la racine "/"', () => {
+    expect(isHomeSection('/')).toBe(true)
+  })
+
+  it('reconnaît "/suivi-rc" et ses sous-pages', () => {
+    expect(isHomeSection('/suivi-rc')).toBe(true)
+  })
+
+  it('ignore une route hors de la section', () => {
+    expect(isHomeSection('/marches')).toBe(false)
+    expect(isHomeSection('/parametres')).toBe(false)
   })
 })
 

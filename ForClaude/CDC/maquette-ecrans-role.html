@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="light dark" />
+  <title>VIGIE — Maquette écrans par rôle</title>
+  <!--
+    MAQUETTE AUTONOME — pas de code destiné à être intégré au développement React.
+    Objectif : matérialiser, pour discussion, l'écran d'accueil de chaque rôle du
+    workflow DA/FAD et la façon dont y cohabitent la file « À traiter » et la liste
+    scopée sur le périmètre du rôle. Construit avec les composants gp-* du design
+    system GPMM (gpmm.css + app.js du dossier Template UX), sans aucun CSS/JS ad hoc,
+    conformément à ForClaude/INSTRUCTIONS_UX.md.
+    Bascule entre les 5 rôles via les onglets du header (mécanisme data-main-tab
+    standard, déjà géré par app.js — aucun script supplémentaire nécessaire).
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../Template%20UX/gpmm.css" />
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <defs>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+      <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+      <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7M5 10v10h14V10M9 20v-6h6v6"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6h7l2 2h9v11H3z"/><path d="M3 9h18"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.8-1.8l.9-1.9-2.2-2.2-1.9.9A7 7 0 0 0 11.5 4L10.5 2h-3L6.8 4a7 7 0 0 0-1.8.8l-1.9-.9L.9 6.1 1.8 8a7 7 0 0 0-.8 1.8L-1 10.5v3l2 .7a7 7 0 0 0 .8 1.8l-.9 1.9 2.2 2.2 1.9-.9a7 7 0 0 0 1.8.8l.7 2h3l.7-2a7 7 0 0 0 1.8-.8l1.9.9 2.2-2.2-.9-1.9a7 7 0 0 0 .8-1.8z" transform="translate(2 0) scale(.85)"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10z"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M3 12h1M20 12h1M5.6 5.6l.7.7M17.7 17.7l.7.7M18.4 5.6l-.7.7M6.3 17.7l-.7.7"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v10M8 10l4 4 4-4M5 19h14"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6 2 6 2 8H4c0-2 2-2 2-8M10 20h4"/></symbol>
+      <symbol id="i-selector" viewBox="0 0 24 24"><path d="M8 9l4-4 4 4M8 15l4 4 4-4"/></symbol>
+      <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+      <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M16 4l4 4L8 20H4v-4z"/><path d="M13.5 6.5l4 4"/></symbol>
+      <symbol id="i-grip-vertical" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.3"/><circle cx="9" cy="12" r="1.3"/><circle cx="9" cy="18" r="1.3"/><circle cx="15" cy="6" r="1.3"/><circle cx="15" cy="12" r="1.3"/><circle cx="15" cy="18" r="1.3"/></symbol>
+    </defs>
+  </svg>
+
+  <div class="app-shell" id="appShell">
+    <header class="app-header">
+      <div class="brand-block">
+        <img src="../Template%20UX/logo-app.png" alt="Marseille Fos" class="brand-logo" />
+        <span class="brand-separator" aria-hidden="true"></span>
+        <span class="app-name">VIGIE — Demandes d'achat</span>
+      </div>
+
+      <div class="header-tabs-shell" id="headerTabsShell">
+        <button type="button" class="tabs-scroll-btn tabs-scroll-btn--left" id="tabsScrollLeft" aria-label="Afficher les onglets précédents" hidden>
+          <svg class="ti"><use href="#i-chevron-left"></use></svg>
+        </button>
+        <nav class="header-tabs gp-tabs" id="headerTabs" aria-label="Aperçu par rôle (maquette)" tabindex="0">
+          <button class="gp-tab" aria-selected="true" data-main-tab="demandeur">Demandeur</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="rc">RC</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="cds">CDS</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="cb">Cellule budget</button>
+          <button class="gp-tab" aria-selected="false" data-main-tab="ds">DS</button>
+        </nav>
+        <button type="button" class="tabs-scroll-btn tabs-scroll-btn--right" id="tabsScrollRight" aria-label="Afficher les onglets suivants" hidden>
+          <svg class="ti"><use href="#i-chevron-right"></use></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <section class="content-area gp-scroll" aria-label="Contenu principal">
+
+        <!-- ============ ACCUEIL DEMANDEUR ============ -->
+        <div data-main-panel="demandeur">
+          <div class="page-heading">
+            <div>
+              <div class="breadcrumbs"><span>VIGIE</span><span>/</span><strong>Accueil — Demandeur</strong></div>
+              <h1>Bonjour, J. Chabert</h1>
+              <p>Service Maintenance. Vous suivez ici vos propres demandes d'achat, de leur préparation jusqu'à la commande.</p>
+            </div>
+            <div class="page-actions">
+              <button class="gp-btn gp-btn--primary"><svg class="ti"><use href="#i-plus"></use></svg>Nouvelle demande d'achat</button>
+            </div>
+          </div>
+
+          <section class="metrics-grid" aria-label="Indicateurs">
+            <article class="metric-card"><span class="metric-label">À traiter</span><strong class="metric-value">1</strong><span class="metric-meta warning">Réponse attendue</span></article>
+            <article class="metric-card"><span class="metric-label">Mes demandes en cours</span><strong class="metric-value">4</strong><span class="metric-meta">Toutes phases confondues</span></article>
+            <article class="metric-card"><span class="metric-label">Validées ce mois</span><strong class="metric-value">5</strong><span class="metric-meta success">Aucun rejet</span></article>
+          </section>
+
+          <div class="gp-tabs" role="tablist" style="margin-top:22px;">
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="dem-traiter">À traiter <span class="gp-badge gp-badge--warning">1</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="dem-mes">Mes demandes <span class="gp-badge">4</span></button>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="dem-traiter">
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Demandes pour lesquelles une action de votre part est attendue.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:220px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:110px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="mono">DA-2026-0341</td>
+                    <td>Fournitures atelier peinture</td>
+                    <td class="mono">850 €</td>
+                    <td><span class="gp-badge gp-badge--warning">DA à compléter par le demandeur</span></td>
+                    <td>RC · il y a 2 j <span class="mono" style="color:var(--gp-text-muted);">· B020</span></td>
+                    <td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Compléter</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="dem-mes" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Toutes vos demandes, quel que soit leur statut actuel.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:220px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">DA-2026-0355</td><td>Achat visseuse sans fil</td><td class="mono">210 €</td><td><span class="gp-badge gp-badge--info">DA en préparation</span></td><td>— · aujourd'hui <span class="mono" style="color:var(--gp-text-muted);">· A010</span></td><td><div class="gp-rowacts"><button aria-label="Modifier"><svg class="ti"><use href="#i-pencil"></use></svg></button><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">DA-2026-0341</td><td>Fournitures atelier peinture</td><td class="mono">850 €</td><td><span class="gp-badge gp-badge--warning">À compléter</span></td><td>RC · il y a 2 j <span class="mono" style="color:var(--gp-text-muted);">· B020</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">DA-2026-0298</td><td>Location nacelle élévatrice</td><td class="mono">1 450 €</td><td><span class="gp-badge gp-badge--info">DA transmise au N+1</span></td><td>Demandeur · hier <span class="mono" style="color:var(--gp-text-muted);">· A020</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0201</td><td>Réfection joints quai 3</td><td class="mono">12 300 €</td><td><span class="gp-badge gp-badge--success">FAD validée par la CB</span></td><td>CB · il y a 3 j <span class="mono" style="color:var(--gp-text-muted);">· D010</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2025-1187</td><td>Casques de sécurité</td><td class="mono">640 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td>CB · il y a 12 j <span class="mono" style="color:var(--gp-text-muted);">· F011</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ ACCUEIL RC ============ -->
+        <div data-main-panel="rc" hidden>
+          <div class="page-heading">
+            <div>
+              <div class="breadcrumbs"><span>VIGIE</span><span>/</span><strong>Accueil — RC</strong></div>
+              <h1>Bonjour, S. Bianchi</h1>
+              <p>Responsable de la cellule Travaux. Vous statuez sur les DA de votre cellule et suivez leur devenir jusqu'à la commande.</p>
+            </div>
+          </div>
+
+          <section class="metrics-grid" aria-label="Indicateurs">
+            <article class="metric-card"><span class="metric-label">À traiter</span><strong class="metric-value">2</strong><span class="metric-meta warning">1 DA, 1 complément FAD</span></article>
+            <article class="metric-card"><span class="metric-label">Mes demandes</span><strong class="metric-value">1</strong><span class="metric-meta">En tant que demandeur</span></article>
+            <article class="metric-card"><span class="metric-label">Ma cellule</span><strong class="metric-value">14</strong><span class="metric-meta">Toutes phases confondues</span></article>
+          </section>
+
+          <div class="gp-tabs" role="tablist" style="margin-top:22px;">
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="rc-traiter">À traiter <span class="gp-badge gp-badge--warning">2</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="rc-mes">Mes demandes <span class="gp-badge">1</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="rc-cellule">Ma cellule <span class="gp-badge">14</span></button>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="rc-traiter">
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">DA en attente de décision, et FAD que la CDS ou la CB vous renvoient pour reprise.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:220px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:110px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr>
+                    <td class="mono">DA-2026-0402</td><td>Réparation pont roulant</td><td class="mono">3 200 €</td>
+                    <td><span class="gp-badge gp-badge--info">DA transmise au N+1</span></td>
+                    <td>Demandeur · il y a 1 j <span class="mono" style="color:var(--gp-text-muted);">· A020</span></td>
+                    <td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Statuer</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td>
+                  </tr>
+                  <tr>
+                    <td class="mono">FAD-2026-0198</td><td>Prestation nettoyage hangar B</td><td class="mono">5 600 €</td>
+                    <td><span class="gp-badge gp-badge--warning">FAD à compléter par le N+1</span></td>
+                    <td>CDS · il y a 4 h <span class="mono" style="color:var(--gp-text-muted);">· C020</span></td>
+                    <td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Compléter</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="rc-mes" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Vos propres demandes, en tant que demandeur — indépendamment de votre rôle de RC.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:220px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">DA-2026-0410</td><td>Ordinateur portable</td><td class="mono">1 100 €</td><td><span class="gp-badge gp-badge--info">DA en préparation</span></td><td>— · aujourd'hui <span class="mono" style="color:var(--gp-text-muted);">· A010</span></td><td><div class="gp-rowacts"><button aria-label="Modifier"><svg class="ti"><use href="#i-pencil"></use></svg></button><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="rc-cellule" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Toutes les DA/FAD que votre cellule a produites, y compris celles désormais entre les mains de la CDS, de la CB ou du DS — visibilité cumulative.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:220px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0201</td><td>Réfection joints quai 3</td><td class="mono">12 300 €</td><td><span class="gp-badge gp-badge--success">FAD validée par la CB</span></td><td>CB · il y a 3 j <span class="mono" style="color:var(--gp-text-muted);">· D010</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0176</td><td>Peinture hangar B</td><td class="mono">8 900 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+3</span></td><td>CB · il y a 5 j <span class="mono" style="color:var(--gp-text-muted);">· D030</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">DA-2026-0341</td><td>Fournitures atelier peinture</td><td class="mono">850 €</td><td><span class="gp-badge gp-badge--warning">DA à compléter par le demandeur</span></td><td>RC · il y a 2 j <span class="mono" style="color:var(--gp-text-muted);">· B020</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2025-1142</td><td>Location grue mobile</td><td class="mono">22 000 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td>CB · il y a 20 j <span class="mono" style="color:var(--gp-text-muted);">· F011</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">DA-2026-0398</td><td>Casques de sécurité renfort</td><td class="mono">640 €</td><td><span class="gp-badge gp-badge--danger">DA rejetée par le N+1</span></td><td>RC · il y a 6 j <span class="mono" style="color:var(--gp-text-muted);">· B021</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ ACCUEIL CDS ============ -->
+        <div data-main-panel="cds" hidden>
+          <div class="page-heading">
+            <div>
+              <div class="breadcrumbs"><span>VIGIE</span><span>/</span><strong>Accueil — CDS</strong></div>
+              <h1>Bonjour, P. Ferrand</h1>
+              <p>Chef du service Infrastructures. Vous statuez sur les FAD de votre service avant transmission au contrôle budgétaire.</p>
+            </div>
+          </div>
+
+          <section class="metrics-grid" aria-label="Indicateurs">
+            <article class="metric-card"><span class="metric-label">À traiter</span><strong class="metric-value">3</strong><span class="metric-meta warning">FAD en attente de décision</span></article>
+            <article class="metric-card"><span class="metric-label">Mes demandes</span><strong class="metric-value">0</strong><span class="metric-meta">Aucune en cours</span></article>
+            <article class="metric-card"><span class="metric-label">Mon service</span><strong class="metric-value">27</strong><span class="metric-meta">Toutes phases confondues</span></article>
+          </section>
+
+          <div class="gp-tabs" role="tablist" style="margin-top:22px;">
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="cds-traiter">À traiter <span class="gp-badge gp-badge--warning">3</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="cds-mes">Mes demandes <span class="gp-badge">0</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="cds-service">Mon service <span class="gp-badge">27</span></button>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cds-traiter">
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">FAD transmises par les RC de votre service, en attente de votre décision.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:100px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Cellule</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:110px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0198</td><td>Prestation nettoyage hangar B</td><td>Travaux</td><td class="mono">5 600 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+2</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Statuer</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0187</td><td>Câblage réseau atelier</td><td>Électricité</td><td class="mono">9 800 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+2</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Statuer</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0175</td><td>Remplacement vitrage atelier</td><td>Travaux</td><td class="mono">3 100 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+2</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Statuer</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cds-mes" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Aucune demande en cours en tant que demandeur.</p>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cds-service" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Toutes les DA/FAD de votre service, quelle que soit la cellule d'origine ou l'étape actuelle.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:100px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Cellule</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0140</td><td>Rénovation éclairage quai 2</td><td>Travaux</td><td class="mono">18 400 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0162</td><td>Contrat maintenance ascenseur</td><td>Électricité</td><td class="mono">6 200 €</td><td><span class="gp-badge gp-badge--info">FAD transmise à la CB</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">DA-2026-0355</td><td>Remplacement compresseur</td><td>Travaux</td><td class="mono">4 750 €</td><td><span class="gp-badge gp-badge--danger">FAD rejetée par le N+2</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ ACCUEIL CELLULE BUDGET ============ -->
+        <div data-main-panel="cb" hidden>
+          <div class="page-heading">
+            <div>
+              <div class="breadcrumbs"><span>VIGIE</span><span>/</span><strong>Accueil — Cellule budget</strong></div>
+              <h1>Bonjour, N. Salvi</h1>
+              <p>Agent de la cellule budget (3 agents). Vous vérifiez la conformité budgétaire et comptable des FAD avant transmission à la direction.</p>
+            </div>
+          </div>
+
+          <section class="metrics-grid" aria-label="Indicateurs">
+            <article class="metric-card"><span class="metric-label">À traiter</span><strong class="metric-value">5</strong><span class="metric-meta warning">Non affectées à un agent</span></article>
+            <article class="metric-card"><span class="metric-label">Mes demandes</span><strong class="metric-value">0</strong><span class="metric-meta">En tant que demandeur</span></article>
+            <article class="metric-card"><span class="metric-label">Traitées par moi</span><strong class="metric-value">9</strong><span class="metric-meta">Ce mois-ci</span></article>
+            <article class="metric-card"><span class="metric-label">Cellule budget</span><strong class="metric-value">42</strong><span class="metric-meta">Depuis sollicitation, tous agents</span></article>
+          </section>
+
+          <div class="gp-tabs" role="tablist" style="margin-top:22px;">
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="cb-traiter">À traiter <span class="gp-badge gp-badge--warning">5</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="cb-mes">Mes demandes <span class="gp-badge">0</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="cb-perso">Traitées par moi <span class="gp-badge">9</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="cb-cellule">Cellule budget <span class="gp-badge">42</span></button>
+          </div>
+
+          <p style="color:var(--gp-text-secondary);font-size:12.5px;margin:14px 0 0;font-style:italic;">Point ouvert : « Traitées par moi » suppose qu'une FAD soit affectée nommément à l'agent qui la prend en charge — ce mécanisme de prise en charge n'existe pas encore dans le référentiel de statuts et reste à concevoir.</p>
+
+          <div class="gp-tabpanel" data-panel="cb-traiter">
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">FAD en attente de vérification budgétaire et comptable, disponibles pour n'importe quel agent de la cellule.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:100px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Service</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:110px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0162</td><td>Contrat maintenance ascenseur</td><td>Infrastructures</td><td class="mono">6 200 €</td><td><span class="gp-badge gp-badge--info">FAD transmise à la CB</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Traiter</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0219</td><td>Achat groupe électrogène</td><td>Exploitation</td><td class="mono">31 000 €</td><td><span class="gp-badge gp-badge--info">FAD transmise à la CB</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Traiter</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0176</td><td>Peinture hangar B</td><td>Travaux</td><td class="mono">8 900 €</td><td><span class="gp-badge gp-badge--warning">FAD à commander</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Commander</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cb-mes" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Aucune demande en cours en tant que demandeur.</p>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cb-perso" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">FAD dont vous avez personnellement rendu la décision budgétaire.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0201</td><td>Réfection joints quai 3</td><td class="mono">12 300 €</td><td><span class="gp-badge gp-badge--success">FAD validée par la CB</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0140</td><td>Rénovation éclairage quai 2</td><td class="mono">18 400 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="cb-cellule" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Toutes les FAD que la cellule budget a vues, depuis sa première sollicitation, tous agents confondus.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Traitée par</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0201</td><td>Réfection joints quai 3</td><td>N. Salvi</td><td class="mono">12 300 €</td><td><span class="gp-badge gp-badge--success">FAD validée par la CB</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2025-1142</td><td>Location grue mobile</td><td>T. Morel</td><td class="mono">22 000 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0091</td><td>Fourniture câbles HT</td><td>K. Reboul</td><td class="mono">4 300 €</td><td><span class="gp-badge gp-badge--danger">FAD rejetée par la CB</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0176</td><td>Peinture hangar B</td><td>N. Salvi</td><td class="mono">8 900 €</td><td><span class="gp-badge gp-badge--warning">FAD à commander</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ ACCUEIL DS ============ -->
+        <div data-main-panel="ds" hidden>
+          <div class="page-heading">
+            <div>
+              <div class="breadcrumbs"><span>VIGIE</span><span>/</span><strong>Accueil — DS</strong></div>
+              <h1>Bonjour, F. Renaud</h1>
+              <p>Directeur de la direction Exploitation. Vous autorisez la commande des FAD au-dessus du seuil de délégation de votre direction.</p>
+            </div>
+          </div>
+
+          <section class="metrics-grid" aria-label="Indicateurs">
+            <article class="metric-card"><span class="metric-label">À traiter</span><strong class="metric-value">1</strong><span class="metric-meta warning">Au-dessus du seuil</span></article>
+            <article class="metric-card"><span class="metric-label">Mes demandes</span><strong class="metric-value">0</strong><span class="metric-meta">En tant que demandeur</span></article>
+            <article class="metric-card"><span class="metric-label">Ma direction</span><strong class="metric-value">63</strong><span class="metric-meta">Dont 51 validées automatiquement sous seuil</span></article>
+          </section>
+
+          <div class="gp-tabs" role="tablist" style="margin-top:22px;">
+            <button class="gp-tab" role="tab" aria-selected="true" data-tab="ds-traiter">À traiter <span class="gp-badge gp-badge--warning">1</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="ds-mes">Mes demandes <span class="gp-badge">0</span></button>
+            <button class="gp-tab" role="tab" aria-selected="false" data-tab="ds-direction">Ma direction <span class="gp-badge">63</span></button>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="ds-traiter">
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">FAD au-dessus du seuil de délégation, en attente de votre autorisation de commande.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:170px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Dernière action</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:110px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0219</td><td>Achat groupe électrogène</td><td class="mono">31 000 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+3</span></td><td>CB · il y a 1 j <span class="mono" style="color:var(--gp-text-muted);">· D030</span></td><td><div class="row" style="gap:10px;flex-wrap:nowrap;"><button class="gp-btn gp-btn--primary gp-btn--sm">Statuer</button><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="ds-mes" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Aucune demande en cours en tant que demandeur.</p>
+          </div>
+
+          <div class="gp-tabpanel" data-panel="ds-direction" hidden>
+            <p style="color:var(--gp-text-secondary);font-size:13px;margin:14px 0;">Toutes les FAD de votre direction ayant atteint le contrôle budgétaire, y compris celles validées automatiquement sous le seuil de délégation.</p>
+            <div class="gp-table-wrap gp-scroll" data-table>
+              <table class="gp-table">
+                <thead><tr>
+                  <th data-col data-type="text" style="width:120px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Référence</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Objet</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:110px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Montant</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th data-col data-type="text" style="width:200px;"><span class="gp-th"><svg class="ti gp-th__grip" draggable="true" aria-label="Déplacer la colonne"><use href="#i-grip-vertical"></use></svg><span class="gp-th__sort" data-sort><span>Statut</span><svg class="ti gp-th__ind" aria-hidden="true"><use href="#i-selector"></use></svg></span></span><span class="gp-th__rz" data-rz></span></th>
+                  <th style="width:80px;">Actions</th>
+                </tr></thead>
+                <tbody>
+                  <tr><td class="mono">FAD-2026-0219</td><td>Achat groupe électrogène</td><td class="mono">31 000 €</td><td><span class="gp-badge gp-badge--info">FAD transmise au N+3</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2026-0176</td><td>Peinture hangar B</td><td class="mono">8 900 €</td><td><span class="gp-badge gp-badge--success">FAD validée automatiquement par le N+3</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                  <tr><td class="mono">FAD-2025-1142</td><td>Location grue mobile</td><td class="mono">22 000 €</td><td><span class="gp-badge gp-badge--success">FAD commandée</span></td><td><div class="gp-rowacts"><button aria-label="Visualiser"><svg class="ti"><use href="#i-eye"></use></svg></button></div></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <aside class="app-sidebar" id="appSidebar" aria-label="Navigation principale latérale">
+        <nav class="sidebar-nav gp-scroll">
+          <a href="#" class="sidebar-item is-active" data-label="Accueil"><svg class="ti"><use href="#i-home"></use></svg><span class="sidebar-label">Accueil</span></a>
+          <div class="menu-group">
+            <button class="sidebar-item menu-trigger" aria-expanded="true"><svg class="ti"><use href="#i-folder"></use></svg><span class="sidebar-label">Demandes d'achat</span><svg class="ti menu-chevron"><use href="#i-chevron-down"></use></svg></button>
+            <div class="submenu"><a href="#">À traiter</a><a href="#">Mon périmètre</a><a href="#">Référentiel des statuts</a></div>
+          </div>
+        </nav>
+        <div class="sidebar-footer">
+          <button type="button" class="sidebar-footer-action" title="Paramètres"><svg class="ti"><use href="#i-settings"></use></svg><span class="sidebar-label">Paramètres</span></button>
+          <span class="sidebar-footer-separator" aria-hidden="true"></span>
+          <button type="button" class="sidebar-footer-action theme-toggle" id="themeToggle" title="Changer de thème" aria-pressed="false"><svg class="ti"><use id="themeIconUse" href="#i-moon"></use></svg><span class="sidebar-label" id="themeLabel">Sombre</span></button>
+        </div>
+      </aside>
+
+      <button type="button" class="sidebar-rail-toggle" id="sidebarRailToggle" aria-controls="appSidebar" aria-expanded="true" aria-label="Escamoter la navigation">
+        <svg class="ti"><use id="sidebarRailIconUse" href="#i-chevron-left"></use></svg>
+      </button>
+    </main>
+
+    <footer class="status-bar" role="status">
+      <div class="status-left"><span class="status-dot"></span><span>VIGIE — Demandes d'achat</span><span class="status-sep">•</span><span>Maquette de conception — non connectée aux données</span></div>
+      <div class="status-right"><span>Aperçu</span><span class="status-sep">•</span><span class="mono">v0 — maquette</span></div>
+    </footer>
+
+    <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
+  </div>
+
+  <div class="gp-toast-region" id="toastRegion" aria-live="polite"></div>
+
+  <script src="../Template%20UX/app.js"></script>
+</body>
+</html>

@@ -6,10 +6,13 @@ import type { OrgCellule } from '../hooks/useCellules'
 
 const ACTEURS: AdminActeur[] = [
   { matricule: '12520', nom: 'DUPONT', prenom: 'Jean', fonction: 'Agent', id_cellule: 7, actif: true },
-  { matricule: '99999', nom: 'MARTIN', prenom: 'Alice', fonction: 'RC', id_cellule: 7, actif: false },
+  { matricule: '99999', nom: 'MARTIN', prenom: 'Alice', fonction: 'RC', id_cellule: 8, actif: false },
 ]
 
-const CELLULES: OrgCellule[] = [{ id_cellule: 7, code_cellule: 'C1', libelle_cellule: 'Cellule Achats', id_service: 1, actif: true }]
+const CELLULES: OrgCellule[] = [
+  { id_cellule: 7, code_cellule: 'C1', libelle_cellule: 'Cellule Achats', id_service: 1, actif: true },
+  { id_cellule: 8, code_cellule: 'C2', libelle_cellule: 'Cellule Exploitation', id_service: 2, actif: true },
+]
 
 const refetch = vi.fn()
 vi.mock('../hooks/useAllActeurs', () => ({
@@ -17,6 +20,26 @@ vi.mock('../hooks/useAllActeurs', () => ({
 }))
 vi.mock('../hooks/useCellules', () => ({
   useCellules: () => ({ cellules: CELLULES, loading: false, refetch: vi.fn() }),
+}))
+vi.mock('../hooks/useServices', () => ({
+  useServices: () => ({
+    services: [
+      { id_service: 1, code_service: 'S1', libelle_service: 'Service Achats', id_direction: 1, actif: true },
+      { id_service: 2, code_service: 'S2', libelle_service: 'Service Exploitation', id_direction: 2, actif: true },
+    ],
+    loading: false,
+    refetch: vi.fn(),
+  }),
+}))
+vi.mock('../hooks/useDirections', () => ({
+  useDirections: () => ({
+    directions: [
+      { id_direction: 1, code_direction: 'D1', libelle_direction: 'Direction Achats', actif: true },
+      { id_direction: 2, code_direction: 'D2', libelle_direction: 'Direction Exploitation', actif: true },
+    ],
+    loading: false,
+    refetch: vi.fn(),
+  }),
 }))
 
 const apiPost = vi.fn()
@@ -38,6 +61,60 @@ describe('Utilisateurs', () => {
 
     const inactiveRow = screen.getByText('99999').closest('tr')!
     expect(within(inactiveRow).getByText('Inactif')).toBeInTheDocument()
+  })
+
+  it('filtre en cascade Direction -> Service -> Cellule', () => {
+    render(<Utilisateurs />)
+
+    // Direction/Service/Cellule sont toujours affichés (comme sur Suivi des DA) — Service/Cellule
+    // n'ont simplement aucune option tant que le niveau parent n'est pas choisi.
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Direction Achats'))
+
+    expect(screen.getByText('12520')).toBeInTheDocument()
+    expect(screen.queryByText('99999')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Service' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Service Achats'))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cellule' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Cellule Achats'))
+
+    expect(screen.getByText('12520')).toBeInTheDocument()
+    expect(screen.queryByText('99999')).not.toBeInTheDocument()
+  })
+
+  it('réinitialise Service et Cellule quand la Direction change', () => {
+    render(<Utilisateurs />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Direction Achats'))
+    fireEvent.click(screen.getByRole('button', { name: 'Service' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Service Achats'))
+
+    // Changement de direction : le filtre Service repart à "Tous" (les deux utilisateurs redeviennent visibles).
+    fireEvent.click(screen.getByRole('button', { name: 'Direction' }))
+    fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Direction Exploitation'))
+
+    expect(screen.getByText('99999')).toBeInTheDocument()
+  })
+
+  it('filtre par recherche sur nom, prénom ou matricule', () => {
+    render(<Utilisateurs />)
+
+    const search = screen.getByLabelText('Recherche')
+
+    fireEvent.change(search, { target: { value: 'dupont' } })
+    expect(screen.getByText('12520')).toBeInTheDocument()
+    expect(screen.queryByText('99999')).not.toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: 'alice' } })
+    expect(screen.queryByText('12520')).not.toBeInTheDocument()
+    expect(screen.getByText('99999')).toBeInTheDocument()
+
+    fireEvent.change(search, { target: { value: '99999' } })
+    expect(screen.getByText('99999')).toBeInTheDocument()
+    expect(screen.queryByText('12520')).not.toBeInTheDocument()
   })
 
   it('filtre par statut', () => {
@@ -97,7 +174,7 @@ describe('Utilisateurs', () => {
     fireEvent.change(within(dialog).getByLabelText('Fonction'), { target: { value: 'Fonction' } })
     fireEvent.change(within(dialog).getByLabelText('Adresse e-mail (compte)'), { target: { value: 'a@b.fr' } })
 
-    fireEvent.click(within(document.body).getByRole('button', { name: 'Cellule' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cellule' }))
     fireEvent.click(within(document.querySelector('.gp-menu') as HTMLElement).getByText('Cellule Achats'))
 
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))

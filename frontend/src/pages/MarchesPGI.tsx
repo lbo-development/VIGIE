@@ -10,6 +10,7 @@ import { SpinButton } from '../components/SpinButton'
 import { PiecesMarcheModal } from '../components/PiecesMarcheModal'
 import { AddPieceMarcheModal } from '../components/AddPieceMarcheModal'
 import { PieceCountBadge } from '../components/PieceCountBadge'
+import { FilterActiveDot } from '../components/FilterActiveDot'
 import { api, ApiError } from '../services/api'
 import '../styles/marche.css'
 
@@ -238,6 +239,10 @@ export function MarchesPGI() {
   const [filterComplet, setFilterComplet] = useState<TriEtat>('tous')
   const [filterAlerteDate, setFilterAlerteDate] = useState<TriEtat>('tous')
   const [filterAlerteMontant, setFilterAlerteMontant] = useState<TriEtat>('tous')
+  // AGENTGESTION est du texte libre (pas de FK vers ACTEUR — voir EditMarcheModal, un agent parti
+  // peut y laisser une valeur qui ne correspond plus à personne) : filtre par valeur exacte parmi
+  // celles réellement présentes dans la liste (agentGestionOptions), pas par sélection d'un acteur.
+  const [filterAgentGestion, setFilterAgentGestion] = useState<string | null>(null)
 
   // Bouton "Supprimer les filtres" (page principale, à côté du compteur) : vide directement le
   // filtre déjà appliqué (statut, alerte, recherche) — contrairement à celui de la modale, qui ne
@@ -247,9 +252,20 @@ export function MarchesPGI() {
     setFilterComplet('tous')
     setFilterAlerteDate('tous')
     setFilterAlerteMontant('tous')
+    setFilterAgentGestion(null)
     setSearchInput('')
     setSearch('')
   }
+
+  // Pastille sur le bouton "Filtrer" (décision utilisateur, 11/09/2026) — signale spécifiquement
+  // qu'un critère de la modale est actif ; la recherche texte (`search`) en est exclue à dessein,
+  // elle vit hors de la modale (voir FilterActiveDot).
+  const hasActiveFilters =
+    filterActif !== 'tous' ||
+    filterComplet !== 'tous' ||
+    filterAlerteDate !== 'tous' ||
+    filterAlerteMontant !== 'tous' ||
+    filterAgentGestion !== null
 
   // "Enregistrés" = date de fin >= aujourd'hui (peu importe ACTIF/COMPLETUDE) — décision utilisateur du 30/08/2026.
   // "Sélectionnés" (displayedMarches) est un sous-ensemble d'"enregistrés" (jamais l'inverse) : filtrer
@@ -258,9 +274,16 @@ export function MarchesPGI() {
   const enregistres = marches.filter((m) => m.dtefinmax !== null && m.dtefinmax >= today)
   const totalEnregistres = enregistres.length
 
+  // Options de la combobox "Agent gestionnaire" (modale de filtre) — valeurs distinctes réellement
+  // présentes parmi les marchés enregistrés, triées, jamais une liste d'acteurs (voir note ci-dessus).
+  const agentGestionOptions = Array.from(
+    new Set(enregistres.map((m) => m.agentgestion).filter((v): v is string => v !== null && v.trim() !== '')),
+  ).sort((a, b) => a.localeCompare(b, 'fr'))
+
   const displayedMarches = enregistres
     .filter((m) => matchesTriEtat(filterActif, m.actif))
     .filter((m) => matchesTriEtat(filterComplet, m.completude))
+    .filter((m) => filterAgentGestion === null || m.agentgestion === filterAgentGestion)
     .filter((m) => {
       if (filterAlerteDate === 'tous' && filterAlerteMontant === 'tous') return true
       const duree = computeDuree(m.dtedebut, m.dtefinmax, m.alertedate)
@@ -363,8 +386,9 @@ export function MarchesPGI() {
             {displayedMarches.length} marchés sélectionnés sur {totalEnregistres} marchés enregistrés.
           </p>
           <div className="row" style={{ gap: 10 }}>
-            <button className="gp-btn gp-btn--secondary" onClick={() => setFilterModalOpen(true)}>
+            <button className="gp-btn gp-btn--secondary" style={{ position: 'relative' }} onClick={() => setFilterModalOpen(true)}>
               Filtrer
+              {hasActiveFilters && <FilterActiveDot />}
             </button>
             <button className="gp-btn gp-btn--ghost" onClick={handleResetFilters}>
               Supprimer les filtres
@@ -403,12 +427,15 @@ export function MarchesPGI() {
           complet={filterComplet}
           alerteDate={filterAlerteDate}
           alerteMontant={filterAlerteMontant}
+          agentGestion={filterAgentGestion}
+          agentGestionOptions={agentGestionOptions}
           onClose={() => setFilterModalOpen(false)}
           onApply={(next) => {
             setFilterActif(next.actif)
             setFilterComplet(next.complet)
             setFilterAlerteDate(next.alerteDate)
             setFilterAlerteMontant(next.alerteMontant)
+            setFilterAgentGestion(next.agentGestion)
             setSearch(searchInput)
             setFilterModalOpen(false)
           }}
@@ -463,9 +490,12 @@ interface FilterModalValues {
   complet: TriEtat
   alerteDate: TriEtat
   alerteMontant: TriEtat
+  /** Valeur exacte d'AGENTGESTION (texte libre, pas de FK) — `null` = tous. */
+  agentGestion: string | null
 }
 
 interface FilterModalProps extends FilterModalValues {
+  agentGestionOptions: string[]
   onClose: () => void
   onApply: (values: FilterModalValues) => void
 }
@@ -513,11 +543,14 @@ function FilterTriEtatRow({ label, value, onChange }: { label: string; value: Tr
  * la page principale, à côté du compteur, et vide directement le filtre
  * appliqué plutôt que le brouillon.
  */
-function FilterModal({ actif, complet, alerteDate, alerteMontant, onClose, onApply }: FilterModalProps) {
+function FilterModal({ actif, complet, alerteDate, alerteMontant, agentGestion, agentGestionOptions, onClose, onApply }: FilterModalProps) {
   const [draftActif, setDraftActif] = useState<TriEtat>(actif)
   const [draftComplet, setDraftComplet] = useState<TriEtat>(complet)
   const [draftAlerteDate, setDraftAlerteDate] = useState<TriEtat>(alerteDate)
   const [draftAlerteMontant, setDraftAlerteMontant] = useState<TriEtat>(alerteMontant)
+  const [draftAgentGestion, setDraftAgentGestion] = useState<string | null>(agentGestion)
+
+  const agentGestionComboOptions = agentGestionOptions.map((a) => ({ value: a, label: a }))
 
   return (
     <div className="gp-overlay is-open">
@@ -540,6 +573,18 @@ function FilterModal({ actif, complet, alerteDate, alerteMontant, onClose, onApp
               <FilterTriEtatRow label="Alerte date" value={draftAlerteDate} onChange={setDraftAlerteDate} />
               <FilterTriEtatRow label="Alerte montant" value={draftAlerteMontant} onChange={setDraftAlerteMontant} />
             </div>
+            <div className="gp-field" style={{ marginTop: 10 }}>
+              <label className="gp-label">Agent gestionnaire</label>
+              <Combobox
+                options={agentGestionComboOptions}
+                value={draftAgentGestion}
+                onChange={setDraftAgentGestion}
+                placeholder="Tous"
+                clearLabel="Tous"
+                ariaLabel="Agent gestionnaire"
+                style={{ maxWidth: 'none' }}
+              />
+            </div>
           </div>
         </div>
         <div className="gp-modal__ft">
@@ -550,7 +595,13 @@ function FilterModal({ actif, complet, alerteDate, alerteMontant, onClose, onApp
             type="button"
             className="gp-btn gp-btn--primary"
             onClick={() =>
-              onApply({ actif: draftActif, complet: draftComplet, alerteDate: draftAlerteDate, alerteMontant: draftAlerteMontant })
+              onApply({
+                actif: draftActif,
+                complet: draftComplet,
+                alerteDate: draftAlerteDate,
+                alerteMontant: draftAlerteMontant,
+                agentGestion: draftAgentGestion,
+              })
             }
           >
             Filtrer
@@ -635,6 +686,7 @@ function MarcheCard({
           <div className="marche-card__subtitle">{marche.libelle_service ?? '—'}</div>
         </div>
         <div className="marche-card__dots">
+          {marche.agentgestion && <span className="marche-card__agent">{marche.agentgestion}</span>}
           <span className="marche-card__dot-row">
             <span className="marche-card__dot-label">{marche.actif ? 'Actif' : 'Archivé'}</span>
             <span className={`marche-dot ${marche.actif ? 'marche-dot--on' : 'marche-dot--off'}`} />

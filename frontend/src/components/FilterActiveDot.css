@@ -1,0 +1,11 @@
+.filter-active-dot {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--gp-primary);
+  box-shadow: 0 0 0 2px var(--gp-surface);
+  pointer-events: none;
+}

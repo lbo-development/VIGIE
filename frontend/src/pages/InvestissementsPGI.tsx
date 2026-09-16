@@ -8,6 +8,7 @@ import { Combobox } from '../components/Combobox'
 import { PiecesInvestissementModal } from '../components/PiecesInvestissementModal'
 import { AddPieceInvestissementModal } from '../components/AddPieceInvestissementModal'
 import { PieceCountBadge } from '../components/PieceCountBadge'
+import { FilterActiveDot } from '../components/FilterActiveDot'
 import { api, ApiError } from '../services/api'
 import '../styles/investissement.css'
 
@@ -155,6 +156,11 @@ export function InvestissementsPGI() {
     setSearch('')
   }
 
+  // Pastille sur le bouton "Filtrer" (décision utilisateur, 11/09/2026, même principe que
+  // MarchesPGI.tsx) — signale qu'un critère de la modale est actif ; la recherche texte en est
+  // exclue à dessein, elle vit hors de la modale (voir FilterActiveDot).
+  const hasActiveFilters = filterStatut !== 'tous' || filterUtilisable !== 'tous' || filterActif !== 'tous'
+
   const totalInvestissements = investissements.length
   const displayedInvestissements = investissements
     .filter((i) => matchesStatutFiltre(filterStatut, i.statut))
@@ -255,8 +261,9 @@ export function InvestissementsPGI() {
             {displayedInvestissements.length} investissements sélectionnés sur {totalInvestissements} enregistrés.
           </p>
           <div className="row" style={{ gap: 10 }}>
-            <button className="gp-btn gp-btn--secondary" onClick={() => setFilterModalOpen(true)}>
+            <button className="gp-btn gp-btn--secondary" style={{ position: 'relative' }} onClick={() => setFilterModalOpen(true)}>
               Filtrer
+              {hasActiveFilters && <FilterActiveDot />}
             </button>
             <button className="gp-btn gp-btn--ghost" onClick={handleResetFilters}>
               Supprimer les filtres

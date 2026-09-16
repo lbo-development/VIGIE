@@ -27,13 +27,20 @@ export async function findUserIdByMatricule(matricule: string): Promise<string |
 }
 
 /**
- * Rattache un compte Supabase Auth déjà créé (Admin API) à un ACTEUR — pas
- * de trigger `handle_new_user` sur `auth.users` dans ce projet (vérifié dans
- * supabase/migrations/), l'insertion est donc explicite ici. Décision du
- * 10/09/2026 : réservé à acteur.service.ts#createActeur (ADMIN_APP).
+ * Rattache un compte Supabase Auth déjà créé (Admin API) à un ACTEUR.
+ *
+ * Correction du 10/09/2026 (incident constaté) : un trigger `on_auth_user_created`
+ * (fonction `public.handle_new_user`) existe bien sur `auth.users` dans ce
+ * projet Supabase partagé — absent de nos migrations suivies (mis en place
+ * au niveau du projet, probablement pour une autre application GPMM), donc
+ * invisible lors de l'audit initial (`supabase/migrations/`). Ce trigger crée
+ * déjà une ligne `profiles` (id seul, matricule NULL) au moment même de
+ * `createAuthUser` — un simple `insert` échoue alors systématiquement
+ * (23505, `profiles_pkey`). `upsert` gère les deux cas (trigger présent ou
+ * non) sans dépendre de son existence.
  */
 export async function linkProfile(userId: string, matricule: string): Promise<void> {
-  const { error } = await supabase.from('profiles').insert({ id: userId, matricule })
+  const { error } = await supabase.from('profiles').upsert({ id: userId, matricule })
   if (error) throw error
 }
 
@@ -50,9 +57,14 @@ export async function deleteProfile(userId: string): Promise<void> {
   if (error) throw error
 }
 
-// Ne couvre pas la suppléance : d'après le MCD (ForClaude/CDC/mcd-phases-1-2.md),
-// la SUPPLEANCE ne s'applique qu'aux rôles RC/CDS/DS ("titulaire absent"), jamais à
-// ADMIN_APP (transverse, plusieurs titulaires possibles sans notion d'absence).
+// Couvre la suppléance depuis le 14/09/2026 (point 7 de la conception
+// statuts) : d'après le MCD (ForClaude/CDC/mcd-phases-1-2.md), la SUPPLEANCE
+// ne s'applique qu'aux rôles RC/CDS/DS ("titulaire absent"), jamais à CB
+// (collective, sans titulaire unique — verrouillé en base, migration
+// 20260914170000) ni à ADMIN_SERVICE/ADMIN_APP (transverses, sans notion
+// d'absence). Le suppléant se substitue entièrement au titulaire pendant sa
+// période active — sans que le titulaire ne perde quoi que ce soit
+// techniquement (simple présomption d'absence, décision du 14/09/2026).
 export async function hasActiveRole(matricule: string, typeRole: string): Promise<boolean> {
   const { data, error } = await supabase
     .schema('finances')
@@ -63,7 +75,9 @@ export async function hasActiveRole(matricule: string, typeRole: string): Promis
     .eq('actif', true)
     .limit(1)
   if (error) throw error
-  return (data?.length ?? 0) > 0
+  if ((data?.length ?? 0) > 0) return true
+
+  return hasActiveSuppleanceRole(matricule, typeRole)
 }
 
 /**
@@ -85,6 +99,31 @@ export async function hasActiveRoleForService(
     .eq('id_service', idService)
     .eq('actif', true)
     .limit(1)
+  if (error) throw error
+  if ((data?.length ?? 0) > 0) return true
+
+  return hasActiveSuppleanceRole(matricule, typeRole, idService)
+}
+
+/**
+ * Un suppléant actif (fenêtre date_debut/date_fin couvrant aujourd'hui) sur
+ * un role_attribution actif de type_role donné — CB étant exclue du
+ * dispositif de suppléance (trigger en base), cette jointure ne renverra
+ * jamais de résultat pour typeRole='CB', pas besoin de l'exclure ici.
+ */
+async function hasActiveSuppleanceRole(matriculeSuppleant: string, typeRole: string, idService?: number): Promise<boolean> {
+  const today = new Date().toISOString().slice(0, 10)
+  let query = supabase
+    .schema('finances')
+    .from('suppleance')
+    .select('id_suppleance, role_attribution!inner(type_role, id_service, actif)')
+    .eq('matricule_suppleant', matriculeSuppleant)
+    .lte('date_debut', today)
+    .gte('date_fin', today)
+    .eq('role_attribution.type_role', typeRole)
+    .eq('role_attribution.actif', true)
+  if (idService !== undefined) query = query.eq('role_attribution.id_service', idService)
+  const { data, error } = await query.limit(1)
   if (error) throw error
   return (data?.length ?? 0) > 0
 }

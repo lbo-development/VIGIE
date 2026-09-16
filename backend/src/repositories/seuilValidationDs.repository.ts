@@ -24,6 +24,18 @@ export async function findAll(): Promise<SeuilValidationDs[]> {
   return data ?? []
 }
 
+/** Ligne d'un service précis — `null` si absente (seuils à considérer comme 0, voir commentaire d'en-tête). Utilisé par OP1.4b (routage automatique du seuil). */
+export async function findByService(idService: number): Promise<SeuilValidationDs | null> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('seuil_validation_ds')
+    .select('id_service, seuil_fonctionnement, seuil_investissement')
+    .eq('id_service', idService)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
 /**
  * Crée ou remplace la ligne du service (clé primaire = id_service) — upsert
  * plutôt que create/update séparés : chaque service a au plus une ligne, la

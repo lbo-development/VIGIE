@@ -47,7 +47,7 @@ vi.mock('../services/api', async () => {
 
 describe('Reglages', () => {
   beforeEach(() => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     vi.mocked(api.get).mockReset()
     vi.mocked(api.post).mockReset()
     vi.mocked(api.put).mockReset()

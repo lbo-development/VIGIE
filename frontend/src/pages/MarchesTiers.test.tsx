@@ -114,14 +114,14 @@ describe('MarchesTiers', () => {
   })
 
   it("aucun service sélectionné : message d'invite, pas de tableau", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<MarchesTiers />)
 
     expect(screen.getByText('Sélectionne une direction et un service pour afficher les marchés tiers.')).toBeInTheDocument()
   })
 
   it('ADMIN_APP : filtre Direction/Service en cascade, affiche la liste une fois les deux choisis', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     marcheTiersMock.marcheTiers = [makeMarcheTiers({})]
     render(<MarchesTiers />)
 
@@ -134,7 +134,7 @@ describe('MarchesTiers', () => {
   })
 
   it("affiche une pastille avec NOMBRE_PIECES sur l'icône Visualiser les pièces, absente quand NOMBRE_PIECES vaut 0", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     marcheTiersMock.marcheTiers = [makeMarcheTiers({ nombre_pieces: 2 })]
     render(<MarchesTiers />)
 
@@ -146,7 +146,7 @@ describe('MarchesTiers', () => {
   })
 
   it('fermer la modale des pièces rafraîchit la liste des marchés tiers (NOMBRE_PIECES peut avoir changé — ajout/suppression dans la modale)', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     marcheTiersMock.marcheTiers = [makeMarcheTiers({ nummarche: 'M1234567', nombre_pieces: 2 })]
     vi.mocked(api.get).mockImplementation((path: string) =>
       path.startsWith('/marches/pieces') || path.startsWith('/libelles-referentiel')
@@ -180,7 +180,7 @@ describe('MarchesTiers', () => {
   })
 
   it('ADMIN_SERVICE : voit le bouton "Nouveau marché tiers" et peut modifier/supprimer une ligne', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({})]
     render(<MarchesTiers />)
@@ -191,7 +191,7 @@ describe('MarchesTiers', () => {
   })
 
   it('CB : voit aussi le bouton "Nouveau marché tiers" et peut supprimer une ligne', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({})]
     render(<MarchesTiers />)
@@ -201,7 +201,7 @@ describe('MarchesTiers', () => {
   })
 
   it('card — pastille de statut (Actif/Inactif) et barre de durée avec jours restants', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     const dansCentJours = new Date()
     dansCentJours.setDate(dansCentJours.getDate() + 100)
@@ -220,7 +220,7 @@ describe('MarchesTiers', () => {
   })
 
   it('affiche le libellé Actif/Inactif en permanence devant la pastille, pas seulement au survol', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({ actif: true })]
     render(<MarchesTiers />)
@@ -287,7 +287,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de création — pas de champ Type de procédure (déduit du numéro côté serveur), soumet via POST /marches/tiers', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     vi.mocked(api.post).mockResolvedValue(makeMarcheTiers({}))
     render(<MarchesTiers />)
@@ -323,7 +323,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de création — saisit un commentaire, transmis dans le payload', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     vi.mocked(api.post).mockResolvedValue(makeMarcheTiers({}))
     render(<MarchesTiers />)
@@ -348,7 +348,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de création — champs obligatoires manquants bloquent la soumission', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     render(<MarchesTiers />)
 
@@ -365,7 +365,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de création — libellé trop court (< 15 caractères) bloque la soumission', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     render(<MarchesTiers />)
 
@@ -385,7 +385,7 @@ describe('MarchesTiers', () => {
   })
 
   it("modale de modification — pas de champ Numéro (immuable), affiche le numéro et le type de procédure en lecture seule, soumet via PUT", async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     const existing = makeMarcheTiers({ libelle_service: 'Nettoyage des locaux', actif: true })
     marcheTiersMock.marcheTiers = [existing]
@@ -413,7 +413,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de modification — ACTIF forcé désactivé si la date de fin maximum est dépassée', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     const hier = new Date()
     hier.setDate(hier.getDate() - 1)
@@ -430,7 +430,7 @@ describe('MarchesTiers', () => {
   })
 
   it("modale de modification — ACTIF soumis au backend forcé à false si la date de fin maximum est dépassée", async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     const hier = new Date()
     hier.setDate(hier.getDate() - 1)
@@ -448,7 +448,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de suppression — ouverture, confirme, DELETE /marches/tiers/:id, ferme et rafraîchit la liste', async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({ nummarche: 'M1234567' })]
     vi.mocked(api.delete).mockResolvedValue(undefined)
@@ -466,7 +466,7 @@ describe('MarchesTiers', () => {
   })
 
   it('modale de suppression — "Annuler" ferme sans appeler l\'API', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({})]
     render(<MarchesTiers />)
@@ -480,7 +480,7 @@ describe('MarchesTiers', () => {
   })
 
   it("modale de suppression — 409 (référencé par une demande d'achat) affiche le message de l'API sans fermer la modale", async () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     currentUserMock.data.idService = 1
     marcheTiersMock.marcheTiers = [makeMarcheTiers({})]
     vi.mocked(api.delete).mockRejectedValue(

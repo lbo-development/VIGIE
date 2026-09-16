@@ -5,7 +5,7 @@ import { RequireAuth } from './components/RequireAuth'
 import { AppShell } from './components/shell/AppShell'
 import { Login } from './pages/Login'
 import { Home } from './pages/Home'
-import { DemandeAchat } from './pages/DemandeAchat'
+import { SuiviRc } from './pages/SuiviRc'
 import { GisementGeographique } from './pages/GisementGeographique'
 import { GisementTechnique } from './pages/GisementTechnique'
 import { Reglages } from './pages/Reglages'
@@ -48,7 +48,7 @@ function App() {
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<Home />} />
-              <Route path="/demandes-achat" element={<DemandeAchat />} />
+              <Route path="/suivi-rc" element={<SuiviRc />} />
               <Route path="/parametres/gisement-geographique" element={<GisementGeographique />} />
               <Route path="/parametres/gisement-technique" element={<GisementTechnique />} />
               <Route path="/parametres/reglages" element={<Reglages />} />

@@ -75,7 +75,7 @@ describe('ImportCommandes', () => {
   })
 
   it("ADMIN_APP : la zone de dépôt n'apparaît qu'une fois direction ET service choisis", () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }]
     render(<ImportCommandes />)
 
     expect(screen.getByText('Sélectionne une direction et un service pour pouvoir importer un fichier.')).toBeInTheDocument()
@@ -94,7 +94,7 @@ describe('ImportCommandes', () => {
   })
 
   it('ADMIN_SERVICE : comboboxes affichées, pré-remplies sur son propre service, zone de dépôt visible directement', () => {
-    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<ImportCommandes />)
 
     expect(screen.getByRole('button', { name: 'Direction' })).toHaveTextContent('Direction Générale')
@@ -103,7 +103,7 @@ describe('ImportCommandes', () => {
   })
 
   it('CB : comboboxes affichées, pré-remplies sur son propre service, zone de dépôt visible directement', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<ImportCommandes />)
 
     expect(screen.getByRole('button', { name: 'Service' })).toHaveTextContent('Maintenance')
@@ -111,7 +111,7 @@ describe('ImportCommandes', () => {
   })
 
   it("affiche la date de la dernière importation dans l'entête (paramètre existant, valeur renseignée, récente)", () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     const recentDate = new Date(Date.now() - 5 * 86_400_000).toISOString().slice(0, 10)
     const [y, m, d] = recentDate.split('-')
     lastImportInfoMock.value = { exists: true, valeur: recentDate }
@@ -122,7 +122,7 @@ describe('ImportCommandes', () => {
   })
 
   it("affiche l'alerte de rappel si la dernière importation date de plus de 15 jours", () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     const staleDate = new Date(Date.now() - 20 * 86_400_000).toISOString().slice(0, 10)
     lastImportInfoMock.value = { exists: true, valeur: staleDate }
     render(<ImportCommandes />)
@@ -131,7 +131,7 @@ describe('ImportCommandes', () => {
   })
 
   it("affiche un message dédié si le paramètre n'existe pas encore pour ce service", () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     lastImportInfoMock.value = { exists: false, valeur: null }
     render(<ImportCommandes />)
 
@@ -139,7 +139,7 @@ describe('ImportCommandes', () => {
   })
 
   it('le dépôt (ou la sélection) du fichier déclenche preview()', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     render(<ImportCommandes />)
 
     const file = new File(['contenu'], 'commandes.xlsx', {
@@ -152,7 +152,7 @@ describe('ImportCommandes', () => {
   })
 
   it('état "ready" : affiche les commandes à intégrer et les anomalies, avec les boutons Confirmer/Annuler', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     commandeImportMock.state = {
       step: 'ready',
       file: new File([''], 'commandes.xlsx'),
@@ -177,7 +177,7 @@ describe('ImportCommandes', () => {
   })
 
   it('état "done" : affiche le résumé et permet de télécharger le compte-rendu ou de relancer un import', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     commandeImportMock.state = {
       step: 'done',
       report: {
@@ -197,7 +197,7 @@ describe('ImportCommandes', () => {
   })
 
   it('état "error" : affiche le message d\'anomalie bloquante', () => {
-    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1 }]
+    currentUserMock.data.roles = [{ typeRole: 'CB', perimeterLabel: 'Maintenance', idService: 1, idCellule: null }]
     commandeImportMock.state = { step: 'error', message: 'La cellule A3 doit contenir "Liste des lignes de commandes par ligne budgétaire".' }
     render(<ImportCommandes />)
 

@@ -150,18 +150,33 @@ export async function createActeur(input: unknown): Promise<CreatedActeur> {
     }
     throw err
   }
-  await authRepository.linkProfile(userId, result.data.matricule)
+  // Compensation (décision du 10/09/2026, incident constaté : un compte Auth
+  // orphelin — sans fiche ACTEUR ni lien profiles — a survécu à un échec
+  // survenu après sa création, ex. double soumission du formulaire). Les 3
+  // écritures (compte Auth, profiles, acteur) ne sont pas transactionnelles
+  // (systèmes distincts), donc si l'une des deux étapes suivantes échoue, on
+  // supprime nous-mêmes le compte Auth et la ligne profiles déjà créés plutôt
+  // que de laisser un compte inutilisable derrière une erreur affichée.
+  try {
+    await authRepository.linkProfile(userId, result.data.matricule)
 
-  const acteur = await acteurRepository.create({
-    matricule: result.data.matricule,
-    nom: result.data.nom,
-    prenom: result.data.prenom,
-    fonction: result.data.fonction,
-    id_cellule: result.data.idCellule,
-    actif: true,
-  })
+    const acteur = await acteurRepository.create({
+      matricule: result.data.matricule,
+      nom: result.data.nom,
+      prenom: result.data.prenom,
+      fonction: result.data.fonction,
+      id_cellule: result.data.idCellule,
+      actif: true,
+    })
 
-  return { acteur, temporaryPassword }
+    return { acteur, temporaryPassword }
+  } catch (err) {
+    await authRepository.deleteProfile(userId).catch(() => undefined)
+    await authAdminRepository.deleteAuthUser(userId).catch((cleanupErr) => {
+      console.error('[acteur.service] Échec du nettoyage du compte Auth après une erreur de création :', cleanupErr)
+    })
+    throw err
+  }
 }
 
 /**

@@ -6,6 +6,8 @@ export interface MeRole {
   typeRole: string
   perimeterLabel: string | null
   idService: number | null
+  /** ID_CELLULE du rôle (RC) — ajouté le 15/09/2026 (écran de suivi RC) pour construire l'entrée de sidebar "FAD — <cellule>" sans dépendre du libellé texte. */
+  idCellule: number | null
 }
 
 export interface MeResponse {

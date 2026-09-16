@@ -1,16 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useCurrentUser } from '../hooks/useCurrentUser'
-import { useDirections } from '../hooks/useDirections'
-import { useServices } from '../hooks/useServices'
-import { useCellules } from '../hooks/useCellules'
-import { useActeurs } from '../hooks/useActeurs'
-import { useFournisseurs } from '../hooks/useFournisseurs'
-import { useMarches } from '../hooks/useMarches'
-import { useMarcheTiers } from '../hooks/useMarcheTiers'
-import { useLibelleReferentiel } from '../hooks/useLibelleReferentiel'
+import { useServices } from '../../hooks/useServices'
+import { useFournisseurs } from '../../hooks/useFournisseurs'
+import { useMarches } from '../../hooks/useMarches'
+import { useMarcheTiers } from '../../hooks/useMarcheTiers'
+import { useLibelleReferentiel } from '../../hooks/useLibelleReferentiel'
 import {
-  useDemandeAchatList,
-  createDemandeAchat,
   updateDemandeAchat,
   selectMarcheDemandeAchat,
   getConsultationDemandeAchat,
@@ -31,512 +25,34 @@ import {
   type MotifChoix,
   type ConsultationCandidat,
   type PieceJointe,
-} from '../hooks/useDemandeAchat'
-import { Combobox } from '../components/Combobox'
-import { FileDropzone } from '../components/FileDropzone'
-import { useDragReorder } from '../hooks/useDragReorder'
-import { ApiError } from '../services/api'
-import '../styles/demandeachat.css'
+} from '../../hooks/useDemandeAchat'
+import { Combobox } from '../Combobox'
+import { FileDropzone } from '../FileDropzone'
+import { SortableTh } from '../SortableTh'
+import { useDragReorder } from '../../hooks/useDragReorder'
+import { useColumnSort, sortRows } from '../../hooks/useColumnSort'
+import { ApiError } from '../../services/api'
+import { CURRENCY_FORMAT, CURRENCY_FORMAT_ROUND, MAX_FICHIER_TAILLE_OCTETS, sanitizeDecimal, formatMontantDecimal, triggerBlobDownload } from './constants'
+import '../../styles/demandeachat.css'
 
-const MAX_FICHIER_TAILLE_OCTETS = 10 * 1024 * 1024
-
-/** Déclenche le téléchargement d'un Blob côté navigateur — même principe que usePiecesMarche.ts#downloadPiece. */
-function triggerBlobDownload(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  link.click()
-  URL.revokeObjectURL(url)
-}
-
-const STATUT_LABELS: Record<string, string> = {
-  DA_EN_PREPARATION: 'En préparation',
-  DA_A_COMPLETER: 'À compléter',
-}
-const STATUT_BADGE_CLASS: Record<string, string> = {
-  DA_EN_PREPARATION: 'gp-badge--info',
-  DA_A_COMPLETER: 'gp-badge--warning',
-}
-const STATUT_FILTER_OPTIONS = [
-  { value: 'DA_EN_PREPARATION', label: 'En préparation' },
-  { value: 'DA_A_COMPLETER', label: 'À compléter' },
-]
 const PROCEDURE_ACHAT_OPTIONS = [
   { value: 'MARCHE', label: 'Marché' },
   { value: 'HORS_MARCHE', label: 'Hors marché' },
 ]
 
-const CURRENCY_FORMAT = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' })
-/** Alerte MT (MarcheDA) — arrondi à l'euro, contrairement à CURRENCY_FORMAT (2 décimales) utilisé ailleurs. */
-const CURRENCY_FORMAT_ROUND = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 })
-
-/** Autorise les chiffres et un seul séparateur décimal (. ou ,), limité à 2 décimales — tous les champs Montant de cet écran. */
-function sanitizeDecimal(raw: string): string {
-  const normalized = raw.replace(/[^0-9.,]/g, '').replace(',', '.')
-  const firstDot = normalized.indexOf('.')
-  if (firstDot === -1) return normalized
-  const integerPart = normalized.slice(0, firstDot)
-  const decimalPart = normalized.slice(firstDot + 1).replace(/\./g, '').slice(0, 2)
-  return `${integerPart}.${decimalPart}`
-}
-
-/** Affichage hors saisie (champ non focus) — CURRENCY_FORMAT (fr-FR), cohérent avec le reste de l'écran (liste des DA, Alerte MT). */
-function formatMontantDecimal(raw: string): string {
-  if (!raw.trim()) return ''
-  const value = Number(raw)
-  return Number.isNaN(value) ? raw : CURRENCY_FORMAT.format(value)
-}
-
-/**
- * Suivi des demandes d'achat, montée sur /demandes-achat (voir
- * ForClaude/CDC/mcd-phases-1-2.md et suivants). Ne montre que les DA encore
- * « à la main » du demandeur/RC (DA_EN_PREPARATION, DA_A_COMPLETER — décision
- * du 07/09/2026, voir demandeAchat.service.ts#STATUTS_PAGE_DEMANDE_ACHAT) ;
- * pas de vue d'historique complet ici, hors périmètre pour l'instant.
- *
- * Portée des filtres par rôle (matrice validée le 07/09/2026, conversation
- * DA.pdf — même principe que MarchesPGI.tsx pour Direction/Service figés) :
- * - Demandeur simple : tout figé sur le sien, aucun sélecteur Demandeur (il
- *   n'a accès qu'à ses propres DA).
- * - RC : Direction/Service/Cellule figés sur les siens (affichage seul) ;
- *   Demandeur sélectionnable parmi TOUT le service (pas seulement sa
- *   cellule) — sans sélection, vue par défaut = sa propre cellule.
- * - ADMIN_SERVICE : Direction/Service figés sur les siens ; Cellule
- *   sélectionnable parmi celles du service ; Demandeur dépend de la cellule
- *   choisie.
- * - ADMIN_APP : tout sélectionnable (transverse).
- *
- * "Nouvelle demande" crée immédiatement le brouillon DA_EN_PREPARATION
- * (modèle de création progressive, décision du 07/09/2026) puis ouvre la
- * modale d'édition dessus — grisé tant qu'aucun demandeur cible n'est
- * résolu (soi-même pour un Demandeur simple, sélection explicite sinon).
- *
- * "Gérer les documents liés à la demande" (liste, icône dossier) ouvre le
- * même écran unifié de gestion documentaire que le bouton « Gestion
- * documentaire » de CreationDA (voir GestionDocumentaireModal) — sans passer
- * par « Modifier une DA » — dès qu'un fournisseur est identifié
- * (ID_FOURNISSEUR_RETENU renseigné), même règle d'activation. "Transmettre
- * au RC" reste désactivé : la transition de statut OP1.2 n'est pas encore
- * construite.
- */
-export function DemandeAchat() {
-  const { data: currentUser } = useCurrentUser()
-  const { directions } = useDirections()
-  const { services } = useServices()
-  const { cellules } = useCellules()
-
-  const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
-  const isAdminService = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_SERVICE') ?? false
-  const isRc = currentUser?.roles.some((r) => r.typeRole === 'RC') ?? false
-  const isElevated = isAdminApp || isAdminService || isRc
-
-  const ownIdService = currentUser?.idService ?? null
-  const ownIdCellule = currentUser?.idCellule ?? null
-  const ownMatricule = currentUser?.matricule ?? null
-
-  const [filterIdDirection, setFilterIdDirection] = useState<string | null>(null)
-  const [filterIdService, setFilterIdService] = useState<string | null>(null)
-  const [filterIdCellule, setFilterIdCellule] = useState<string | null>(null)
-  const [filterMatriculeDemandeur, setFilterMatriculeDemandeur] = useState<string | null>(null)
-  const [filterStatut, setFilterStatut] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-
-  // Direction/Service : figés sur les siens pour tout non-ADMIN_APP (même mécanisme que MarchesPGI.tsx).
-  const isLockedToOwnService = !isAdminApp && ownIdService != null
-  useEffect(() => {
-    if (isLockedToOwnService && filterIdDirection === null) {
-      const ownService = services.find((s) => s.id_service === ownIdService)
-      if (ownService) {
-        setFilterIdDirection(String(ownService.id_direction))
-        setFilterIdService(String(ownIdService))
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLockedToOwnService, ownIdService, services])
-
-  // Cellule : figée sur la sienne pour RC et pour un Demandeur simple (affichage seul, jamais éditable de toute façon) ; laissée au choix pour ADMIN_SERVICE/ADMIN_APP.
-  const isCelluleLockedToOwn = !isAdminApp && !isAdminService && ownIdCellule != null
-  useEffect(() => {
-    if (isCelluleLockedToOwn && filterIdCellule === null) {
-      setFilterIdCellule(String(ownIdCellule))
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isCelluleLockedToOwn, ownIdCellule])
-
-  const directionOptions = directions.map((d) => ({ value: String(d.id_direction), label: d.libelle_direction }))
-  const servicesForFilter = filterIdDirection === null ? [] : services.filter((s) => s.id_direction === Number(filterIdDirection))
-  const serviceOptions = servicesForFilter.map((s) => ({ value: String(s.id_service), label: s.libelle_service }))
-
-  const idServiceNum = filterIdService !== null ? Number(filterIdService) : null
-  const cellulesForFilter = idServiceNum === null ? [] : cellules.filter((c) => c.id_service === idServiceNum)
-  const celluleOptions = cellulesForFilter.map((c) => ({ value: String(c.id_cellule), label: c.libelle_cellule }))
-  const idCelluleNum = filterIdCellule !== null ? Number(filterIdCellule) : null
-
-  // Demandeur : RC voit tout le service (pas juste sa cellule) ; ADMIN_SERVICE/ADMIN_APP dépendent de la cellule choisie.
-  const rcSansAdmin = isRc && !isAdminApp && !isAdminService
-  const demandeurScopeIdService = rcSansAdmin ? idServiceNum : null
-  const demandeurScopeIdCellule = !rcSansAdmin ? idCelluleNum : null
-  const { acteurs: demandeurOptionsRaw } = useActeurs({ idService: demandeurScopeIdService, idCellule: demandeurScopeIdCellule })
-  const demandeurOptions = demandeurOptionsRaw.map((a) => ({ value: a.matricule, label: `${a.nom} ${a.prenom}` }))
-
-  // Un changement de cellule invalide le demandeur choisi (ADMIN_SERVICE/ADMIN_APP).
-  useEffect(() => {
-    setFilterMatriculeDemandeur(null)
-  }, [filterIdCellule])
-
-  const isPlainDemandeur = !isElevated
-  const effectiveMatriculeDemandeur = isPlainDemandeur ? ownMatricule : filterMatriculeDemandeur
-
-  const { demandesAchat, loading, error, refetch } = useDemandeAchatList({
-    idCellule: isPlainDemandeur ? null : idCelluleNum,
-    matriculeDemandeur: effectiveMatriculeDemandeur,
-    statut: filterStatut,
-    search,
-  })
-
-  // Compteur (même principe que MarchesPGI.tsx) : enregistrées = même
-  // périmètre (cellule/demandeur) mais sans le filtre statut/recherche —
-  // le pool total avant affinage ; sélectionnées = demandesAchat déjà filtré.
-  const { demandesAchat: demandesAchatEnregistrees } = useDemandeAchatList({
-    idCellule: isPlainDemandeur ? null : idCelluleNum,
-    matriculeDemandeur: effectiveMatriculeDemandeur,
-  })
-
-  const { fournisseurs } = useFournisseurs(idServiceNum)
-  const fournisseurLabel = (idFournisseur: number | null) => {
-    if (idFournisseur === null) return '—'
-    return fournisseurs.find((f) => f.id_fournisseur === idFournisseur)?.raison_sociale_service ?? '—'
-  }
-
-  const [modalDa, setModalDa] = useState<DemandeAchatRow | null>(null)
-  // Distingue le premier passage (juste après « Nouvelle demande », procédure
-  // encore modifiable) d'une réouverture via « Modifier une DA » (procédure
-  // figée — décision du 09/09/2026, voir DemandeAchatModal#procedureEditable).
-  const [modalDaIsNew, setModalDaIsNew] = useState(false)
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
-  const [daToDelete, setDaToDelete] = useState<DemandeAchatRow | null>(null)
-  const [gestionDocumentaireDa, setGestionDocumentaireDa] = useState<DemandeAchatRow | null>(null)
-
-  async function handleNouvelleDemande() {
-    if (!effectiveMatriculeDemandeur) return
-    setCreating(true)
-    setCreateError(null)
-    try {
-      const da = await createDemandeAchat(isPlainDemandeur ? undefined : effectiveMatriculeDemandeur)
-      setModalDa(da)
-      setModalDaIsNew(true)
-    } catch (err) {
-      setCreateError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  return (
-    <div className="stack">
-      <div className="page-heading">
-        <div>
-          <h1>Suivi des DA</h1>
-          <p>Suivi des demandes d'achat en préparation ou à compléter.</p>
-        </div>
-      </div>
-
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div className="gp-field" style={{ flex: '1 1 260px' }}>
-          <label className="gp-label">Direction</label>
-          {isAdminApp ? (
-            <Combobox
-              options={directionOptions}
-              value={filterIdDirection}
-              onChange={(v) => {
-                setFilterIdDirection(v)
-                setFilterIdService(null)
-                setFilterIdCellule(null)
-              }}
-              placeholder="Choisir une direction…"
-              ariaLabel="Direction"
-              style={{ maxWidth: 'none' }}
-            />
-          ) : (
-            <input className="gp-input" value={directionOptions.find((d) => d.value === filterIdDirection)?.label ?? '—'} readOnly />
-          )}
-        </div>
-
-        <div className="gp-field" style={{ flex: '1 1 260px' }}>
-          <label className="gp-label">Service</label>
-          {isAdminApp ? (
-            <Combobox
-              options={serviceOptions}
-              value={filterIdService}
-              onChange={(v) => {
-                setFilterIdService(v)
-                setFilterIdCellule(null)
-              }}
-              placeholder="Choisir un service…"
-              ariaLabel="Service"
-              style={{ maxWidth: 'none' }}
-            />
-          ) : (
-            <input className="gp-input" value={serviceOptions.find((s) => s.value === filterIdService)?.label ?? '—'} readOnly />
-          )}
-        </div>
-
-        <div className="gp-field" style={{ flex: '0 0 234px' }}>
-          <label className="gp-label">Cellule</label>
-          {isAdminApp || isAdminService ? (
-            <Combobox
-              options={celluleOptions}
-              value={filterIdCellule}
-              onChange={setFilterIdCellule}
-              placeholder="Choisir une cellule…"
-              clearLabel="Toutes"
-              ariaLabel="Cellule"
-              style={{ maxWidth: 'none' }}
-            />
-          ) : (
-            <input className="gp-input" value={celluleOptions.find((c) => c.value === filterIdCellule)?.label ?? '—'} readOnly />
-          )}
-        </div>
-
-        <div className="gp-field" style={{ flex: '0 0 234px' }}>
-          <label className="gp-label">Demandeur</label>
-          {isPlainDemandeur ? (
-            <input className="gp-input" value={`${currentUser?.nom ?? ''} ${currentUser?.prenom ?? ''}`.trim() || '—'} readOnly />
-          ) : (
-            <Combobox
-              options={demandeurOptions}
-              value={filterMatriculeDemandeur}
-              onChange={setFilterMatriculeDemandeur}
-              placeholder="Choisir un demandeur…"
-              clearLabel={rcSansAdmin ? undefined : 'Tous'}
-              ariaLabel="Demandeur"
-              style={{ maxWidth: 'none' }}
-            />
-          )}
-        </div>
-      </div>
-
-      <div className="row" style={{ flexWrap: 'wrap' }}>
-        <div className="gp-field" style={{ width: 200 }}>
-          <label className="gp-label">Filtre statut</label>
-          <Combobox
-            options={STATUT_FILTER_OPTIONS}
-            value={filterStatut}
-            onChange={setFilterStatut}
-            placeholder="Toutes"
-            clearLabel="Toutes"
-            ariaLabel="Filtre statut"
-            style={{ maxWidth: 'none' }}
-          />
-        </div>
-
-        <div className="gp-field" style={{ width: 260 }}>
-          <label className="gp-label" htmlFor="da-search">
-            Recherche
-          </label>
-          <div className="gp-inputgroup">
-            <svg className="ti">
-              <use href="#i-search" />
-            </svg>
-            <input
-              id="da-search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Numéro, objet, fournisseur…"
-              aria-label="Rechercher une demande d'achat"
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="row" style={{ justifyContent: 'space-between' }}>
-        <p className="gp-help">
-          {effectiveMatriculeDemandeur && !loading
-            ? `${demandesAchat.length} demandes sélectionnées sur ${demandesAchatEnregistrees.length} demandes enregistrées.`
-            : ''}
-        </p>
-        <span className="gp-tip" data-tip={!effectiveMatriculeDemandeur ? 'Choisis un demandeur' : undefined}>
-          <button
-            type="button"
-            className="gp-btn gp-btn--primary"
-            disabled={!effectiveMatriculeDemandeur || creating}
-            onClick={handleNouvelleDemande}
-          >
-            {creating ? 'Création…' : 'Nouvelle demande'}
-          </button>
-        </span>
-      </div>
-
-      {createError && (
-        <p className="gp-errmsg">
-          <svg className="ti">
-            <use href="#i-alert-circle" />
-          </svg>
-          {createError}
-        </p>
-      )}
-
-      {error && (
-        <p className="gp-errmsg">
-          <svg className="ti">
-            <use href="#i-alert-circle" />
-          </svg>
-          {error}
-        </p>
-      )}
-
-      <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 'calc(70vh - 70px)' }}>
-        <table className="gp-table da-table">
-          <colgroup>
-            <col style={{ width: 143 }} />
-            <col />
-            <col style={{ width: 122 }} />
-            <col style={{ width: 361 }} />
-            <col style={{ width: 100 }} />
-            <col style={{ width: 133 }} />
-            <col style={{ width: 150 }} />
-          </colgroup>
-          <thead>
-            <tr>
-              <th>Numéro DA</th>
-              <th>Objet</th>
-              <th>Montant DA</th>
-              <th>Fournisseur</th>
-              <th>Procédure</th>
-              <th>Statut</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan={7}>Chargement…</td>
-              </tr>
-            )}
-            {!loading && demandesAchat.length === 0 && (
-              <tr>
-                <td colSpan={7}>
-                  {!effectiveMatriculeDemandeur ? 'Choisis un demandeur pour afficher ses demandes.' : 'Aucune demande d\'achat pour ce filtre.'}
-                </td>
-              </tr>
-            )}
-            {demandesAchat.map((da) => {
-              const canDelete = da.code_statut === 'DA_EN_PREPARATION'
-              return (
-                <tr key={da.id_demande_achat}>
-                  <td className="mono">{da.numero}</td>
-                  <td>{da.objet || '—'}</td>
-                  <td>{CURRENCY_FORMAT.format(da.montant_demande)}</td>
-                  <td>{fournisseurLabel(da.id_fournisseur_retenu)}</td>
-                  <td>{da.procedure_achat === 'MARCHE' ? 'Marché' : 'Hors marché'}</td>
-                  <td>
-                    <span className={`gp-badge ${STATUT_BADGE_CLASS[da.code_statut] ?? ''}`}>
-                      {STATUT_LABELS[da.code_statut] ?? da.code_statut}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="gp-rowacts">
-                      <span className="gp-tip" data-tip="Modifier une DA">
-                        <button
-                          aria-label="Modifier une DA"
-                          onClick={() => {
-                            setModalDa(da)
-                            setModalDaIsNew(false)
-                          }}
-                        >
-                          <svg className="ti">
-                            <use href="#i-pencil" />
-                          </svg>
-                        </button>
-                      </span>
-                      <span className="gp-tip" data-tip={canDelete ? 'Supprimer une DA' : 'Possible tant que la DA n\'a pas été transmise au RC'}>
-                        <button className="del" aria-label="Supprimer une DA" disabled={!canDelete} onClick={() => setDaToDelete(da)}>
-                          <svg className="ti">
-                            <use href="#i-trash" />
-                          </svg>
-                        </button>
-                      </span>
-                      <span
-                        className="gp-tip"
-                        data-tip={
-                          da.id_fournisseur_retenu === null
-                            ? 'Identifiez d\'abord un fournisseur (marché ou éléments de consultation)'
-                            : 'Gérer les documents liés à la demande'
-                        }
-                      >
-                        <button
-                          aria-label="Gérer les documents liés à la demande"
-                          disabled={da.id_fournisseur_retenu === null}
-                          onClick={() => setGestionDocumentaireDa(da)}
-                        >
-                          <svg className="ti">
-                            <use href="#i-folder" />
-                          </svg>
-                        </button>
-                      </span>
-                      <span className="gp-tip" data-tip="Transmettre au RC — bientôt disponible">
-                        <button aria-label="Transmettre au RC" disabled>
-                          <svg className="ti">
-                            <use href="#i-log-out" />
-                          </svg>
-                        </button>
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {modalDa && (
-        <DemandeAchatModal
-          demandeAchat={modalDa}
-          procedureEditable={modalDaIsNew}
-          onClose={() => {
-            setModalDa(null)
-            void refetch()
-          }}
-          onSaved={() => {
-            setModalDa(null)
-            void refetch()
-          }}
-        />
-      )}
-
-      {daToDelete && (
-        <DeleteDemandeAchatModal
-          demandeAchat={daToDelete}
-          onClose={() => setDaToDelete(null)}
-          onDeleted={() => {
-            setDaToDelete(null)
-            void refetch()
-          }}
-        />
-      )}
-
-      {gestionDocumentaireDa && gestionDocumentaireDa.id_fournisseur_retenu !== null && (
-        <GestionDocumentaireModal
-          idDemandeAchat={gestionDocumentaireDa.id_demande_achat}
-          idService={gestionDocumentaireDa.id_service}
-          procedureAchat={gestionDocumentaireDa.procedure_achat}
-          objetDa={gestionDocumentaireDa.objet}
-          idFournisseurRetenu={gestionDocumentaireDa.id_fournisseur_retenu}
-          montantDemande={gestionDocumentaireDa.montant_demande}
-          onClose={() => setGestionDocumentaireDa(null)}
-        />
-      )}
-    </div>
-  )
-}
-
-interface DemandeAchatModalProps {
+export interface DemandeAchatModalProps {
   demandeAchat: DemandeAchatRow
   /** Faux dès la réouverture via « Modifier une DA » — décision du 09/09/2026 : la procédure d'achat ne se choisit qu'à la création, jamais ensuite. */
   procedureEditable: boolean
+  /**
+   * Mode consultation (icône loupe « Voir les éléments de la demande », onglets
+   * 2/3/4 de l'écran d'accueil — décision du 15/09/2026) : champs figés en lecture
+   * seule, pied de modale réduit à « Fermer », aucun accès aux sous-écrans
+   * d'édition (Montant & marché / Éléments de consultation / Gestion
+   * documentaire) — la DA/FAD n'est de toute façon plus éditable à ce stade.
+   * Faux par défaut (comportement inchangé pour l'onglet « A finaliser »).
+   */
+  readOnly?: boolean
   onClose: () => void
   onSaved: () => void
 }
@@ -552,9 +68,12 @@ interface DemandeAchatModalProps {
  * Montant). « Fournisseurs consultés » reste désactivé : DEVIS_CONSULTE n'a
  * pas encore de backend.
  */
-function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }: DemandeAchatModalProps) {
-  const [objet, setObjet] = useState(demandeAchat.objet)
-  const [description, setDescription] = useState(demandeAchat.description ?? '')
+export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = false, onClose, onSaved }: DemandeAchatModalProps) {
+  // OBJET_RC/DESCRIPTION_RC (pas *_DEMANDEUR) : synchronisés tant que la DA est éditable par le
+  // demandeur, font foi ensuite (décision du 15/09/2026 — voir MLD §2.4). updateDemandeAchat
+  // (OP1.1) recopie la valeur saisie ici dans les deux colonnes côté serveur.
+  const [objet, setObjet] = useState(demandeAchat.objet_rc)
+  const [description, setDescription] = useState(demandeAchat.description_rc ?? '')
   const [montant, setMontant] = useState(String(demandeAchat.montant_demande || ''))
   const [procedureAchat, setProcedureAchat] = useState<ProcedureAchat>(demandeAchat.procedure_achat)
   const [submitting, setSubmitting] = useState(false)
@@ -603,7 +122,11 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
    * suppression ne bloque pas la fermeture.
    */
   async function handleClose() {
-    if (demandeAchat.code_statut === 'DA_EN_PREPARATION' && !demandeAchat.objet) {
+    if (readOnly) {
+      onClose()
+      return
+    }
+    if (demandeAchat.code_statut === 'DA_EN_PREPARATION' && !demandeAchat.objet_demandeur) {
       try {
         await deleteDemandeAchat(demandeAchat.id_demande_achat)
       } catch {
@@ -647,6 +170,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
+    if (readOnly) return
     setError(null)
 
     if (objet.trim().length < 15) {
@@ -699,6 +223,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
                 value={objet}
                 onChange={(e) => setObjet(e.target.value)}
                 maxLength={75}
+                readOnly={readOnly}
               />
             </div>
 
@@ -713,6 +238,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={256}
                 rows={4}
+                readOnly={readOnly}
               />
             </div>
 
@@ -745,7 +271,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
             <div className="row" style={{ alignItems: 'flex-start' }}>
               <div className="gp-field" style={{ flex: 2 }}>
                 <label className="gp-label">Type procédure d'achat</label>
-                {procedureEditable ? (
+                {procedureEditable && !readOnly ? (
                   <Combobox
                     options={PROCEDURE_ACHAT_OPTIONS}
                     value={procedureAchat}
@@ -775,6 +301,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
                   <button
                     type="button"
                     className="gp-btn gp-btn--secondary"
+                    disabled={readOnly}
                     title={
                       procedureAchat === 'MARCHE'
                         ? 'Choisir le marché à utiliser et le montant de la DA'
@@ -803,7 +330,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
                   <button
                     type="button"
                     className="gp-btn gp-btn--secondary"
-                    disabled={idFournisseurRetenu === null}
+                    disabled={idFournisseurRetenu === null || readOnly}
                     onClick={() => setGestionDocumentaireOpen(true)}
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
@@ -836,11 +363,13 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
           </div>
           <div className="gp-modal__ft">
             <button type="button" className="gp-btn gp-btn--secondary" onClick={() => void handleClose()}>
-              Retour
+              {readOnly ? 'Fermer' : 'Retour'}
             </button>
-            <button type="submit" className="gp-btn gp-btn--primary" disabled={submitting}>
-              {submitting ? 'Enregistrement…' : 'Enregistrer'}
-            </button>
+            {!readOnly && (
+              <button type="submit" className="gp-btn gp-btn--primary" disabled={submitting}>
+                {submitting ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            )}
           </div>
         </form>
       </div>
@@ -898,7 +427,7 @@ function DemandeAchatModal({ demandeAchat, procedureEditable, onClose, onSaved }
   )
 }
 
-interface MarcheDaModalProps {
+export interface MarcheDaModalProps {
   idDemandeAchat: number
   idService: number
   currentNummarche: string | null
@@ -935,6 +464,8 @@ interface MarcheDaRow {
   select: { nummarche: string | null; idMarcheTiers: number | null }
 }
 
+type MarcheDaColumn = 'numero' | 'fournisseur' | 'libelle' | 'alertedate' | 'alertemt'
+
 /**
  * Écran MarcheDA (bouton « Marché concerné », CreationDA — procédure MARCHE
  * uniquement, croquis DA.pdf page 3) : liste combinée des marchés du service
@@ -947,7 +478,7 @@ interface MarcheDaRow {
  * un seul appel à PUT /demandes-achat/:id/marche (ID_FOURNISSEUR_RETENU/
  * MOTIF_CHOIX dérivés côté serveur, jamais ici).
  */
-function MarcheDaModal({
+export function MarcheDaModal({
   idDemandeAchat,
   idService,
   currentNummarche,
@@ -1005,6 +536,15 @@ function MarcheDaModal({
   const rows = (filtre === 'MARCHE' ? rowsMarche : filtre === 'MARCHE_TIERS' ? rowsMarcheTiers : [...rowsMarche, ...rowsMarcheTiers]).filter(
     (r) => !searchLc || r.numero.toLowerCase().includes(searchLc) || r.fournisseur.toLowerCase().includes(searchLc) || r.libelle.toLowerCase().includes(searchLc),
   )
+
+  const { sort, toggleSort } = useColumnSort<MarcheDaColumn>()
+  const displayedRows = sortRows(rows, sort, (r, column) => {
+    if (column === 'numero') return r.numero
+    if (column === 'fournisseur') return r.fournisseur
+    if (column === 'libelle') return r.libelle
+    if (column === 'alertedate') return String(r.jours ?? -1)
+    return String(r.montantRestant ?? -1)
+  })
 
   const isSelected = (r: MarcheDaRow) => r.select.nummarche === selection.nummarche && r.select.idMarcheTiers === selection.idMarcheTiers
 
@@ -1078,23 +618,23 @@ function MarcheDaModal({
           <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 320 }}>
             <table className="gp-table da-marche-table">
               <colgroup>
-                <col style={{ width: 94 }} />
+                <col style={{ width: 109 }} />
                 <col style={{ width: 226 }} />
                 <col style={{ width: 546 }} />
-                <col style={{ width: 130 }} />
-                <col style={{ width: 112 }} />
+                <col style={{ width: 124 }} />
+                <col style={{ width: 106 }} />
               </colgroup>
               <thead>
                 <tr>
-                  <th>Numéro marche</th>
-                  <th>Fournisseur</th>
-                  <th>Libelle</th>
-                  <th>Alerte date</th>
-                  <th>Alerte MT</th>
+                  <SortableTh label="Numéro marche" column="numero" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Fournisseur" column="fournisseur" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Libelle" column="libelle" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Alerte date" column="alertedate" sort={sort} onSort={toggleSort} />
+                  <SortableTh label="Alerte MT" column="alertemt" sort={sort} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r) => (
+                {displayedRows.map((r) => (
                   <tr key={r.key} className={isSelected(r) ? 'is-sel' : undefined} onClick={() => toggleSelect(r)} style={{ cursor: 'pointer' }}>
                     <td className="mono">{r.numero}</td>
                     <td>{r.fournisseur}</td>
@@ -1123,7 +663,7 @@ function MarcheDaModal({
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && (
+                {displayedRows.length === 0 && (
                   <tr>
                     <td colSpan={5}>Aucun résultat.</td>
                   </tr>
@@ -1180,7 +720,7 @@ interface FournisseurCandidat {
   nomFichierOriginal: string | null
 }
 
-interface FournisseurDaModalProps {
+export interface FournisseurDaModalProps {
   idDemandeAchat: number
   idService: number
   initialMotifChoix: MotifChoix | null
@@ -1213,7 +753,7 @@ interface FournisseurDaModalProps {
  * s'effectue désormais depuis CreationDA (bouton « Gestion documentaire »,
  * voir GestionDocumentaireModal).
  */
-function FournisseurDaModal({
+export function FournisseurDaModal({
   idDemandeAchat,
   idService,
   initialMotifChoix,
@@ -1535,7 +1075,7 @@ function FournisseurDaModal({
   )
 }
 
-interface GestionDocumentaireModalProps {
+export interface GestionDocumentaireModalProps {
   idDemandeAchat: number
   idService: number
   procedureAchat: ProcedureAchat
@@ -1556,7 +1096,7 @@ interface GestionDocumentaireModalProps {
  * seul fournisseur possible en procédure Marché (le titulaire), la liste des
  * candidats consultés en Hors marché.
  */
-function GestionDocumentaireModal({
+export function GestionDocumentaireModal({
   idDemandeAchat,
   idService,
   procedureAchat,
@@ -1902,7 +1442,7 @@ function GestionDocumentaireModal({
   )
 }
 
-interface AddPieceDaModalProps {
+export interface AddPieceDaModalProps {
   kind: 'DEVIS' | 'PIECE_COMPLEMENTAIRE'
   idDemandeAchat: number
   /** Requis quand `kind === 'DEVIS'`. */
@@ -1926,7 +1466,7 @@ const TYPE_PIECE_EXCLUS_SAISIE = new Set(['FICHE_FAD'])
  * complémentaire », type de pièce obligatoire, une nouvelle ligne
  * PIECE_JOINTE à chaque dépôt).
  */
-function AddPieceDaModal({
+export function AddPieceDaModal({
   kind,
   idDemandeAchat,
   idDevis,
@@ -2043,7 +1583,7 @@ function AddPieceDaModal({
   )
 }
 
-function DeleteDemandeAchatModal({
+export function DeleteDemandeAchatModal({
   demandeAchat,
   onClose,
   onDeleted,
@@ -2083,7 +1623,7 @@ function DeleteDemandeAchatModal({
         </div>
         <div className="gp-modal__bd gp-scroll stack">
           <p>
-            Supprimer définitivement la DA {demandeAchat.numero} ({demandeAchat.objet || 'sans objet'}) ? Cette action
+            Supprimer définitivement la DA {demandeAchat.numero} ({demandeAchat.objet_rc || 'sans objet'}) ? Cette action
             est irréversible.
           </p>
           {error && (
