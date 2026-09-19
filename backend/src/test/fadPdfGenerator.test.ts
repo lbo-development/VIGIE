@@ -90,6 +90,18 @@ describe('fillFadWorkbook', () => {
     expect(sheet.getCell('N23').value).toBeNull()
   })
 
+  it('procédure MARCHE : n\'affiche jamais le motif du choix, même si motifChoix est renseigné (résidu d\'une saisie antérieure)', async () => {
+    const workbook = await loadTemplate()
+    fillFadWorkbook(workbook, buildData({ procedureAchat: 'MARCHE', nummarche: 'P2503329', entrepriseRetenue: 'INEO', motifChoix: 'Prix' }))
+    const sheet = workbook.getWorksheet('Modèle FAD')!
+
+    expect(sheet.getCell('K25').value).toBeNull()
+    expect(sheet.getCell('O25').value).toBeNull()
+    expect(sheet.getCell('S25').value).toBeNull()
+    expect(sheet.getCell('Z25').value).toBeNull()
+    expect(sheet.getCell('K26').value).toBeNull()
+  })
+
   it('procédure HORS_MARCHE : coche la case Hors marché, remplit N23, et laisse E19/N19 vides', async () => {
     const workbook = await loadTemplate()
     fillFadWorkbook(workbook, buildData({ procedureAchat: 'HORS_MARCHE', entrepriseRetenue: 'INEO' }))

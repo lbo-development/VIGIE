@@ -319,11 +319,15 @@ export function fillFadWorkbook(workbook: ExcelJS.Workbook, data: FadPdfData): v
     setCell(sheet, CELLS.fournisseurRetenu, data.entrepriseRetenue)
   }
 
-  setCheckbox(sheet, CELLS.motifPrix, data.motifChoix === 'Prix')
-  setCheckbox(sheet, CELLS.motifDelai, data.motifChoix === 'Délai')
-  setCheckbox(sheet, CELLS.motifTechnique, data.motifChoix === 'Technique')
-  setCheckbox(sheet, CELLS.motifAutre, data.motifChoix === 'Autre')
-  if (data.motifChoix === 'Autre') setCell(sheet, CELLS.libelleAutreMotif, data.libelleAutreMotif)
+  // Motif du choix affiché uniquement en procédure HORS_MARCHE (le choix entre plusieurs
+  // entreprises consultées n'a pas de sens en MARCHE) — voir ForClaude/CDC/Modèle-FAD-XLSX.xlsx,
+  // feuille Correspondance Cellule-Valeur (K25/O25/S25/Z25/K26).
+  const affichierMotifChoix = data.procedureAchat === 'HORS_MARCHE'
+  setCheckbox(sheet, CELLS.motifPrix, affichierMotifChoix && data.motifChoix === 'Prix')
+  setCheckbox(sheet, CELLS.motifDelai, affichierMotifChoix && data.motifChoix === 'Délai')
+  setCheckbox(sheet, CELLS.motifTechnique, affichierMotifChoix && data.motifChoix === 'Technique')
+  setCheckbox(sheet, CELLS.motifAutre, affichierMotifChoix && data.motifChoix === 'Autre')
+  if (affichierMotifChoix && data.motifChoix === 'Autre') setCell(sheet, CELLS.libelleAutreMotif, data.libelleAutreMotif)
 
   const entrepriseCells = [
     { nom: CELLS.ent1Nom, cp: CELLS.ent1Cp, ville: CELLS.ent1Ville, montant: CELLS.ent1Montant, delai: CELLS.ent1Delai },
