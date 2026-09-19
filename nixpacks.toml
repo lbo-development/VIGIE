@@ -3,10 +3,9 @@
 # 19/09/2026) : le backend convertit un classeur Excel rempli en PDF via
 # `soffice --headless --convert-to pdf`, en tant que sous-processus du serveur Node.
 #
-# ATTENTION — non vérifié sur ce projet : le nom de paquet Nix "libreoffice" et la syntaxe
-# `[phases.setup]`/`nixPkgs` correspondent à la doc Nixpacks au moment de l'écriture, mais
-# n'ont jamais été testés sur un déploiement Railway réel de VIGIE. À valider sur un déploiement
-# de test (taille d'image/temps de build fortement accrus — LibreOffice est un paquet volumineux)
-# avant de considérer la génération de fiche FAD comme fonctionnelle en production.
+# IMPORTANT : déclarer `[phases.setup]` remplace entièrement la détection automatique de
+# Nixpacks (Node.js/npm inclus) au lieu de s'y ajouter — nodejs_22 doit donc être listé
+# explicitement ici, sinon `npm ci` échoue avec "npm: command not found" (constaté au
+# déploiement du 19/09/2026). Version alignée sur "engines.node" du package.json racine (>=22).
 [phases.setup]
-nixPkgs = ["libreoffice"]
+nixPkgs = ["nodejs_22", "libreoffice"]
