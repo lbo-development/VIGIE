@@ -6,10 +6,11 @@ import { useCellules } from '../hooks/useCellules'
 import { useDemandeAchatList, useAccueilSynthese, type DemandeAchat as DemandeAchatRow, type AccueilScope } from '../hooks/useDemandeAchat'
 import { Combobox } from '../components/Combobox'
 import { MetricCard } from '../components/MetricCard'
-import { DemandeAchatModal, GestionDocumentaireModal } from '../components/demandeAchat/modals'
+import { DemandeAchatModal } from '../components/demandeAchat/modals'
 import { HistoriqueStatutsModal } from '../components/demandeAchat/HistoriqueStatutsModal'
 import { DemandeAchatCard } from '../components/demandeAchat/DemandeAchatCard'
 import { TraiterFadRcModal } from '../components/demandeAchat/TraiterFadRcModal'
+import { ValiderCommandeRcModal } from '../components/demandeAchat/ValiderCommandeRcModal'
 import { STATUT_LABELS, ACCUEIL_SCOPE_STATUTS, CURRENCY_FORMAT } from '../components/demandeAchat/constants'
 import '../styles/tableauDeBord.css'
 
@@ -43,11 +44,26 @@ const EN_TRANSIT_LABELS_RC: { key: 'CDS' | 'DS' | 'CB'; label: string }[] = [
  * exclue). Accessible via l'entrée de sidebar « FAD — <cellule> »
  * (config/navigation.ts), masquée pour qui n'a pas de rôle RC actif.
  *
- * Gestion documentaire en modification (décision du 15/09/2026) : icône
- * dédiée, réservée à l'onglet « À traiter » (là où le RC est « pour action »
- * — même principe que l'onglet « A finaliser » du Demandeur) — « Voir » reste
- * en lecture seule sur tous les onglets, y compris « À traiter ».
+ * Droits sur la gestion documentaire (matrice ForClaude/CDC/Gestion
+ * documentaire.xlsx, décision du 17/09/2026) : tant que le RC est « pour
+ * action » sur la ligne (`estStatutADecider` ci-dessous, et les statuts
+ * équivalents ouverts par « Traiter » — TraiterFadRcModal), devis verrouillé
+ * (`devisReadOnly`, Télécharger seul actif) mais pièces complémentaires
+ * éditables (voir demandeAchat.service.ts#STATUTS_PIECES_MODIFIABLES côté
+ * backend). Une fois la ligne retransmise (onglets « En cours »/« FAD
+ * commandées »/« Rejetées / Annulées »), gestion documentaire entière en
+ * consultation + téléchargement (DemandeAchatModal `readOnly`, via « Voir les
+ * éléments de la demande »). `DA_TRANSMISE_DEM_RC`/`DA_VALIDEE_RC` ouvrent
+ * « Valider les éléments de la commande » (ValiderCommandeRcModal) pour
+ * décider/dévalider ; les autres statuts « pour action »
+ * (`FAD_A_COMPLETER_CDS`/`FAD_A_MODIFIER_CB`) passent par « Traiter »
+ * (TraiterFadRcModal, complétion + transmission) — l'icône « Traiter »
+ * n'apparaît pas pour `DA_TRANSMISE_DEM_RC`, rien à y compléter tant que la
+ * DA n'est pas validée.
  */
+function estStatutADecider(codeStatut: string): boolean {
+  return codeStatut === 'DA_TRANSMISE_DEM_RC' || codeStatut === 'DA_VALIDEE_RC'
+}
 export function SuiviRc() {
   const { session } = useAuth()
   const { data: currentUser } = useCurrentUser()
@@ -113,9 +129,9 @@ export function SuiviRc() {
   const statutFilterOptions = ACCUEIL_SCOPE_STATUTS[activeTab].map((code) => ({ value: code, label: STATUT_LABELS[code] ?? code }))
 
   const [modalDa, setModalDa] = useState<DemandeAchatRow | null>(null)
+  const [validerCommandeDa, setValiderCommandeDa] = useState<DemandeAchatRow | null>(null)
   const [historiqueDa, setHistoriqueDa] = useState<DemandeAchatRow | null>(null)
   const [traiterDa, setTraiterDa] = useState<DemandeAchatRow | null>(null)
-  const [gestionDocumentaireDa, setGestionDocumentaireDa] = useState<DemandeAchatRow | null>(null)
 
   return (
     <div className="stack">
@@ -145,48 +161,56 @@ export function SuiviRc() {
         </div>
 
         <div className="stack" style={{ padding: '16px 0 0' }}>
-          <div className="row" style={{ flexWrap: 'wrap' }}>
-            <div className="gp-field" style={{ width: 260 }}>
-              <label className="gp-label">Fournisseurs</label>
-              <Combobox
-                options={fournisseurOptions}
-                value={filterFournisseur}
-                onChange={setFilterFournisseur}
-                placeholder="Tous"
-                clearLabel="Tous"
-                ariaLabel="Filtre fournisseur"
-                style={{ maxWidth: 'none' }}
-              />
-            </div>
-            <div className="gp-field" style={{ width: 220 }}>
-              <label className="gp-label">Statut</label>
-              <Combobox
-                options={statutFilterOptions}
-                value={filterStatut}
-                onChange={setFilterStatut}
-                placeholder="Tous"
-                clearLabel="Tous"
-                ariaLabel="Filtre statut"
-                style={{ maxWidth: 'none' }}
-              />
-            </div>
-            <div className="gp-field" style={{ width: 260 }}>
-              <label className="gp-label" htmlFor="suivirc-search">
-                Recherche
-              </label>
-              <div className="gp-inputgroup">
-                <svg className="ti">
-                  <use href="#i-search" />
-                </svg>
-                <input
-                  id="suivirc-search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Numéro, objet, fournisseur…"
-                  aria-label="Rechercher"
+          <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'space-between' }}>
+            <div className="row" style={{ flexWrap: 'wrap', flex: 1 }}>
+              <div className="gp-field" style={{ width: 520 }}>
+                <label className="gp-label">Fournisseurs</label>
+                <Combobox
+                  options={fournisseurOptions}
+                  value={filterFournisseur}
+                  onChange={setFilterFournisseur}
+                  placeholder="Tous"
+                  clearLabel="Tous"
+                  ariaLabel="Filtre fournisseur"
+                  style={{ maxWidth: 'none' }}
                 />
               </div>
+              <div className="gp-field" style={{ width: 220 }}>
+                <label className="gp-label">Statut</label>
+                <Combobox
+                  options={statutFilterOptions}
+                  value={filterStatut}
+                  onChange={setFilterStatut}
+                  placeholder="Tous"
+                  clearLabel="Tous"
+                  ariaLabel="Filtre statut"
+                  style={{ maxWidth: 'none' }}
+                />
+              </div>
+              <div className="gp-field" style={{ width: 260 }}>
+                <label className="gp-label" htmlFor="suivirc-search">
+                  Recherche
+                </label>
+                <div className="gp-inputgroup">
+                  <svg className="ti">
+                    <use href="#i-search" />
+                  </svg>
+                  <input
+                    id="suivirc-search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Numéro, objet, fournisseur…"
+                    aria-label="Rechercher"
+                  />
+                </div>
+              </div>
             </div>
+
+            <button type="button" className="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Actualiser la liste" onClick={() => refetchAll()}>
+              <svg className="ti">
+                <use href="#i-refresh" />
+              </svg>
+            </button>
           </div>
 
           {listError && <p className="gp-errmsg">{listError}</p>}
@@ -201,38 +225,32 @@ export function SuiviRc() {
                 fournisseurLabel={fournisseurLabel}
                 actions={
                   <>
-                    {activeTab === 'A_TRAITER' && (
-                      <>
-                        <span className="gp-tip" data-tip="Traiter la demande">
-                          <button aria-label="Traiter la demande" onClick={() => setTraiterDa(da)}>
-                            <svg className="ti">
-                              <use href="#i-circle-check" />
-                            </svg>
-                          </button>
-                        </span>
-                        <span
-                          className="gp-tip"
-                          data-tip={da.id_fournisseur_retenu === null ? "Identifiez d'abord un fournisseur" : 'Gérer les documents liés à la demande'}
-                        >
-                          <button
-                            aria-label="Gérer les documents liés à la demande"
-                            disabled={da.id_fournisseur_retenu === null}
-                            onClick={() => setGestionDocumentaireDa(da)}
-                          >
-                            <svg className="ti">
-                              <use href="#i-folder" />
-                            </svg>
-                          </button>
-                        </span>
-                      </>
+                    {activeTab === 'A_TRAITER' && da.code_statut !== 'DA_TRANSMISE_DEM_RC' && (
+                      <span className="gp-tip" data-tip="Traiter la demande">
+                        <button aria-label="Traiter la demande" onClick={() => setTraiterDa(da)}>
+                          <svg className="ti">
+                            <use href="#i-circle-check" />
+                          </svg>
+                        </button>
+                      </span>
                     )}
-                    <span className="gp-tip" data-tip="Voir les éléments de la demande">
-                      <button aria-label="Voir les éléments de la demande" onClick={() => setModalDa(da)}>
-                        <svg className="ti">
-                          <use href="#i-eye" />
-                        </svg>
-                      </button>
-                    </span>
+                    {estStatutADecider(da.code_statut) ? (
+                      <span className="gp-tip" data-tip="Valider les éléments de la commande">
+                        <button aria-label="Valider les éléments de la commande" onClick={() => setValiderCommandeDa(da)}>
+                          <svg className="ti">
+                            <use href="#i-eye" />
+                          </svg>
+                        </button>
+                      </span>
+                    ) : (
+                      <span className="gp-tip" data-tip="Voir les éléments de la demande">
+                        <button aria-label="Voir les éléments de la demande" onClick={() => setModalDa(da)}>
+                          <svg className="ti">
+                            <use href="#i-eye" />
+                          </svg>
+                        </button>
+                      </span>
+                    )}
                     <span className="gp-tip" data-tip="Historique des statuts">
                       <button aria-label="Historique des statuts" onClick={() => setHistoriqueDa(da)}>
                         <svg className="ti">
@@ -297,6 +315,17 @@ export function SuiviRc() {
         <DemandeAchatModal demandeAchat={modalDa} procedureEditable={false} readOnly onClose={() => setModalDa(null)} onSaved={() => setModalDa(null)} />
       )}
 
+      {validerCommandeDa && (
+        <ValiderCommandeRcModal
+          demandeAchat={validerCommandeDa}
+          onClose={() => setValiderCommandeDa(null)}
+          onSaved={() => {
+            setValiderCommandeDa(null)
+            refetchAll()
+          }}
+        />
+      )}
+
       {historiqueDa && (
         <HistoriqueStatutsModal idDemandeAchat={historiqueDa.id_demande_achat} numero={historiqueDa.numero} onClose={() => setHistoriqueDa(null)} />
       )}
@@ -309,18 +338,13 @@ export function SuiviRc() {
             setTraiterDa(null)
             refetchAll()
           }}
-        />
-      )}
-
-      {gestionDocumentaireDa && gestionDocumentaireDa.id_fournisseur_retenu !== null && (
-        <GestionDocumentaireModal
-          idDemandeAchat={gestionDocumentaireDa.id_demande_achat}
-          idService={gestionDocumentaireDa.id_service}
-          procedureAchat={gestionDocumentaireDa.procedure_achat}
-          objetDa={gestionDocumentaireDa.objet_rc}
-          idFournisseurRetenu={gestionDocumentaireDa.id_fournisseur_retenu}
-          montantDemande={gestionDocumentaireDa.montant_demande}
-          onClose={() => setGestionDocumentaireDa(null)}
+          onProgressSaved={(updated) => {
+            // La modale reste ouverte (contrairement à onSaved) — met à jour la ligne tenue par
+            // ce composant et rafraîchit les listes en tâche de fond, sinon rouvrir la modale
+            // après « Retour » réafficherait la ligne obsolète (voir TraiterFadRcModal.tsx).
+            setTraiterDa(updated)
+            refetchAll()
+          }}
         />
       )}
     </div>

@@ -6,23 +6,27 @@ interface HistoriqueStatutsModalProps {
   idDemandeAchat: number
   numero: string
   onClose: () => void
+  /** À fournir depuis pages/SuiviCds.tsx/pages/SuiviCb.tsx — voir useDemandeAchat.ts#getHistoriqueStatuts. */
+  role?: 'CDS' | 'CB'
 }
 
 /**
- * Icône calendrier (tous les onglets de l'écran d'accueil) — simple liste
- * chronologique des transitions de statut d'une DA/FAD (GET
- * /demandes-achat/:id/historique, voir demandeAchat.service.ts#getHistoriqueStatuts),
- * aucune action possible dessus (historique_statut est immuable en base).
+ * Icône calendrier (tous les onglets de l'écran d'accueil, ainsi que
+ * pages/SuiviCds.tsx) — simple liste chronologique des transitions de statut
+ * d'une DA/FAD (GET /demandes-achat/:id/historique, voir
+ * demandeAchat.service.ts#getHistoriqueStatuts), aucune action possible
+ * dessus (historique_statut est immuable en base).
  */
-export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose }: HistoriqueStatutsModalProps) {
+export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose, role }: HistoriqueStatutsModalProps) {
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<HistoriqueStatutView[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [commentaireAAfficher, setCommentaireAAfficher] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    getHistoriqueStatuts(idDemandeAchat)
+    getHistoriqueStatuts(idDemandeAchat, role)
       .then((data) => {
         if (!cancelled) setRows(data)
       })
@@ -35,7 +39,7 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose }: Hist
     return () => {
       cancelled = true
     }
-  }, [idDemandeAchat])
+  }, [idDemandeAchat, role])
 
   return (
     <div className="gp-overlay is-open">
@@ -94,7 +98,25 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose }: Hist
                           </>
                         )}
                       </td>
-                      <td>{row.commentaireStatut ?? '—'}</td>
+                      <td>
+                        {row.commentaireStatut ? (
+                          <div className="gp-rowacts">
+                            <span className="gp-tip" data-tip="Voir le commentaire">
+                              <button
+                                type="button"
+                                aria-label="Voir le commentaire"
+                                onClick={() => setCommentaireAAfficher(row.commentaireStatut)}
+                              >
+                                <svg className="ti">
+                                  <use href="#i-eye" />
+                                </svg>
+                              </button>
+                            </span>
+                          </div>
+                        ) : (
+                          '—'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -108,6 +130,31 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose }: Hist
           </button>
         </div>
       </div>
+
+      {commentaireAAfficher !== null && (
+        <div className="gp-overlay is-open">
+          <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="commentaireHistoriqueModalTitle">
+            <div className="gp-modal__hd">
+              <h3 className="gp-modal__title" id="commentaireHistoriqueModalTitle">
+                Commentaire
+              </h3>
+              <button className="gp-modal__close" aria-label="Fermer" onClick={() => setCommentaireAAfficher(null)}>
+                <svg className="ti">
+                  <use href="#i-x" />
+                </svg>
+              </button>
+            </div>
+            <div className="gp-modal__bd gp-scroll stack">
+              <p style={{ whiteSpace: 'pre-wrap' }}>{commentaireAAfficher}</p>
+            </div>
+            <div className="gp-modal__ft">
+              <button type="button" className="gp-btn gp-btn--secondary" onClick={() => setCommentaireAAfficher(null)}>
+                Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

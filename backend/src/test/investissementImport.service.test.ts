@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs'
 const assertManagesServiceOrHasRoleCb = vi.fn()
 const findAllCug = vi.fn()
 const upsertMany = vi.fn()
+const findAllInvestissement = vi.fn()
 const findAllRowsParametre = vi.fn()
 const upsertParametre = vi.fn()
 
@@ -15,6 +16,7 @@ vi.mock('../repositories/cug.repository.js', () => ({
 }))
 vi.mock('../repositories/investissement.repository.js', () => ({
   upsertMany: (...args: unknown[]) => upsertMany(...args),
+  findAll: (...args: unknown[]) => findAllInvestissement(...args),
 }))
 vi.mock('../repositories/parametres.repository.js', () => ({
   findAllRows: (...args: unknown[]) => findAllRowsParametre(...args),
@@ -143,6 +145,7 @@ beforeEach(() => {
   assertManagesServiceOrHasRoleCb.mockReset().mockResolvedValue(undefined)
   findAllCug.mockReset().mockResolvedValue([{ code_cug: '268', libelle_cug: 'Fournitures', id_service: ID_SERVICE, actif: true }])
   upsertMany.mockReset().mockResolvedValue(undefined)
+  findAllInvestissement.mockReset().mockResolvedValue([])
   findAllRowsParametre.mockReset().mockResolvedValue([])
   upsertParametre.mockReset().mockResolvedValue({})
 })
@@ -269,7 +272,7 @@ describe('preview — agrégation AP/CP', () => {
 })
 
 describe('confirm', () => {
-  it('upserte les opérations éligibles avec les 16 montants (actif non inclus — champ manuel depuis le 04/09/2026)', async () => {
+  it('upserte les opérations éligibles avec les 16 montants (statut A, création : actif et utilisable forcés à VRAI)', async () => {
     const buffer = await buildWorkbookBuffer({
       opRows: [{ code: 'VN000203', cug: '268', statut: 'A', montantFc: 1000 }],
       apRows: [{ numop: 'VN000203', indice: '1', budget: 5, engage: 4, liquide: 3, solde: 2 }],
@@ -283,6 +286,8 @@ describe('confirm', () => {
         id_service: ID_SERVICE,
         code_cug: '268',
         statut: 'A',
+        actif: true,
+        utilisable: true,
         mt_initial: 1000,
         mt_budget_ap1: 5,
         mt_engage_ap1: 4,
@@ -293,8 +298,6 @@ describe('confirm', () => {
         mt_budget_cp8: 0,
       }),
     ])
-    const [rows] = upsertMany.mock.calls[0] as [Record<string, unknown>[]]
-    expect(rows[0]).not.toHaveProperty('actif')
   })
 
   it('alimente mt_travaux depuis la colonne "Montant travaux" de la feuille OP', async () => {
@@ -307,7 +310,7 @@ describe('confirm', () => {
     expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ mt_initial: 1000, mt_travaux: 700 })])
   })
 
-  it("n'inclut jamais libelle_service, actif, utilisable ni mt_fesi dans la charge de l'upsert (champs manuels ou générés, jamais réécrits par un import — voir migrations 20260904100000/20260904110000/20260904120000)", async () => {
+  it("n'inclut jamais libelle_service ni mt_fesi dans la charge de l'upsert (champ manuel / colonne générée, jamais réécrits par un import — voir migrations 20260904100000/20260904120000)", async () => {
     const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203' }] })
 
     await confirm(MATRICULE, ID_SERVICE, buffer)
@@ -315,8 +318,6 @@ describe('confirm', () => {
     const [rows] = upsertMany.mock.calls[0] as [Record<string, unknown>[]]
     expect(rows[0]).not.toHaveProperty('libelle_service')
     expect(rows[0]).not.toHaveProperty('mt_fesi')
-    expect(rows[0]).not.toHaveProperty('actif')
-    expect(rows[0]).not.toHaveProperty('utilisable')
   })
 
   it("met à jour last.import.investissement.pgi avec la date du jour au format YYYY-MM-DD (horodatage serveur, pas une date du fichier)", async () => {
@@ -339,6 +340,75 @@ describe('confirm', () => {
 
     await expect(preview(MATRICULE, ID_SERVICE, buffer)).rejects.toMatchObject({ status: 403 })
     expect(findAllCug).not.toHaveBeenCalled()
+  })
+})
+
+describe('confirm — pilotage ACTIF/UTILISABLE par STATUT (décision du 17/09/2026)', () => {
+  it('statut F, opération nouvelle : actif=false et utilisable=false', async () => {
+    const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203', statut: 'F' }] })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ numero_operation: 'VN000203', actif: false, utilisable: false })])
+  })
+
+  it('statut F, opération déjà en base et précédemment A : actif=false et utilisable=false (écrase la valeur manuelle)', async () => {
+    findAllInvestissement.mockResolvedValue([{ numero_operation: 'VN000203', statut: 'A' }])
+    const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203', statut: 'F' }] })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ numero_operation: 'VN000203', actif: false, utilisable: false })])
+  })
+
+  it('statut A, opération nouvelle (absente de la base) : actif=true et utilisable=true', async () => {
+    findAllInvestissement.mockResolvedValue([])
+    const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203', statut: 'A' }] })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ numero_operation: 'VN000203', actif: true, utilisable: true })])
+  })
+
+  it('statut A, opération déjà en base et précédemment F (sortie de F) : actif=true et utilisable=true', async () => {
+    findAllInvestissement.mockResolvedValue([{ numero_operation: 'VN000203', statut: 'F' }])
+    const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203', statut: 'A' }] })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ numero_operation: 'VN000203', actif: true, utilisable: true })])
+  })
+
+  it('statut A, opération déjà en base et déjà à A : actif=true forcé, mais utilisable absent de la charge (préserve une valeur modifiée manuellement)', async () => {
+    findAllInvestissement.mockResolvedValue([{ numero_operation: 'VN000203', statut: 'A' }])
+    const buffer = await buildWorkbookBuffer({ opRows: [{ code: 'VN000203', statut: 'A' }] })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledWith([expect.objectContaining({ numero_operation: 'VN000203', actif: true })])
+    const rows = upsertMany.mock.calls.flatMap(([rows]) => rows as Record<string, unknown>[])
+    const row = rows.find((r) => r.numero_operation === 'VN000203')
+    expect(row).not.toHaveProperty('utilisable')
+  })
+
+  it('deux opérations dans des cas différents (F, et A déjà à A) : deux lots distincts passés à upsertMany', async () => {
+    findAllInvestissement.mockResolvedValue([{ numero_operation: 'VN000203', statut: 'A' }])
+    const buffer = await buildWorkbookBuffer({
+      opRows: [
+        { code: 'VN000203', statut: 'A' },
+        { code: 'VN000204', statut: 'F' },
+      ],
+    })
+
+    await confirm(MATRICULE, ID_SERVICE, buffer)
+
+    expect(upsertMany).toHaveBeenCalledTimes(2)
+    const lots = upsertMany.mock.calls.map(([rows]) => rows as Record<string, unknown>[])
+    const lotComplet = lots.find((lot) => lot.some((r) => r.numero_operation === 'VN000204'))
+    const lotActifSeul = lots.find((lot) => lot.some((r) => r.numero_operation === 'VN000203'))
+    expect(lotComplet).toEqual([expect.objectContaining({ numero_operation: 'VN000204', actif: false, utilisable: false })])
+    expect(lotActifSeul).toEqual([expect.objectContaining({ numero_operation: 'VN000203', actif: true })])
+    expect(lotActifSeul?.[0]).not.toHaveProperty('utilisable')
   })
 })
 

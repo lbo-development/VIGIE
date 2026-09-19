@@ -4,8 +4,11 @@ import { IconSprite } from './components/shell/IconSprite'
 import { RequireAuth } from './components/RequireAuth'
 import { AppShell } from './components/shell/AppShell'
 import { Login } from './pages/Login'
+import { AccueilRedirect } from './pages/AccueilRedirect'
 import { Home } from './pages/Home'
 import { SuiviRc } from './pages/SuiviRc'
+import { SuiviCds } from './pages/SuiviCds'
+import { SuiviCb } from './pages/SuiviCb'
 import { GisementGeographique } from './pages/GisementGeographique'
 import { GisementTechnique } from './pages/GisementTechnique'
 import { Reglages } from './pages/Reglages'
@@ -18,6 +21,7 @@ import { Cug } from './pages/Cug'
 import { LibelleReferentiel } from './pages/LibelleReferentiel'
 import { Utilisateurs } from './pages/Utilisateurs'
 import { RolesUtilisateurs } from './pages/RolesUtilisateurs'
+import { SignaturesActeurs } from './pages/SignaturesActeurs'
 import { MarchesPGI } from './pages/MarchesPGI'
 import { ImportMarches } from './pages/ImportMarches'
 import { MarchesTiers } from './pages/MarchesTiers'
@@ -26,6 +30,7 @@ import { CommandesPGI } from './pages/CommandesPGI'
 import { ImportCommandes } from './pages/ImportCommandes'
 import { InvestissementsPGI } from './pages/InvestissementsPGI'
 import { ImportInvestissements } from './pages/ImportInvestissements'
+import { Manuel } from './pages/Manuel'
 import { NotFound } from './pages/NotFound'
 
 /**
@@ -47,8 +52,11 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<RequireAuth />}>
             <Route element={<AppShell />}>
-              <Route path="/" element={<Home />} />
+              <Route path="/" element={<AccueilRedirect />} />
+              <Route path="/mes-demandes" element={<Home />} />
               <Route path="/suivi-rc" element={<SuiviRc />} />
+              <Route path="/suivi-cds" element={<SuiviCds />} />
+              <Route path="/suivi-cb" element={<SuiviCb />} />
               <Route path="/parametres/gisement-geographique" element={<GisementGeographique />} />
               <Route path="/parametres/gisement-technique" element={<GisementTechnique />} />
               <Route path="/parametres/reglages" element={<Reglages />} />
@@ -61,6 +69,7 @@ function App() {
               <Route path="/parametres/libelle-referentiel" element={<LibelleReferentiel />} />
               <Route path="/parametres/utilisateurs" element={<Utilisateurs />} />
               <Route path="/parametres/roles" element={<RolesUtilisateurs />} />
+              <Route path="/parametres/signatures" element={<SignaturesActeurs />} />
               <Route path="/marches" element={<MarchesPGI />} />
               <Route path="/marches/import" element={<ImportMarches />} />
               <Route path="/marches/tiers" element={<MarchesTiers />} />
@@ -69,6 +78,8 @@ function App() {
               <Route path="/commandes/import" element={<ImportCommandes />} />
               <Route path="/investissements" element={<InvestissementsPGI />} />
               <Route path="/investissements/import" element={<ImportInvestissements />} />
+              <Route path="/manuel" element={<Manuel />} />
+              <Route path="/manuel/:module" element={<Manuel />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Route>

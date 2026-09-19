@@ -68,13 +68,16 @@ const updateManagedFieldsSchema = z.object({
 })
 
 /**
- * Modification manuelle des seuls champs éditables hors import — LIBELLE_SERVICE, ACTIF et
- * UTILISABLE (voir ForClaude/importation-investissementsPGI/import-investissements-pgi.md, §11 —
- * ACTIF rendu manuel le 04/09/2026, l'import ne le pilote plus du tout après création) — icône
- * « Modifier » des cartes d'InvestissementsPGI.tsx, réservée ADMIN_APP/ADMIN_SERVICE/CB
+ * Modification manuelle des champs LIBELLE_SERVICE, ACTIF et UTILISABLE — icône « Modifier » des
+ * cartes d'InvestissementsPGI.tsx, réservée ADMIN_APP/ADMIN_SERVICE/CB
  * (`assertManagesServiceOrHasRoleCb`), même triplet que l'import. `id_service` résolu depuis la
  * ligne existante (colonne directe sur la table, pas de résolution via CUG/fournisseur
  * nécessaire, contrairement à marche.service.ts#resolveMarcheIdService).
+ *
+ * Attention : depuis le 17/09/2026, ACTIF et UTILISABLE sont aussi repilotés par STATUT à chaque
+ * import (voir investissementImport.service.ts#confirm) — une modification faite ici peut être
+ * écrasée par le prochain import (systématiquement sur statut F ; sur statut A, seul ACTIF est
+ * réécrasé, UTILISABLE ne l'est que si l'opération vient de sortir du statut F).
  */
 export async function updateManagedFields(matricule: string | null, numeroOperation: string, input: unknown): Promise<OperationInvestissement> {
   const result = updateManagedFieldsSchema.safeParse(input)

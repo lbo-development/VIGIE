@@ -1,0 +1,47 @@
+<svg class="svg-sprite" aria-hidden="true">
+  <defs>
+    <!--
+      Icônes propres à VIGIE (nomenclature #iv-xxx, distincte de #i-xxx) —
+      exception documentée au sprite partagé GPMM (ForClaude/Template
+      UX/icons.svg), décision du 17/09/2026 : une icône par rôle pour les
+      entrées de sidebar « Accueil » (config/navigation.ts#getAccueilSidebarItems),
+      aucun de ces 5 concepts (rôle + pictogramme dédié) n'existant dans le
+      sprite partagé. Même principe d'exception déjà accepté pour
+      PieceCountBadge (components/PieceCountBadge.tsx) : composant/asset
+      propre à cette application, jamais ajouté au template partagé. Même
+      style que icons.svg (viewBox 24x24, traits, pas de remplissage — la
+      couleur/épaisseur vient de la classe .ti partagée, gpmm.css) pour
+      rester visuellement cohérentes avec le reste du sprite.
+    -->
+    <symbol id="iv-demandeur" viewBox="0 0 24 24">
+      <path d="M12 3v8M9 8l3 3 3-3"/>
+      <path d="M4 14v4a2 2 0 0 0 2 2h5.5a4 4 0 0 0 2.8-1.2l4.7-4.7a1.4 1.4 0 0 0-2-2L13 16"/>
+      <path d="M4 14l-1 1 4 4 1-1"/>
+    </symbol>
+    <symbol id="iv-rc" viewBox="0 0 24 24">
+      <circle cx="8" cy="8" r="3"/>
+      <path d="M2 20c0-4 2.5-6 6-6"/>
+      <circle cx="17" cy="16" r="2.6"/>
+      <path d="M17 11.4v1.6M17 18.6V20M12.4 16H14M20 16h1.6M13.8 12.8l1.1 1.1M19.1 18.1l1.1 1.1M13.8 19.2l1.1-1.1M19.1 13.9l1.1-1.1"/>
+    </symbol>
+    <symbol id="iv-cds" viewBox="0 0 24 24">
+      <circle cx="8" cy="8" r="3"/>
+      <path d="M2 20c0-4 2.5-6 6-6"/>
+      <rect x="14" y="15" width="8" height="6" rx="1.5"/>
+      <path d="M16 15v-2a2 2 0 0 1 4 0v2"/>
+    </symbol>
+    <symbol id="iv-cb" viewBox="0 0 24 24">
+      <circle cx="16" cy="6" r="4.2"/>
+      <path d="M16 3.8v.6M16 7.6v.6M14.6 4.9c.3-.5.9-.9 1.4-.9.8 0 1.4.5 1.4 1s-.6 1-1.4 1-1.4.5-1.4 1 .6 1 1.4 1c.5 0 1.1-.4 1.4-.9"/>
+      <path d="M2 14c1-1.3 2.3-1.3 3.3-.3l2.4 2c1 .8 2.3.8 3.3 0l2.4-2a1.6 1.6 0 0 1 2.2 2.3l-3.4 3.4A4 4 0 0 1 9.5 20H4a2 2 0 0 1-2-2z"/>
+    </symbol>
+    <symbol id="iv-ds" viewBox="0 0 24 24">
+      <path d="M11 3c-1.7 0-2.5 1.1-2.5 2.5S9 8 9 9.5"/>
+      <rect x="6" y="9.5" width="10" height="3.5" rx="1"/>
+      <rect x="3" y="13" width="16" height="3.5" rx="1"/>
+      <path d="M3 20h16"/>
+      <circle cx="19" cy="7" r="4"/>
+      <path d="M17 7l1.3 1.3L21 5.6"/>
+    </symbol>
+  </defs>
+</svg>

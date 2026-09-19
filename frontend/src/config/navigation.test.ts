@@ -35,10 +35,11 @@ describe('filterParametresItems', () => {
       'Gisement technique',
       'Seuils de validation DS',
       'Rôles',
+      'Signatures',
     ])
   })
 
-  it('ADMIN_APP voit toutes les entrées, dans l\'ordre Directions/Services/Cellules/CUG/gisements puis Seuils de validation DS/Référentiel libellé/Utilisateurs/Rôles puis Réglages', () => {
+  it('ADMIN_APP voit toutes les entrées, dans l\'ordre Directions/Services/Cellules/CUG/gisements puis Seuils de validation DS/Référentiel libellé/Utilisateurs/Rôles/Signatures puis Réglages', () => {
     const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: true, isAdminService: false })
 
     expect(result.map((i) => i.label)).toEqual([
@@ -52,6 +53,7 @@ describe('filterParametresItems', () => {
       'Référentiel libellé',
       'Utilisateurs',
       'Rôles',
+      'Signatures',
       'Réglages',
     ])
   })
@@ -67,10 +69,10 @@ describe('filterParametresItems', () => {
 })
 
 describe('filterNavItems', () => {
-  it('"Accueil", "Marchés", "Commandes PGI" et "Investissements" sont toujours visibles', () => {
+  it('"Accueil", "Mes demandes", "Marchés", "Commandes PGI" et "Investissements" sont toujours visibles', () => {
     const result = filterNavItems(NAV_ITEMS, { isAdminApp: false, isAdminService: false, hasOwnService: false })
 
-    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Marchés', 'Commandes PGI', 'Investissements'])
+    expect(result.map((i) => i.label)).toEqual(['Accueil', 'Mes demandes', 'Marchés', 'Commandes PGI', 'Investissements', 'Manuel'])
   })
 
   it("masque \"Fournisseurs\" pour un compte non rattaché à un ACTEUR (ni rôle d'administration, ni service propre)", () => {
@@ -84,10 +86,12 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
+      'Mes demandes',
       'Marchés',
       'Commandes PGI',
       'Investissements',
       'Fournisseurs',
+      'Manuel',
     ])
   })
 
@@ -96,10 +100,12 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
+      'Mes demandes',
       'Marchés',
       'Commandes PGI',
       'Investissements',
       'Fournisseurs',
+      'Manuel',
     ])
   })
 
@@ -108,10 +114,12 @@ describe('filterNavItems', () => {
 
     expect(result.map((i) => i.label)).toEqual([
       'Accueil',
+      'Mes demandes',
       'Marchés',
       'Commandes PGI',
       'Investissements',
       'Fournisseurs',
+      'Manuel',
     ])
   })
 
@@ -125,20 +133,58 @@ function meResponse(roles: MeResponse['roles']): MeResponse {
 }
 
 describe('getAccueilSidebarItems', () => {
-  it("retourne une liste vide sans rôle RC actif (currentUser null)", () => {
+  it('liste vide sans utilisateur résolu (currentUser null) — "Mes demandes" a son propre onglet, plus dans cette sidebar', () => {
     expect(getAccueilSidebarItems(null)).toEqual([])
   })
 
-  it('retourne une liste vide sans rôle RC actif (autres rôles présents)', () => {
+  it('liste vide sans rôle RC, CDS ni CB actif (autres rôles présents)', () => {
     const currentUser = meResponse([{ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Service Achats', idService: 10, idCellule: null }])
 
     expect(getAccueilSidebarItems(currentUser)).toEqual([])
   })
 
-  it('retourne "FAD — <cellule>" pointant vers /suivi-rc avec un rôle RC (titulaire ou suppléant)', () => {
+  it('ajoute "FAD — <cellule>" pointant vers /suivi-rc avec un rôle RC (titulaire ou suppléant)', () => {
     const currentUser = meResponse([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 }])
 
-    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: '' }])
+    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' }])
+  })
+
+  it('ajoute "FAD (N+2) — <service>" pointant vers /suivi-cds avec un rôle CDS (titulaire ou suppléant)', () => {
+    const currentUser = meResponse([{ typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null }])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' }])
+  })
+
+  it('cumul RC+CDS : les deux entrées apparaissent, RC avant CDS, avec des libellés distincts', () => {
+    const currentUser = meResponse([
+      { typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 },
+      { typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null },
+    ])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([
+      { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
+      { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
+    ])
+  })
+
+  it('ajoute "FAD (CB) — <service>" pointant vers /suivi-cb avec un rôle CB (titulaire ou suppléant)', () => {
+    const currentUser = meResponse([{ typeRole: 'CB', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null }])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' }])
+  })
+
+  it('cumul RC+CDS+CB : les trois entrées apparaissent, dans l\'ordre RC/CDS/CB', () => {
+    const currentUser = meResponse([
+      { typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 },
+      { typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null },
+      { typeRole: 'CB', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null },
+    ])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([
+      { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
+      { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
+      { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
+    ])
   })
 })
 
@@ -149,6 +195,14 @@ describe('isHomeSection', () => {
 
   it('reconnaît "/suivi-rc" et ses sous-pages', () => {
     expect(isHomeSection('/suivi-rc')).toBe(true)
+  })
+
+  it('reconnaît "/suivi-cds" et ses sous-pages', () => {
+    expect(isHomeSection('/suivi-cds')).toBe(true)
+  })
+
+  it('reconnaît "/suivi-cb" et ses sous-pages', () => {
+    expect(isHomeSection('/suivi-cb')).toBe(true)
   })
 
   it('ignore une route hors de la section', () => {

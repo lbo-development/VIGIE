@@ -1,196 +1,69 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useFournisseurs } from '../../hooks/useFournisseurs'
 import { useSites } from '../../hooks/useSites'
 import { useSecteurs } from '../../hooks/useSecteurs'
 import { useCug } from '../../hooks/useCug'
 import { useInvestissementsPgi } from '../../hooks/useInvestissementsPgi'
 import {
-  decisionRc,
   transmettreFad,
   retransmettreCb,
+  enregistrerFad,
   getHistoriqueStatuts,
   type DemandeAchat as DemandeAchatRow,
-  type DemandeAchatDecision,
+  type MotifChoix,
+  type TypeFad,
 } from '../../hooks/useDemandeAchat'
 import { Combobox } from '../Combobox'
+import { GestionDocumentaireModal, InvestissementDaModal } from './modals'
 import { ApiError } from '../../services/api'
-import { CURRENCY_FORMAT } from './constants'
 
 export interface TraiterFadRcModalProps {
   demandeAchat: DemandeAchatRow
   onClose: () => void
   onSaved: () => void
+  /**
+   * Appelé après un enregistrement intermédiaire réussi (bouton « Enregistrer », contrairement à
+   * onSaved qui ferme la modale) — transmet la ligne à jour au parent pour qu'il rafraîchisse ses
+   * listes en tâche de fond. Sans ce callback, rouvrir la modale après « Retour » réaffiche les
+   * anciennes valeurs (le parent réinjecte encore la ligne obsolète de sa liste non rafraîchie).
+   */
+  onProgressSaved?: (demandeAchat: DemandeAchatRow) => void
 }
 
 /**
- * Modale adaptative « Traiter » de l'écran de suivi RC (décision du
- * 15/09/2026), sélectionnée selon `demandeAchat.code_statut` : statuer sur
- * l'opportunité d'une DA fraîchement transmise (OP1.2, `DA_TRANSMISE_DEM_RC`),
- * ou compléter/transmettre une FAD (OP1.2b, `DA_VALIDEE_RC`/
- * `FAD_A_COMPLETER_CDS`/`FAD_A_MODIFIER_CB` — reprise directe à la CB, sans
- * repasser par le CDS, pour ce dernier statut). N'affiche jamais
- * OBJET_DEMANDEUR/DESCRIPTION_DEMANDEUR (décision explicite : uniquement les
+ * Modale « Traiter » de l'écran de suivi RC — complétion et transmission de
+ * la FAD (OP1.2b), une fois la décision (OP1.2, « Valider les éléments de la
+ * commande ») déjà prise. Décision du 16/09/2026 (revient sur la fusion
+ * décision+complétion du 15/09/2026) : ne gère plus `DA_TRANSMISE_DEM_RC` du
+ * tout — l'icône « Traiter » n'apparaît plus pour ce statut (voir
+ * ValiderCommandeRcModal, qui gère désormais Valider/Compléter/Rejeter/
+ * Annuler). Reste inchangée pour `DA_VALIDEE_RC`/`FAD_A_COMPLETER_CDS`
+ * (formulaire de complétion + « Transmettre au CDS ») et `FAD_A_MODIFIER_CB`
+ * (reprise CB, tous champs optionnels). Accès à la gestion documentaire
+ * directement depuis la modale. N'affiche jamais OBJET_DEMANDEUR/
+ * DESCRIPTION_DEMANDEUR (décision explicite du 15/09/2026 : uniquement les
  * champs RC éditables).
  */
-export function TraiterFadRcModal({ demandeAchat, onClose, onSaved }: TraiterFadRcModalProps) {
-  if (demandeAchat.code_statut === 'DA_TRANSMISE_DEM_RC') {
-    return <DecisionRcSection demandeAchat={demandeAchat} onClose={onClose} onSaved={onSaved} />
-  }
-  return <CompletionFadSection demandeAchat={demandeAchat} onClose={onClose} onSaved={onSaved} />
-}
-
-const DECISION_BUTTONS: { decision: DemandeAchatDecision; label: string; className: string }[] = [
-  { decision: 'VALIDER', label: 'Valider', className: 'gp-btn--primary' },
-  { decision: 'COMPLEMENT', label: 'Demander un complément', className: 'gp-btn--secondary' },
-  { decision: 'REJETER', label: 'Rejeter', className: 'gp-btn--danger' },
-  { decision: 'ANNULER', label: 'Annuler', className: 'gp-btn--danger' },
-]
-
-/** Libellé procédure — même logique que la carte DA/FAD de l'écran d'accueil (pages/Home.tsx). */
-function procedureLabel(demandeAchat: DemandeAchatRow): string {
-  if (demandeAchat.procedure_achat !== 'MARCHE') return 'Hors marché'
-  return demandeAchat.nummarche ?? (demandeAchat.id_marche_tiers !== null ? `Marché tiers #${demandeAchat.id_marche_tiers}` : 'Marché')
-}
-
-function DecisionRcSection({ demandeAchat, onClose, onSaved }: TraiterFadRcModalProps) {
-  const [commentaire, setCommentaire] = useState('')
-  const [submittingDecision, setSubmittingDecision] = useState<DemandeAchatDecision | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const { fournisseurs } = useFournisseurs(demandeAchat.id_service)
-  const fournisseurLabel = fournisseurs.find((f) => f.id_fournisseur === demandeAchat.id_fournisseur_retenu)?.raison_sociale_service ?? '—'
-
-  async function handleDecision(decision: DemandeAchatDecision) {
-    setError(null)
-    if (decision !== 'VALIDER' && !commentaire.trim()) {
-      setError('Un commentaire est requis pour justifier ce choix.')
-      return
-    }
-    setSubmittingDecision(decision)
-    try {
-      await decisionRc(demandeAchat.id_demande_achat, { decision, commentaireStatut: commentaire.trim() || undefined })
-      onSaved()
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
-    } finally {
-      setSubmittingDecision(null)
-    }
-  }
-
-  return (
-    <div className="gp-overlay is-open">
-      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="traiterFadRcModalTitle" style={{ maxWidth: 640 }}>
-        <div className="gp-modal__hd">
-          <h3 className="gp-modal__title" id="traiterFadRcModalTitle">
-            {demandeAchat.numero} — Statuer sur l'opportunité
-          </h3>
-          <button className="gp-modal__close" aria-label="Fermer" onClick={onClose}>
-            <svg className="ti">
-              <use href="#i-x" />
-            </svg>
-          </button>
-        </div>
-        <div className="gp-modal__bd gp-scroll stack">
-          <div className="stack" style={{ gap: 8 }}>
-            <div className="gp-field">
-              <label className="gp-label">Objet de la DA</label>
-              <input className="gp-input" value={demandeAchat.objet_rc} readOnly />
-            </div>
-            {demandeAchat.description_rc && (
-              <div className="gp-field">
-                <label className="gp-label">Description de la DA</label>
-                <textarea className="gp-textarea" value={demandeAchat.description_rc} readOnly rows={3} />
-              </div>
-            )}
-            <div className="row">
-              <div className="gp-field" style={{ flex: '0 0 21.25%' }}>
-                <label className="gp-label">Montant</label>
-                <input className="gp-input" value={CURRENCY_FORMAT.format(demandeAchat.montant_demande)} readOnly />
-              </div>
-              <div className="gp-field" style={{ flex: 1 }}>
-                <label className="gp-label">Procédure</label>
-                <input className="gp-input" value={procedureLabel(demandeAchat)} readOnly />
-              </div>
-              <div className="gp-field" style={{ flex: 1 }}>
-                <label className="gp-label">Fournisseur</label>
-                <input className="gp-input" value={fournisseurLabel} readOnly />
-              </div>
-            </div>
-          </div>
-
-          <div className="gp-field">
-            <label className="gp-label" htmlFor="decisionrc-commentaire">
-              Commentaire (obligatoire sauf pour Valider)
-            </label>
-            <textarea
-              id="decisionrc-commentaire"
-              className="gp-textarea"
-              value={commentaire}
-              onChange={(e) => setCommentaire(e.target.value)}
-              maxLength={500}
-              rows={3}
-            />
-          </div>
-
-          {error && (
-            <p className="gp-errmsg">
-              <svg className="ti">
-                <use href="#i-alert-circle" />
-              </svg>
-              {error}
-            </p>
-          )}
-        </div>
-        <div className="gp-modal__ft" style={{ flexWrap: 'wrap' }}>
-          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose} disabled={submittingDecision !== null}>
-            Retour
-          </button>
-          {DECISION_BUTTONS.map(({ decision, label, className }) => (
-            <button
-              key={decision}
-              type="button"
-              className={`gp-btn ${className}`}
-              disabled={submittingDecision !== null}
-              onClick={() => void handleDecision(decision)}
-            >
-              {submittingDecision === decision ? 'Envoi…' : label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const TYPE_ACHAT_OPTIONS = [
-  { value: 'TRAVAUX', label: 'Travaux' },
-  { value: 'FOURNITURES', label: 'Fournitures' },
-  { value: 'SERVICES', label: 'Services' },
-]
-
-const IMPUTATION_OPTIONS = [
-  { value: 'FONCTIONNEMENT', label: 'Fonctionnement' },
-  { value: 'INVESTISSEMENT', label: 'Investissement' },
-]
-
-function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcModalProps) {
-  // FAD_A_MODIFIER_CB (reprise OP1.4→RC) : tous les champs restent optionnels côté serveur (le RC
-  // ne corrige que ce que la CB a demandé) — voir retransmettreCbSchema. Sinon (première
-  // complétion/reprise CDS), site/secteur/CUG/type achat/imputation sont obligatoires — voir
-  // transmettreFadSchema.
+export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSaved }: TraiterFadRcModalProps) {
   const isReprisesCb = demandeAchat.code_statut === 'FAD_A_MODIFIER_CB'
 
   const [objet, setObjet] = useState(demandeAchat.objet_rc)
   const [description, setDescription] = useState(demandeAchat.description_rc ?? '')
+  const [motifChoix, setMotifChoix] = useState<string | null>(demandeAchat.motif_choix)
+  const [libelleMotifChoix, setLibelleMotifChoix] = useState(demandeAchat.libelle_motif_choix ?? '')
   const [codeSite, setCodeSite] = useState<string | null>(demandeAchat.code_site)
   const [codeSousSite, setCodeSousSite] = useState<string | null>(demandeAchat.code_sous_site)
   const [codeSecteur, setCodeSecteur] = useState<string | null>(demandeAchat.code_secteur)
   const [codeSousSecteur, setCodeSousSecteur] = useState<string | null>(demandeAchat.code_sous_secteur)
   const [codeCug, setCodeCug] = useState<string | null>(demandeAchat.code_cug)
   const [typeAchat, setTypeAchat] = useState<string | null>(demandeAchat.type_achat)
+  const [typeFad, setTypeFad] = useState<string | null>(demandeAchat.type_fad)
   const [imputationComptable, setImputationComptable] = useState<string | null>(demandeAchat.imputation_comptable)
   const [numeroOperation, setNumeroOperation] = useState<string | null>(demandeAchat.numero_operation)
+  const [gestionDocumentaireOpen, setGestionDocumentaireOpen] = useState(false)
+  const [investissementModalOpen, setInvestissementModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [savingProgress, setSavingProgress] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const [motifCb, setMotifCb] = useState<string | null>(null)
@@ -225,8 +98,11 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
   const sousSecteursDisponibles = secteurs.find((s) => s.code_secteur === codeSecteur)?.sous_secteurs ?? []
   const sousSecteurOptions = sousSecteursDisponibles.map((s) => ({ value: s.code_sous_secteur, label: s.lib_sous_secteur }))
 
-  const cugOptions = cug.map((c) => ({ value: c.code_cug, label: c.libelle_cug }))
-  const investissementOptions = investissements.map((i) => ({ value: i.numero_operation, label: `${i.numero_operation} — ${i.libelle_service ?? i.libelle}` }))
+  const cugOptions = cug.map((c) => ({ value: c.code_cug, label: `${c.code_cug} — ${c.libelle_cug}` }))
+  const investissementSelectionne = investissements.find((i) => i.numero_operation === numeroOperation)
+  const investissementLabel = investissementSelectionne
+    ? `${investissementSelectionne.numero_operation} — ${investissementSelectionne.libelle_service ?? investissementSelectionne.libelle}`
+    : numeroOperation
 
   function handleSiteChange(v: string | null) {
     setCodeSite(v)
@@ -242,13 +118,40 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
     }
   }
 
+  /** MOTIF_CHOIX pertinent seulement en Hors Marché — en Marché il reste automatique ("Prix", un seul candidat, posé à OP1.1). */
+  const motifEditable = demandeAchat.procedure_achat === 'HORS_MARCHE'
+
+  /** Champs communs à la transmission finale et à l'enregistrement intermédiaire — un champ vide est omis (undefined), jamais écrasé de force. */
+  function buildInput() {
+    return {
+      objet: objet.trim() || undefined,
+      description: description.trim() || undefined,
+      motifChoix: motifEditable && motifChoix ? (motifChoix as MotifChoix) : undefined,
+      libelleMotifChoix: motifEditable && motifChoix === 'Autre' ? libelleMotifChoix.trim() : undefined,
+      codeSite: codeSite ?? undefined,
+      codeSousSite,
+      codeSecteur: codeSecteur ?? undefined,
+      codeSousSecteur,
+      codeCug: codeCug ?? undefined,
+      typeAchat: (typeAchat ?? undefined) as 'TRAVAUX' | 'FOURNITURES' | 'SERVICES' | undefined,
+      typeFad: (typeFad ?? undefined) as TypeFad | undefined,
+      imputationComptable: (imputationComptable ?? undefined) as 'FONCTIONNEMENT' | 'INVESTISSEMENT' | undefined,
+      numeroOperation: imputationComptable === 'INVESTISSEMENT' ? numeroOperation : null,
+    }
+  }
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
+    setSaveMessage(null)
 
+    if (motifEditable && motifChoix === 'Autre' && !libelleMotifChoix.trim()) {
+      setError('Le libellé du motif est obligatoire quand le motif est "Autre".')
+      return
+    }
     if (!isReprisesCb) {
-      if (!codeSite || !codeSecteur || !codeCug || !typeAchat || !imputationComptable) {
-        setError('Site, secteur, CUG, type d\'achat et imputation comptable sont obligatoires.')
+      if (!codeSite || !codeSecteur || !codeCug || !typeAchat || !typeFad || !imputationComptable) {
+        setError('Site, secteur, CUG, type d\'achat, type de FAD et imputation comptable sont obligatoires.')
         return
       }
     }
@@ -257,18 +160,7 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
       return
     }
 
-    const input = {
-      objet: objet.trim() || undefined,
-      description: description.trim() || undefined,
-      codeSite: codeSite ?? undefined,
-      codeSousSite,
-      codeSecteur: codeSecteur ?? undefined,
-      codeSousSecteur,
-      codeCug: codeCug ?? undefined,
-      typeAchat: (typeAchat ?? undefined) as 'TRAVAUX' | 'FOURNITURES' | 'SERVICES' | undefined,
-      imputationComptable: (imputationComptable ?? undefined) as 'FONCTIONNEMENT' | 'INVESTISSEMENT' | undefined,
-      numeroOperation: imputationComptable === 'INVESTISSEMENT' ? numeroOperation : null,
-    }
+    const input = buildInput()
 
     setSubmitting(true)
     try {
@@ -286,9 +178,36 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
     }
   }
 
+  /**
+   * Enregistrement intermédiaire (décision du 16/09/2026) — sauvegarde la saisie en cours sans
+   * transmettre ni changer de statut, pour permettre de compléter la FAD en plusieurs fois.
+   * Contrairement à handleSubmit, n'exige aucun champ obligatoire (seule règle qui s'applique
+   * déjà, y compris à un enregistrement partiel : le libellé du motif si "Autre" est choisi).
+   */
+  async function handleEnregistrer() {
+    setError(null)
+    setSaveMessage(null)
+
+    if (motifEditable && motifChoix === 'Autre' && !libelleMotifChoix.trim()) {
+      setError('Le libellé du motif est obligatoire quand le motif est "Autre".')
+      return
+    }
+
+    setSavingProgress(true)
+    try {
+      const updated = await enregistrerFad(demandeAchat.id_demande_achat, buildInput())
+      setSaveMessage('Enregistré.')
+      onProgressSaved?.(updated)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setSavingProgress(false)
+    }
+  }
+
   return (
     <div className="gp-overlay is-open">
-      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="traiterFadRcModalTitle" style={{ maxWidth: 760 }}>
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="traiterFadRcModalTitle" style={{ maxWidth: 800 }}>
         <div className="gp-modal__hd">
           <h3 className="gp-modal__title" id="traiterFadRcModalTitle">
             {demandeAchat.numero} — {isReprisesCb ? 'Retransmettre à la CB' : 'Compléter et transmettre au CDS'}
@@ -329,6 +248,41 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
                 rows={3}
               />
             </div>
+
+            {motifEditable && (
+              <div className="row" style={{ flexWrap: 'wrap' }}>
+                <div className="gp-field" style={{ flex: 1 }}>
+                  <label className="gp-label">Motif du choix</label>
+                  <Combobox
+                    options={[
+                      { value: 'Prix', label: 'Prix' },
+                      { value: 'Délai', label: 'Délai' },
+                      { value: 'Technique', label: 'Technique' },
+                      { value: 'Autre', label: 'Autre' },
+                    ]}
+                    value={motifChoix}
+                    onChange={setMotifChoix}
+                    placeholder="Choisir…"
+                    ariaLabel="Motif du choix"
+                    style={{ maxWidth: 'none' }}
+                  />
+                </div>
+                {motifChoix === 'Autre' && (
+                  <div className="gp-field" style={{ flex: 1 }}>
+                    <label className="gp-label" htmlFor="traiterfad-libelle-motif">
+                      Libellé du motif
+                    </label>
+                    <input
+                      id="traiterfad-libelle-motif"
+                      className="gp-input"
+                      value={libelleMotifChoix}
+                      onChange={(e) => setLibelleMotifChoix(e.target.value)}
+                      maxLength={200}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="row" style={{ flexWrap: 'wrap' }}>
               <div className="gp-field" style={{ flex: 1 }}>
@@ -383,7 +337,11 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
               <div className="gp-field" style={{ flex: 1 }}>
                 <label className="gp-label">Type d'achat</label>
                 <Combobox
-                  options={TYPE_ACHAT_OPTIONS}
+                  options={[
+                    { value: 'TRAVAUX', label: 'Travaux' },
+                    { value: 'FOURNITURES', label: 'Fournitures' },
+                    { value: 'SERVICES', label: 'Services' },
+                  ]}
                   value={typeAchat}
                   onChange={setTypeAchat}
                   placeholder="Choisir…"
@@ -392,9 +350,30 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
                 />
               </div>
               <div className="gp-field" style={{ flex: 1 }}>
+                <label className="gp-label">Type de FAD</label>
+                <Combobox
+                  options={[
+                    { value: 'FERMEE', label: 'Fermée (action unique, prix forfaitaire)' },
+                    { value: 'CONTRAT', label: 'Contrat (annuel, prestations récurrentes)' },
+                    { value: 'OUVERTE', label: 'Ouverte (enveloppe, objet non connu à l\'avance)' },
+                  ]}
+                  value={typeFad}
+                  onChange={setTypeFad}
+                  placeholder="Choisir…"
+                  ariaLabel="Type de FAD"
+                  style={{ maxWidth: 'none' }}
+                />
+              </div>
+            </div>
+
+            <div className="row" style={{ flexWrap: 'wrap' }}>
+              <div className="gp-field" style={{ flex: 1 }}>
                 <label className="gp-label">Imputation comptable</label>
                 <Combobox
-                  options={IMPUTATION_OPTIONS}
+                  options={[
+                    { value: 'FONCTIONNEMENT', label: 'Fonctionnement' },
+                    { value: 'INVESTISSEMENT', label: 'Investissement' },
+                  ]}
                   value={imputationComptable}
                   onChange={setImputationComptable}
                   placeholder="Choisir…"
@@ -402,21 +381,45 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
                   style={{ maxWidth: 'none' }}
                 />
               </div>
-            </div>
-
-            {imputationComptable === 'INVESTISSEMENT' && (
-              <div className="gp-field">
-                <label className="gp-label">Numéro d'opération</label>
-                <Combobox
-                  options={investissementOptions}
-                  value={numeroOperation}
-                  onChange={setNumeroOperation}
-                  placeholder="Choisir…"
-                  ariaLabel="Numéro d'opération"
-                  style={{ maxWidth: 'none' }}
-                />
+              {imputationComptable === 'INVESTISSEMENT' && (
+                <div className="gp-field" style={{ flex: 1 }}>
+                  <label className="gp-label">Numéro d'opération</label>
+                  <button
+                    type="button"
+                    className="gp-btn gp-btn--secondary"
+                    aria-label="Numéro d'opération"
+                    title={investissementLabel ?? undefined}
+                    style={{ width: '100%', justifyContent: 'flex-start', overflow: 'hidden' }}
+                    onClick={() => setInvestissementModalOpen(true)}
+                  >
+                    {/* .gp-btn impose white-space:nowrap (pensé pour un libellé court et fixe) — un libellé
+                        d'opération un peu long pousserait sinon toute la modale en scroll horizontal. Tronqué
+                        avec une ellipse plutôt que de laisser le contenu dicter la largeur. */}
+                    <span style={{ display: 'block', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'left' }}>
+                      {investissementLabel ?? 'Choisir…'}
+                    </span>
+                  </button>
+                </div>
+              )}
+              <div className="gp-field" style={{ flex: '0 0 auto', alignSelf: 'flex-end' }}>
+                <span
+                  className="gp-tip"
+                  data-tip={demandeAchat.id_fournisseur_retenu === null ? "Identifiez d'abord un fournisseur" : 'Gérer les pièces complémentaires et consulter le devis de la DA'}
+                >
+                  <button
+                    type="button"
+                    className="gp-btn gp-btn--secondary"
+                    disabled={demandeAchat.id_fournisseur_retenu === null}
+                    onClick={() => setGestionDocumentaireOpen(true)}
+                  >
+                    <svg className="ti">
+                      <use href="#i-folder" />
+                    </svg>
+                    Gestion documentaire
+                  </button>
+                </span>
               </div>
-            )}
+            </div>
 
             {error && (
               <p className="gp-errmsg">
@@ -428,8 +431,16 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
             )}
           </div>
           <div className="gp-modal__ft">
+            {saveMessage && (
+              <span className="gp-badge gp-badge--success" style={{ marginRight: 'auto' }}>
+                {saveMessage}
+              </span>
+            )}
             <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose}>
               Retour
+            </button>
+            <button type="button" className="gp-btn gp-btn--secondary" disabled={savingProgress || submitting} onClick={() => void handleEnregistrer()}>
+              {savingProgress ? 'Enregistrement…' : 'Enregistrer'}
             </button>
             <button type="submit" className="gp-btn gp-btn--primary" disabled={submitting}>
               {submitting ? 'Envoi…' : isReprisesCb ? 'Retransmettre à la CB' : 'Transmettre au CDS'}
@@ -437,6 +448,28 @@ function CompletionFadSection({ demandeAchat, onClose, onSaved }: TraiterFadRcMo
           </div>
         </form>
       </div>
+
+      {gestionDocumentaireOpen && demandeAchat.id_fournisseur_retenu !== null && (
+        <GestionDocumentaireModal
+          idDemandeAchat={demandeAchat.id_demande_achat}
+          idService={demandeAchat.id_service}
+          procedureAchat={demandeAchat.procedure_achat}
+          objetDa={objet}
+          idFournisseurRetenu={demandeAchat.id_fournisseur_retenu}
+          montantDemande={demandeAchat.montant_demande}
+          devisReadOnly
+          onClose={() => setGestionDocumentaireOpen(false)}
+        />
+      )}
+
+      {investissementModalOpen && (
+        <InvestissementDaModal
+          investissements={investissements}
+          currentNumeroOperation={numeroOperation}
+          onClose={() => setInvestissementModalOpen(false)}
+          onSelected={setNumeroOperation}
+        />
+      )}
     </div>
   )
 }

@@ -1,0 +1,13 @@
+-- DEMANDE_ACHAT : ajout de VALIDEE_SUR_SEUIL_DS (décision du 18/09/2026,
+-- chantier CB — mise en évidence des FAD validées par exemption du seuil de
+-- validation DS). FAD_VALIDEE_DS_SEUIL est un statut transitoire
+-- (demandeAchat.service.ts#transmettreDsOuSeuil enchaîne aussitôt sur
+-- FAD_A_COMMANDER, décision du 15/09/2026) : sans cette colonne, le passage
+-- par l'exemption de seuil ne serait visible que dans HISTORIQUE_STATUT
+-- (immuable mais pas exploitable pour un affichage de liste sans requête
+-- dédiée par ligne). Même principe de dénormalisation que CODE_STATUT
+-- lui-même (synchronisé depuis HISTORIQUE_STATUT).
+--
+-- Posée à `true` une seule fois par transmettreDsOuSeuil quand le montant
+-- est sous le seuil, jamais réinitialisée ensuite (fait acquis sur la FAD).
+alter table finances.demande_achat add column if not exists validee_sur_seuil_ds boolean not null default false;

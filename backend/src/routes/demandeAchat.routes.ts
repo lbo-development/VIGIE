@@ -19,10 +19,13 @@ import {
   postDemandeAchatPiece,
   deleteDemandeAchatPiece,
   getDemandeAchatPieceFichier,
+  getDemandeAchatFadPdf,
   deleteDemandeAchat,
   postDemandeAchatTransmettreRc,
   postDemandeAchatDecisionRc,
+  postDemandeAchatDevaliderRc,
   postDemandeAchatTransmettreFad,
+  putDemandeAchatFad,
   postDemandeAchatDecisionCds,
   postDemandeAchatTransmettreCb,
   postDemandeAchatDecisionCb,
@@ -65,9 +68,12 @@ router.get('/:id/pieces', getDemandeAchatPieces)
 router.post('/:id/pieces', upload.single('fichier'), postDemandeAchatPiece)
 router.delete('/:id/pieces/:idPiece', deleteDemandeAchatPiece)
 router.get('/:id/pieces/:idPiece/fichier', getDemandeAchatPieceFichier)
+router.get('/:id/fad-pdf', getDemandeAchatFadPdf)
 router.post('/:id/transmettre-rc', postDemandeAchatTransmettreRc)
 router.post('/:id/decision-rc', postDemandeAchatDecisionRc)
+router.post('/:id/devalider-rc', postDemandeAchatDevaliderRc)
 router.post('/:id/transmettre-fad', postDemandeAchatTransmettreFad)
+router.put('/:id/fad', putDemandeAchatFad)
 router.post('/:id/decision-cds', postDemandeAchatDecisionCds)
 router.post('/:id/transmettre-cb', postDemandeAchatTransmettreCb)
 router.post('/:id/decision-cb', postDemandeAchatDecisionCb)

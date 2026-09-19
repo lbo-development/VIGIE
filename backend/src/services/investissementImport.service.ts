@@ -4,7 +4,11 @@ import * as cugRepository from '../repositories/cug.repository.js'
 import * as parametresRepository from '../repositories/parametres.repository.js'
 import { assertManagesServiceOrHasRoleCb } from './authorization.service.js'
 import { AppError } from '../middlewares/errorHandler.js'
-import type { OperationInvestissementUpsert } from '../repositories/investissement.repository.js'
+import type {
+  OperationInvestissementUpsertBase,
+  OperationInvestissementUpsertComplet,
+  OperationInvestissementUpsertActifSeul,
+} from '../repositories/investissement.repository.js'
 
 /**
  * Import PGI des opérations d'investissement — voir
@@ -19,11 +23,19 @@ import type { OperationInvestissementUpsert } from '../repositories/investisseme
  *
  * Contrairement à commandePgiImport.service.ts ("annule et remplace" par service), chaque
  * confirm() est un upsert par NUMERO_OPERATION : une opération jamais réimportée reste en base,
- * jamais de suppression physique. ACTIF est un champ manuel (décision du 04/09/2026,
- * investissement.service.ts#updateManagedFields) : ce module ne le fixe qu'à la création (défaut
- * de colonne `true`, jamais inclus dans la charge de l'upsert) — il n'y a donc plus de mécanisme
- * d'inactivation automatique quand une opération sort du lot éligible (absente du fichier,
- * statut hors {A, F}, ou CUG hors service) : elle reste simplement inchangée en base.
+ * jamais de suppression physique. Une opération qui sort du lot éligible (absente du fichier,
+ * statut hors {A, F}, ou CUG hors service) reste simplement inchangée en base (ni ACTIF ni
+ * UTILISABLE ne sont touchés dans ce cas, faute de ligne à upserter pour elle).
+ *
+ * ACTIF/UTILISABLE sont repilotés par STATUT à chaque import (décision du 17/09/2026, revient sur
+ * celle du 04/09/2026 qui les rendait purement manuels) — règle appliquée dans `confirm()` :
+ *   - statut F : ACTIF=FAUX et UTILISABLE=FAUX, systématiquement.
+ *   - statut A sur une opération absente de la base ou dont le statut précédent était F (création
+ *     ou sortie de F) : ACTIF=VRAI et UTILISABLE=VRAI, ensemble.
+ *   - statut A sur une opération déjà en base et déjà à A lors de l'import précédent : seul
+ *     ACTIF=VRAI est forcé ; UTILISABLE n'est jamais inclus dans la charge de ce cas — une
+ *     modification manuelle (icône « Modifier ») faite entre deux imports y survit tant que
+ *     l'opération reste au statut A.
  */
 
 const OP_SHEET = 'OP'
@@ -226,7 +238,7 @@ async function parseAndValidate(
   matricule: string | null,
   idService: number,
   buffer: Buffer,
-): Promise<{ operations: OperationInvestissementUpsert[]; nbExclues: number; anomalies: Anomalie[] }> {
+): Promise<{ operations: OperationInvestissementUpsertBase[]; nbExclues: number; anomalies: Anomalie[] }> {
   await assertManagesServiceOrHasRoleCb(matricule, idService)
 
   const workbook = new ExcelJS.Workbook()
@@ -266,7 +278,7 @@ async function parseAndValidate(
   const cp = aggregateSheet(cpWorksheet, eligibleCodes)
   const nbExclues = ap.nbExclues + cp.nbExclues
 
-  const operations: OperationInvestissementUpsert[] = eligibleOpRows.map((row) => {
+  const operations: OperationInvestissementUpsertBase[] = eligibleOpRows.map((row) => {
     const ap1 = ap.parTranche.get(`${row.code}|1`) ?? zeroMontants()
     const ap8 = ap.parTranche.get(`${row.code}|8`) ?? zeroMontants()
     const cp1 = cp.parTranche.get(`${row.code}|1`) ?? zeroMontants()
@@ -344,10 +356,44 @@ export async function preview(matricule: string | null, idService: number, buffe
   return toReport(result)
 }
 
+/**
+ * Répartit les opérations éligibles entre les deux formes d'upsert (§ commentaire de module) selon
+ * le statut importé et le statut précédent en base pour ce service — un seul appel `findAll`
+ * (scopé au service, pas de coût par opération) suffit à connaître ce dernier avant que l'upsert
+ * ne l'écrase.
+ */
+async function repartirParActifUtilisable(
+  idService: number,
+  operations: OperationInvestissementUpsertBase[],
+): Promise<{ completes: OperationInvestissementUpsertComplet[]; actifSeul: OperationInvestissementUpsertActifSeul[] }> {
+  const existantes = await investissementRepository.findAll(idService)
+  const statutPrecedentParCode = new Map(existantes.map((op) => [op.numero_operation, op.statut]))
+
+  const completes: OperationInvestissementUpsertComplet[] = []
+  const actifSeul: OperationInvestissementUpsertActifSeul[] = []
+
+  for (const operation of operations) {
+    if (operation.statut === 'F') {
+      completes.push({ ...operation, actif: false, utilisable: false })
+      continue
+    }
+    const statutPrecedent = statutPrecedentParCode.get(operation.numero_operation)
+    if (statutPrecedent === undefined || statutPrecedent === 'F') {
+      completes.push({ ...operation, actif: true, utilisable: true })
+    } else {
+      actifSeul.push({ ...operation, actif: true })
+    }
+  }
+
+  return { completes, actifSeul }
+}
+
 export async function confirm(matricule: string | null, idService: number, buffer: Buffer): Promise<ImportReport> {
   const result = await parseAndValidate(matricule, idService, buffer)
 
-  await investissementRepository.upsertMany(result.operations)
+  const { completes, actifSeul } = await repartirParActifUtilisable(idService, result.operations)
+  await investissementRepository.upsertMany(completes)
+  await investissementRepository.upsertMany(actifSeul)
 
   await parametresRepository.upsert({
     cle: 'last.import.investissement.pgi',

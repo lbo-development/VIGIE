@@ -39,6 +39,8 @@ export interface DemandeAchat {
   libelle_motif_choix: string | null
   montant_retenu: number | null
   montant_commande: number | null
+  /** Posée une seule fois par demandeAchat.service.ts#transmettreDsOuSeuil (exemption automatique sous le seuil de validation DS, décision du 18/09/2026) — jamais réinitialisée ensuite. */
+  validee_sur_seuil_ds: boolean
   date_creation: string
   matricule_demandeur: string
   code_site: string | null
@@ -56,7 +58,7 @@ export interface DemandeAchat {
 }
 
 const SELECT_COLUMNS =
-  'id_demande_achat, numero, id_service, objet_demandeur, description_demandeur, objet_rc, description_rc, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
+  'id_demande_achat, numero, id_service, objet_demandeur, description_demandeur, objet_rc, description_rc, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, validee_sur_seuil_ds, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
 
 /** Crée le brouillon (NUMERO alloué, DA_EN_PREPARATION, historique posé) — voir la fonction Postgres pour le détail. */
 export async function createBrouillon(idService: number, matriculeDemandeur: string): Promise<DemandeAchat> {
@@ -98,7 +100,17 @@ export async function findAll(filters: ListFilters): Promise<DemandeAchat[]> {
   if (filters.statuts && filters.statuts.length > 0) query = query.in('code_statut', filters.statuts)
   if (filters.idFournisseurRetenu !== undefined) query = query.eq('id_fournisseur_retenu', filters.idFournisseurRetenu)
   if (filters.search) {
-    const orClauses = [`numero.ilike.%${filters.search}%`, `objet.ilike.%${filters.search}%`]
+    // OBJET_DEMANDEUR/OBJET_RC (colonne OBJET renommée/scindée par la migration
+    // 20260915120000_demande_achat_double_objet_description.sql) — cette clause référençait
+    // encore l'ancien nom de colonne (OBJET, inexistant depuis), faisant échouer toute recherche
+    // texte non vide (PostgREST renvoie une erreur, "Impossible de charger les demandes d'achat."
+    // côté frontend). Cherche sur les deux formulations : la reformulation RC fait foi une fois la
+    // FAD constituée, mais la formulation d'origine du demandeur reste recherchable aussi.
+    const orClauses = [
+      `numero.ilike.%${filters.search}%`,
+      `objet_demandeur.ilike.%${filters.search}%`,
+      `objet_rc.ilike.%${filters.search}%`,
+    ]
     if (filters.idFournisseurIn && filters.idFournisseurIn.length > 0) {
       orClauses.push(`id_fournisseur_retenu.in.(${filters.idFournisseurIn.join(',')})`)
     }
@@ -130,7 +142,9 @@ export interface DemandeAchatUpdate {
   id_fournisseur_retenu?: number | null
   motif_choix?: MotifChoix | null
   libelle_motif_choix?: string | null
+  type_fad?: TypeFad | null
   montant_commande?: number
+  validee_sur_seuil_ds?: boolean
 }
 
 export async function update(idDemandeAchat: number, input: DemandeAchatUpdate): Promise<DemandeAchat> {

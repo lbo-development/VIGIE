@@ -91,5 +91,7 @@ export const api = {
   delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
   /** Upload de fichier (multipart/form-data) — voir la note sur isFormData dans request() ci-dessus. */
   postForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'POST', body: formData }),
+  /** Dépôt/remplacement de fichier via PUT (ex. signature d'un acteur — idempotent, remplace en place). */
+  putForm: <T>(path: string, formData: FormData) => request<T>(path, { method: 'PUT', body: formData }),
   getBlob: (path: string) => requestBlob(path),
 }

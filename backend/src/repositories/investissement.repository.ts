@@ -6,25 +6,27 @@ import { supabase } from '../config/supabaseClient.js'
  * ForClaude/importation-investissementsPGI/import-investissements-pgi.md.
  * Contrairement à finances.commande_pgi (annule et remplace), chaque import est un upsert par
  * NUMERO_OPERATION : une opération jamais réimportée reste en base — jamais de suppression
- * physique, ni de flag automatique : ACTIF est un champ manuel (décision du 04/09/2026, voir
- * `OperationInvestissementUpsert`), l'import n'a plus aucun moyen de le modifier après création.
+ * physique. ACTIF et UTILISABLE sont repilotés par STATUT à chaque import (décision du
+ * 17/09/2026, revient sur celle du 04/09/2026 qui les rendait purement manuels) — voir le détail
+ * des règles sur `OperationInvestissementUpsertComplet`/`OperationInvestissementUpsertActifSeul`
+ * et investissementImport.service.ts#confirm.
  */
 
 export interface OperationInvestissement {
   numero_operation: string
   libelle: string
-  /** Libellé propre au service, distinct de `libelle` (PGI) — voir `OperationInvestissementUpsert`. */
+  /** Libellé propre au service, distinct de `libelle` (PGI) — voir `OperationInvestissementUpsertBase`. */
   libelle_service: string
   id_service: number
   code_cug: string
   statut: 'A' | 'F'
-  /** Champ manuel (décision du 04/09/2026) — l'import ne le fixe qu'à la création (défaut de colonne `true`), jamais réécrit ensuite. Voir `OperationInvestissementUpsert`. */
+  /** Repiloté par l'import selon STATUT (décision du 17/09/2026) — voir `OperationInvestissementUpsertComplet`/`OperationInvestissementUpsertActifSeul`. Reste modifiable manuellement (icône « Modifier »), mais un réimport ultérieur peut écraser cette valeur (statut F, ou statut A sur une opération nouvellement créée/sortant de F). */
   actif: boolean
-  /** Champ manuel, distinct d'`actif` — pas de second critère documenté (pas de COMPLETUDE comme finances.marche), voir `OperationInvestissementUpsert`. */
+  /** Distinct d'`actif` — pas de second critère documenté (pas de COMPLETUDE comme finances.marche). Forcé par l'import à FAUX sur statut F et à VRAI sur une création/sortie de F, mais **jamais retouché** par l'import tant que l'opération reste au statut A d'un import à l'autre (modification manuelle alors préservée) — voir `OperationInvestissementUpsertComplet`/`OperationInvestissementUpsertActifSeul`. */
   utilisable: boolean
   mt_initial: number
   mt_travaux: number
-  /** Colonne générée Postgres (`mt_initial - mt_travaux`) — voir `OperationInvestissementUpsert`. */
+  /** Colonne générée Postgres (`mt_initial - mt_travaux`) — voir `OperationInvestissementUpsertBase`. */
   mt_fesi: number
   mt_budget_ap1: number
   mt_engage_ap1: number
@@ -45,7 +47,7 @@ export interface OperationInvestissement {
 }
 
 /**
- * Charge upsertée par l'import — exclut délibérément :
+ * Charge de base upsertée par l'import — exclut toujours :
  * - `libelle_service` : à la création, un trigger BEFORE INSERT (migration
  *   20260904120000_operation_investissement_libelle_service.sql) la calcule depuis `libelle`
  *   amputé du préfixe `numero_operation` s'il y figure (sinon `libelle` tel quel) ; à la mise à
@@ -55,16 +57,29 @@ export interface OperationInvestissement {
  * - `mt_fesi` : colonne générée Postgres (`mt_initial - mt_travaux`, migration
  *   20260904100000_operation_investissement_mt_travaux_fesi.sql) — Postgres refuse toute valeur
  *   explicite sur une colonne générée, à l'INSERT comme à l'UPDATE.
- * - `utilisable` : champ manuel (migration 20260904110000_operation_investissement_utilisable.sql),
- *   même raisonnement que `libelle_service` — prend le défaut de colonne (`true`) à la création,
- *   jamais réécrit par un import suivant.
- * - `actif` : rendu manuel le 04/09/2026 (même raisonnement, défaut de colonne `true` à la
- *   création) — avant cette date, l'import le pilotait entièrement (`true` sur les opérations
- *   éligibles, `false` sur celles qui en sortaient, voir historique de
- *   investissementImport.service.ts) ; ce mécanisme d'inactivation automatique est abandonné,
- *   seule une modification manuelle (icône « Modifier ») change désormais ce champ.
+ *
+ * `actif`/`utilisable` sont ajoutés à cette base par l'un des deux types ci-dessous selon le cas
+ * (voir investissementImport.service.ts#confirm pour la règle de choix, décision du 17/09/2026) —
+ * jamais les deux formes dans un même lot passé à `upsertMany` : PostgREST dérive les colonnes de
+ * la clause `ON CONFLICT ... DO UPDATE SET` de l'ensemble des clés présentes dans le lot, un lot
+ * hétérogène écraserait `utilisable` à NULL sur les lignes qui ne le portent pas.
  */
-export type OperationInvestissementUpsert = Omit<OperationInvestissement, 'libelle_service' | 'mt_fesi' | 'utilisable' | 'actif'>
+export type OperationInvestissementUpsertBase = Omit<OperationInvestissement, 'libelle_service' | 'mt_fesi' | 'utilisable' | 'actif'>
+
+/**
+ * Statut F (toujours), ou statut A sur une opération inconnue en base ou dont le statut
+ * précédent était F (création ou sortie de F) — `actif` et `utilisable` forcés ensemble
+ * (respectivement `false`/`false` ou `true`/`true`).
+ */
+export type OperationInvestissementUpsertComplet = OperationInvestissementUpsertBase & { actif: boolean; utilisable: boolean }
+
+/**
+ * Statut A sur une opération déjà en base dont le statut précédent était déjà A — seul `actif`
+ * est forcé à `true` ; `utilisable` est délibérément absent de la charge pour ne jamais écraser
+ * une valeur modifiée manuellement (icône « Modifier ») tant que l'opération reste active d'un
+ * import à l'autre.
+ */
+export type OperationInvestissementUpsertActifSeul = OperationInvestissementUpsertBase & { actif: boolean }
 
 export async function findByNumeroOperation(numeroOperation: string): Promise<OperationInvestissement | null> {
   const { data, error } = await supabase
@@ -107,7 +122,7 @@ export async function findAll(idService: number): Promise<OperationInvestissemen
   return data ?? []
 }
 
-export async function upsertMany(rows: OperationInvestissementUpsert[]): Promise<void> {
+export async function upsertMany<T extends OperationInvestissementUpsertBase>(rows: T[]): Promise<void> {
   if (rows.length === 0) return
   const { error } = await supabase
     .schema('finances')

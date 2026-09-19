@@ -21,6 +21,7 @@ const DA1: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
   code_site: null,
@@ -162,6 +163,10 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
     SUIVI_FAD: [],
     A_TRAITER: [],
     EN_COURS: [],
+    A_TRAITER_CDS: [],
+    EN_COURS_CDS: [],
+    A_TRAITER_CB: [],
+    EN_COURS_CB: [],
     FAD_COMMANDEES: [],
     REJETEES_ANNULEES: [],
     ...overrides,
@@ -281,6 +286,18 @@ describe('Home — onglets', () => {
     expect(row.queryByRole('button', { name: 'Modifier la demande' })).not.toBeInTheDocument()
     expect(row.queryByRole('button', { name: 'Transmettre au RC' })).not.toBeInTheDocument()
   })
+
+  it('affiche le badge "Seuil DS" sur une FAD validée par exemption de seuil, pas sur les autres', () => {
+    mockLists({ SUIVI_FAD: [FAD1, { ...FAD1, id_demande_achat: 6, numero: '2026-09-06-001', validee_sur_seuil_ds: true }] })
+    render(<Home />)
+
+    fireEvent.click(screen.getByRole('tab', { name: /Suivre & gérer les FAD/ }))
+
+    const rowSansSeuil = within(screen.getByText('2026-09-05-001').closest('article')!)
+    const rowAvecSeuil = within(screen.getByText('2026-09-06-001').closest('article')!)
+    expect(rowSansSeuil.queryByText('Seuil DS')).not.toBeInTheDocument()
+    expect(rowAvecSeuil.getByText('Seuil DS')).toBeInTheDocument()
+  })
 })
 
 describe('Home — "A finaliser" (actions de ligne)', () => {
@@ -304,24 +321,45 @@ describe('Home — "A finaliser" (actions de ligne)', () => {
     expect(rowACompleter.getByRole('button', { name: 'Supprimer la demande' })).toBeDisabled()
   })
 
-  it('"Transmettre au RC" appelle transmettreRc et rafraîchit les listes', async () => {
+  it('"Transmettre au RC" demande confirmation avant d\'appeler transmettreRc', async () => {
     transmettreRcMock.mockResolvedValue({ ...DA1, code_statut: 'DA_TRANSMISE_DEM_RC' })
     render(<Home />)
 
     const row = within(screen.getByText('2026-09-08-001').closest('article')!)
     fireEvent.click(row.getByRole('button', { name: 'Transmettre au RC' }))
 
+    expect(transmettreRcMock).not.toHaveBeenCalled()
+    const dialog = await screen.findByRole('dialog', { name: 'Transmettre au RC' })
+    expect(within(dialog).getByText(/2026-09-08-001/)).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Transmettre' }))
+
     await waitFor(() => expect(transmettreRcMock).toHaveBeenCalledWith(1))
+    expect(screen.queryByRole('dialog', { name: 'Transmettre au RC' })).not.toBeInTheDocument()
   })
 
-  it("affiche l'erreur retournée si la transmission échoue (ex. DA incomplète)", async () => {
+  it('"Annuler" ferme la confirmation sans transmettre', async () => {
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Transmettre au RC' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Transmettre au RC' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Annuler' }))
+
+    expect(screen.queryByRole('dialog', { name: 'Transmettre au RC' })).not.toBeInTheDocument()
+    expect(transmettreRcMock).not.toHaveBeenCalled()
+  })
+
+  it("affiche l'erreur retournée si la transmission échoue (ex. DA incomplète), sans fermer la confirmation", async () => {
     const { ApiError } = await import('../services/api')
     transmettreRcMock.mockRejectedValue(new ApiError('Sélectionnez un marché ou consultez des fournisseurs avant de transmettre.', 409))
     render(<Home />)
 
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Transmettre au RC' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Transmettre au RC' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Transmettre' }))
 
     expect(await screen.findByText('Sélectionnez un marché ou consultez des fournisseurs avant de transmettre.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Transmettre au RC' })).toBeInTheDocument()
   })
 
   it('"Gérer les documents liés à la demande" est désactivé tant qu\'aucun fournisseur n\'est identifié', () => {
@@ -344,7 +382,7 @@ describe('Home — Voir les éléments de la demande (lecture seule)', () => {
     expect(within(dialog.querySelector('.gp-modal__ft') as HTMLElement).getByRole('button', { name: 'Fermer' })).toBeInTheDocument()
   })
 
-  it('les boutons "Montant & marché" et "Gestion documentaire" sont désactivés en lecture seule', async () => {
+  it('"Montant & marché" est désactivé en lecture seule, "Gestion documentaire" reste accessible en consultation', async () => {
     const da: DemandeAchatRow = { ...DA1, procedure_achat: 'MARCHE', id_fournisseur_retenu: 42 }
     mockLists({ A_FINALISER: [da] })
     render(<Home />)
@@ -353,7 +391,13 @@ describe('Home — Voir les éléments de la demande (lecture seule)', () => {
     const dialog = await screen.findByRole('dialog')
 
     expect(within(dialog).getByRole('button', { name: 'Montant & marché' })).toBeDisabled()
-    expect(within(dialog).getByRole('button', { name: 'Gestion documentaire' })).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Gestion documentaire' })).toBeEnabled()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Gestion documentaire' }))
+    const gestionDialog = await screen.findByRole('dialog', { name: 'Gestion documentaire' })
+    // Consultation seule : pas d'icône d'ajout/remplacement du devis, Télécharger reste actif.
+    expect(within(gestionDialog).queryByRole('button', { name: /Ajouter le devis|Remplacer le devis/ })).not.toBeInTheDocument()
+    expect(within(gestionDialog).getByRole('button', { name: 'Télécharger le devis — ACME' })).toBeInTheDocument()
   })
 })
 
@@ -375,7 +419,7 @@ describe('Home — Historique des statuts', () => {
 
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
 
-    await waitFor(() => expect(getHistoriqueMock).toHaveBeenCalledWith(1))
+    await waitFor(() => expect(getHistoriqueMock).toHaveBeenCalledWith(1, undefined))
     expect(await screen.findByText('Alice MARTIN')).toBeInTheDocument()
     expect(screen.getByText('DA en préparation')).toBeInTheDocument()
   })
@@ -398,6 +442,43 @@ describe('Home — Historique des statuts', () => {
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
 
     expect(await screen.findByText('en suppléance de Alice MARTIN')).toBeInTheDocument()
+  })
+
+  it('affiche une icône œil dans la colonne Commentaire quand il est renseigné, "—" sinon ; le clic ouvre le commentaire complet', async () => {
+    getHistoriqueMock.mockResolvedValue([
+      {
+        idHisto: 1,
+        codeStatut: 'DA_REJETEE_RC',
+        libelleStatut: 'Rejetée par N+1',
+        dateHeure: '2026-09-09T10:00:00Z',
+        matriculeActeur: '20002',
+        acteurNomPrenom: 'Jean DUPONT',
+        suppleanceLabel: null,
+        commentaireStatut: 'Achat non pertinent pour le service.',
+      },
+      {
+        idHisto: 2,
+        codeStatut: 'DA_EN_PREPARATION',
+        libelleStatut: 'DA en préparation',
+        dateHeure: '2026-09-08T09:00:00Z',
+        matriculeActeur: '10001',
+        acteurNomPrenom: 'Alice MARTIN',
+        suppleanceLabel: null,
+        commentaireStatut: null,
+      },
+    ])
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
+    const dialog = await screen.findByRole('dialog', { name: /Historique des statuts/ })
+
+    expect(within(dialog).queryByText('Achat non pertinent pour le service.')).not.toBeInTheDocument()
+    expect(within(dialog).getAllByText('—')).toHaveLength(1)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Voir le commentaire' }))
+
+    const commentDialog = await screen.findByRole('dialog', { name: 'Commentaire' })
+    expect(within(commentDialog).getByText('Achat non pertinent pour le service.')).toBeInTheDocument()
   })
 })
 
@@ -478,7 +559,7 @@ describe('DemandeAchatModal — Marché concerné', () => {
     fireEvent.click(gestionBtn)
 
     const gestionDialog = await screen.findByRole('dialog', { name: 'Gestion documentaire' })
-    const ajouterDevisBtn = await within(gestionDialog).findByRole('button', { name: 'Ajouter le devis' })
+    const ajouterDevisBtn = await within(gestionDialog).findByRole('button', { name: 'Ajouter le devis — ACME' })
     fireEvent.click(ajouterDevisBtn)
 
     await waitFor(() => expect(getOrCreateMarcheDevisMock).toHaveBeenCalledWith(7))
@@ -517,7 +598,11 @@ describe('DemandeAchatModal — Éléments de consultation', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
 
     await waitFor(() =>
-      expect(saveConsultationMock).toHaveBeenCalledWith(1, { candidats: [{ idDevis: 42, montantDevis: 1500 }], motifChoix: 'Prix', libelleMotifChoix: undefined }),
+      expect(saveConsultationMock).toHaveBeenCalledWith(1, {
+        candidats: [{ idDevis: 42, montantDevis: 1500, delaiLivraison: null }],
+        motifChoix: 'Prix',
+        libelleMotifChoix: undefined,
+      }),
     )
   })
 
@@ -551,11 +636,12 @@ describe('DemandeAchatModal — Gestion documentaire', () => {
     return screen.findByRole('dialog', { name: 'Gestion documentaire' })
   }
 
-  it('procédure Marché : le sélecteur Fournisseurs n\'affiche que le titulaire retenu', async () => {
+  it('procédure Marché : la liste n\'affiche qu\'une ligne, celle du titulaire retenu', async () => {
     const da: DemandeAchatRow = { ...DA1, procedure_achat: 'MARCHE', id_fournisseur_retenu: 42 }
     const dialog = await openGestionDocumentaireModal(da)
 
-    expect(within(dialog).getByRole('button', { name: 'Fournisseur' })).toHaveTextContent('ACME')
+    expect(await within(dialog).findByText('ACME')).toBeInTheDocument()
+    expect(within(dialog).getAllByRole('row')).toHaveLength(2) // 1 ligne d'en-tête + 1 ligne fournisseur
   })
 
   it('ajoute une pièce complémentaire (type de pièce obligatoire, FICHE_FAD exclu de la liste)', async () => {
@@ -563,7 +649,10 @@ describe('DemandeAchatModal — Gestion documentaire', () => {
     addPieceMock.mockResolvedValue({ idPiece: 5, idFournisseur: 42, typePiece: 'PLAN', nomFichierOriginal: 'plan.pdf', tailleOctets: 2048 })
     const dialog = await openGestionDocumentaireModal(da)
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Ajouter une pièce complémentaire' }))
+    fireEvent.click(await within(dialog).findByRole('button', { name: /Pièces complémentaires — ACME/ }))
+    const piecesDialog = await screen.findByRole('dialog', { name: 'Pièces complémentaires' })
+
+    fireEvent.click(within(piecesDialog).getByRole('button', { name: 'Ajouter une pièce complémentaire' }))
     const addDialog = await screen.findByRole('dialog', { name: 'Pièce complémentaire' })
 
     expect(within(addDialog).queryByText('Fiche récapitulative FAD')).not.toBeInTheDocument()
@@ -573,8 +662,27 @@ describe('DemandeAchatModal — Gestion documentaire', () => {
     fireEvent.change(input, { target: { files: [file] } })
     fireEvent.click(within(addDialog).getByRole('button', { name: 'Enregistrer' }))
 
-    await waitFor(() => expect(addPieceMock).toHaveBeenCalledWith(1, 42, 'PLAN', file))
-    expect(await within(dialog).findByText('plan.pdf')).toBeInTheDocument()
+    await waitFor(() => expect(addPieceMock).toHaveBeenCalledWith(1, 42, 'PLAN', file, undefined))
+    expect(await within(piecesDialog).findByText('plan.pdf')).toBeInTheDocument()
+  })
+
+  it('supprime le devis — demande confirmation avant d\'appeler deleteDevisFile', async () => {
+    const da: DemandeAchatRow = { ...DA1, procedure_achat: 'MARCHE', id_fournisseur_retenu: 42 }
+    getConsultationMock.mockResolvedValue([
+      { idDevis: 99, idFournisseur: 42, montantDevis: null, ordre: 1, retenu: true, nomFichierOriginal: 'devis-acme.pdf', tailleOctets: 4096 },
+    ])
+    deleteDevisFileMock.mockResolvedValue({ idDevis: 99, idFournisseur: 42, montantDevis: null, ordre: 1, retenu: true, nomFichierOriginal: null, tailleOctets: null })
+    const dialog = await openGestionDocumentaireModal(da)
+
+    fireEvent.click(await within(dialog).findByRole('button', { name: 'Remplacer le devis — ACME' }))
+    const devisDialog = await screen.findByRole('dialog', { name: 'Devis' })
+    fireEvent.click(within(devisDialog).getByRole('button', { name: 'Supprimer le devis' }))
+
+    const confirmDialog = await screen.findByRole('dialog', { name: 'Supprimer le devis' })
+    expect(deleteDevisFileMock).not.toHaveBeenCalled()
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Supprimer' }))
+
+    await waitFor(() => expect(deleteDevisFileMock).toHaveBeenCalledWith(1, 99))
   })
 
   it('supprime une pièce complémentaire', async () => {
@@ -582,10 +690,18 @@ describe('DemandeAchatModal — Gestion documentaire', () => {
     getPiecesMock.mockResolvedValue([{ idPiece: 5, idFournisseur: 42, typePiece: 'PLAN', nomFichierOriginal: 'plan.pdf', tailleOctets: 2048 }])
     const dialog = await openGestionDocumentaireModal(da)
 
-    const row = (await within(dialog).findByText('plan.pdf')).closest('tr')!
+    fireEvent.click(await within(dialog).findByRole('button', { name: /Pièces complémentaires — ACME/ }))
+    const piecesDialog = await screen.findByRole('dialog', { name: 'Pièces complémentaires' })
+
+    const row = (await within(piecesDialog).findByText('plan.pdf')).closest('tr')!
     fireEvent.click(within(row).getByRole('button', { name: 'Supprimer plan.pdf' }))
 
-    await waitFor(() => expect(removePieceMock).toHaveBeenCalledWith(1, 5))
-    await waitFor(() => expect(within(dialog).queryByText('plan.pdf')).not.toBeInTheDocument())
+    // Confirmation obligatoire (décision du 17/09/2026) — pas de suppression avant validation.
+    const confirmDialog = await screen.findByRole('dialog', { name: 'Supprimer la pièce' })
+    expect(removePieceMock).not.toHaveBeenCalled()
+    fireEvent.click(within(confirmDialog).getByRole('button', { name: 'Supprimer' }))
+
+    await waitFor(() => expect(removePieceMock).toHaveBeenCalledWith(1, 5, undefined))
+    await waitFor(() => expect(within(piecesDialog).queryByText('plan.pdf')).not.toBeInTheDocument())
   })
 })

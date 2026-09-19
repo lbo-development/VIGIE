@@ -1,0 +1,76 @@
+/*
+ * Typographie du manuel d'utilisateur — volontairement distincte des
+ * composants GPMM (.gp-panel, .gp-btn, etc.) : c'est un contenu de
+ * documentation, pas un écran applicatif. Les couleurs restent les
+ * tokens --gp-* pour suivre le thème clair/sombre (voir gpmm.css).
+ */
+.manuel-content {
+  max-width: 760px;
+  line-height: 1.65;
+  color: var(--gp-text);
+}
+
+.manuel-content h2 {
+  margin: 28px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--gp-border);
+  font-size: 1.15rem;
+}
+
+.manuel-content h2:first-child {
+  margin-top: 0;
+}
+
+.manuel-content h3 {
+  margin: 18px 0 8px;
+  font-size: 1rem;
+}
+
+.manuel-content p {
+  margin: 10px 0;
+}
+
+.manuel-content ul,
+.manuel-content ol {
+  margin: 10px 0;
+  padding-left: 22px;
+}
+
+.manuel-content li {
+  margin: 4px 0;
+}
+
+.manuel-content img {
+  max-width: 100%;
+  border: 1px solid var(--gp-border);
+  border-radius: var(--gp-radius);
+  margin: 14px 0;
+}
+
+.manuel-content code {
+  background: var(--gp-surface-2);
+  border: 1px solid var(--gp-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: var(--gp-mono);
+  font-size: 0.9em;
+}
+
+.manuel-sommaire-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.manuel-sommaire-list li + li {
+  margin-top: 4px;
+}
+
+.manuel-sommaire-list a {
+  color: var(--gp-primary);
+  text-decoration: none;
+}
+
+.manuel-sommaire-list a:hover {
+  text-decoration: underline;
+}

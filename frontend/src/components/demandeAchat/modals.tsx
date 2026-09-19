@@ -4,6 +4,7 @@ import { useFournisseurs } from '../../hooks/useFournisseurs'
 import { useMarches } from '../../hooks/useMarches'
 import { useMarcheTiers } from '../../hooks/useMarcheTiers'
 import { useLibelleReferentiel } from '../../hooks/useLibelleReferentiel'
+import type { OperationInvestissement } from '../../hooks/useInvestissementsPgi'
 import {
   updateDemandeAchat,
   selectMarcheDemandeAchat,
@@ -28,6 +29,7 @@ import {
 } from '../../hooks/useDemandeAchat'
 import { Combobox } from '../Combobox'
 import { FileDropzone } from '../FileDropzone'
+import { PieceCountBadge } from '../PieceCountBadge'
 import { SortableTh } from '../SortableTh'
 import { useDragReorder } from '../../hooks/useDragReorder'
 import { useColumnSort, sortRows } from '../../hooks/useColumnSort'
@@ -46,11 +48,15 @@ export interface DemandeAchatModalProps {
   procedureEditable: boolean
   /**
    * Mode consultation (icône loupe « Voir les éléments de la demande », onglets
-   * 2/3/4 de l'écran d'accueil — décision du 15/09/2026) : champs figés en lecture
-   * seule, pied de modale réduit à « Fermer », aucun accès aux sous-écrans
-   * d'édition (Montant & marché / Éléments de consultation / Gestion
-   * documentaire) — la DA/FAD n'est de toute façon plus éditable à ce stade.
-   * Faux par défaut (comportement inchangé pour l'onglet « A finaliser »).
+   * 2/3/4 de l'écran d'accueil et onglet « En cours » de SuiviRc/SuiviCds —
+   * décision du 15/09/2026) : champs figés en lecture seule, pied de modale
+   * réduit à « Fermer », aucun accès à Montant & marché / Éléments de
+   * consultation (la DA/FAD n'est de toute façon plus éditable à ce stade).
+   * Gestion documentaire reste accessible mais bascule elle-même en pure
+   * consultation (décision du 17/09/2026 — RC doit pouvoir télécharger devis
+   * et pièces complémentaires d'une DA/FAD « en cours », sans les modifier ;
+   * avant cette date, le bouton était entièrement désactivé). Faux par
+   * défaut (comportement inchangé pour l'onglet « A finaliser »).
    */
   readOnly?: boolean
   onClose: () => void
@@ -324,13 +330,15 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
                   data-tip={
                     idFournisseurRetenu === null
                       ? 'Identifiez d\'abord un fournisseur (marché ou éléments de consultation)'
-                      : 'Gérer les devis et pièces complémentaires de la DA'
+                      : readOnly
+                        ? 'Consulter les devis et pièces complémentaires de la DA'
+                        : 'Gérer les devis et pièces complémentaires de la DA'
                   }
                 >
                   <button
                     type="button"
                     className="gp-btn gp-btn--secondary"
-                    disabled={idFournisseurRetenu === null || readOnly}
+                    disabled={idFournisseurRetenu === null}
                     onClick={() => setGestionDocumentaireOpen(true)}
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
@@ -420,6 +428,7 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
           objetDa={objet}
           idFournisseurRetenu={idFournisseurRetenu}
           montantDemande={Number(montant) || 0}
+          readOnly={readOnly}
           onClose={() => setGestionDocumentaireOpen(false)}
         />
       )}
@@ -710,6 +719,122 @@ export function MarcheDaModal({
   )
 }
 
+export interface InvestissementDaModalProps {
+  investissements: OperationInvestissement[]
+  currentNumeroOperation: string | null
+  onClose: () => void
+  onSelected: (numeroOperation: string) => void
+}
+
+/**
+ * Modale de sélection de l'opération d'investissement (TraiterFadRcModal, imputation
+ * comptable INVESTISSEMENT, décision du 16/09/2026) — liste des opérations UTILISABLE du
+ * service, recherche texte client (numéro, libellé). Contrairement à MarcheDaModal, purement
+ * locale : « Enregistrer » commet juste NUMERO_OPERATION dans le formulaire parent (pas
+ * d'appel API ici — transmis avec le reste à transmettreFad/retransmettreCb).
+ */
+export function InvestissementDaModal({ investissements, currentNumeroOperation, onClose, onSelected }: InvestissementDaModalProps) {
+  const [search, setSearch] = useState('')
+  const [selection, setSelection] = useState<string | null>(currentNumeroOperation)
+
+  const searchLc = search.trim().toLowerCase()
+  const rows = investissements.filter((i) => i.utilisable).filter((i) => {
+    if (!searchLc) return true
+    const libelle = i.libelle_service ?? i.libelle
+    return i.numero_operation.toLowerCase().includes(searchLc) || libelle.toLowerCase().includes(searchLc)
+  })
+
+  function handleSubmit() {
+    if (selection) onSelected(selection)
+    onClose()
+  }
+
+  return (
+    <div className="gp-overlay is-open">
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="investissementDaModalTitle" style={{ maxWidth: 1196 }}>
+        <div className="gp-modal__hd">
+          <h3 className="gp-modal__title" id="investissementDaModalTitle">
+            Sélectionner une opération d'investissement « utilisable »
+          </h3>
+          <button className="gp-modal__close" aria-label="Fermer" onClick={onClose}>
+            <svg className="ti">
+              <use href="#i-x" />
+            </svg>
+          </button>
+        </div>
+        <div className="gp-modal__bd gp-scroll stack">
+          <div className="gp-field">
+            <label className="gp-label" htmlFor="investissementda-recherche">
+              Recherche
+            </label>
+            <div className="gp-inputgroup">
+              <svg className="ti">
+                <use href="#i-search" />
+              </svg>
+              <input
+                id="investissementda-recherche"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Recherche sur numéro, libellé…"
+                aria-label="Recherche sur numéro, libellé opération"
+              />
+            </div>
+          </div>
+
+          <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 320 }}>
+            <table className="gp-table">
+              <thead>
+                <tr>
+                  <th>Numéro</th>
+                  <th>Libellé</th>
+                  <th>Montant travaux</th>
+                  <th>Montant FESI</th>
+                  <th>MT AP.1</th>
+                  <th>MT AP.8</th>
+                  <th>MT CP.1</th>
+                  <th>MT CP.8</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((i) => (
+                  <tr
+                    key={i.numero_operation}
+                    className={selection === i.numero_operation ? 'is-sel' : undefined}
+                    onClick={() => setSelection(i.numero_operation)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td className="mono">{i.numero_operation}</td>
+                    <td>{i.libelle_service ?? i.libelle}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_travaux)}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_fesi)}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_budget_ap1)}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_budget_ap8)}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_budget_cp1)}</td>
+                    <td>{CURRENCY_FORMAT_ROUND.format(i.mt_budget_cp8)}</td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={8}>Aucun résultat.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="gp-modal__ft">
+          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose}>
+            Retour
+          </button>
+          <button type="button" className="gp-btn gp-btn--primary" disabled={!selection} onClick={handleSubmit}>
+            Enregistrer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const MAX_CANDIDATS = 5
 const MOTIF_CHOIX_OPTIONS: MotifChoix[] = ['Prix', 'Délai', 'Technique', 'Autre']
 
@@ -717,6 +842,8 @@ interface FournisseurCandidat {
   idDevis: number
   idFournisseur: number
   montantDevis: string
+  /** Format ISO (YYYY-MM-DD), lié à un <input type="date"> — voir demandeAchat.service.ts#genererFadPdf (fiche FAD papier, bouton CB). */
+  delaiLivraison: string
   nomFichierOriginal: string | null
 }
 
@@ -788,6 +915,7 @@ export function FournisseurDaModal({
               idDevis: r.idDevis,
               idFournisseur: r.idFournisseur,
               montantDevis: r.montantDevis != null ? String(r.montantDevis) : '',
+              delaiLivraison: r.delaiLivraison ?? '',
               nomFichierOriginal: r.nomFichierOriginal,
             })),
         )
@@ -819,7 +947,13 @@ export function FournisseurDaModal({
       const candidat = await addConsultationCandidat(idDemandeAchat, idFournisseur)
       setCandidats((prev) => [
         ...prev,
-        { idDevis: candidat.idDevis, idFournisseur: candidat.idFournisseur, montantDevis: '', nomFichierOriginal: candidat.nomFichierOriginal },
+        {
+          idDevis: candidat.idDevis,
+          idFournisseur: candidat.idFournisseur,
+          montantDevis: '',
+          delaiLivraison: '',
+          nomFichierOriginal: candidat.nomFichierOriginal,
+        },
       ])
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
@@ -844,6 +978,10 @@ export function FournisseurDaModal({
 
   function changerMontant(idDevis: number, value: string) {
     setCandidats((prev) => prev.map((c) => (c.idDevis === idDevis ? { ...c, montantDevis: sanitizeDecimal(value) } : c)))
+  }
+
+  function changerDelai(idDevis: number, value: string) {
+    setCandidats((prev) => prev.map((c) => (c.idDevis === idDevis ? { ...c, delaiLivraison: value } : c)))
   }
 
   const reorder = useDragReorder(
@@ -877,7 +1015,11 @@ export function FournisseurDaModal({
     setSubmitting(true)
     try {
       const da = await saveConsultationDemandeAchat(idDemandeAchat, {
-        candidats: candidats.map((c) => ({ idDevis: c.idDevis, montantDevis: Number(c.montantDevis) })),
+        candidats: candidats.map((c) => ({
+          idDevis: c.idDevis,
+          montantDevis: Number(c.montantDevis),
+          delaiLivraison: c.delaiLivraison.trim() === '' ? null : c.delaiLivraison,
+        })),
         motifChoix,
         libelleMotifChoix: motifChoix === 'Autre' ? libelleAutreMotif.trim() : undefined,
       })
@@ -994,6 +1136,15 @@ export function FournisseurDaModal({
                                 aria-label={`Montant du devis — ${fournisseurLabel(c.idFournisseur)}`}
                               />
                             </td>
+                            <td style={{ width: 140 }}>
+                              <input
+                                type="date"
+                                className="gp-input gp-input--compact"
+                                value={c.delaiLivraison}
+                                onChange={(e) => changerDelai(c.idDevis, e.target.value)}
+                                aria-label={`Délai annoncé — ${fournisseurLabel(c.idFournisseur)}`}
+                              />
+                            </td>
                             <td style={{ width: 40 }}>
                               {/* title natif plutôt que .gp-tip (rogné par le scroll de la liste). */}
                               <div className="gp-rowacts">
@@ -1084,17 +1235,48 @@ export interface GestionDocumentaireModalProps {
   idFournisseurRetenu: number
   /** DEMANDE_ACHAT.MONTANT_DEMANDE — montant affiché à côté du sélecteur Fournisseurs en procédure Marché (un seul fournisseur, DEVIS_CONSULTE.MONTANT_DEVIS non significatif pour cette procédure). En Hors marché, le montant affiché est celui du devis du fournisseur sélectionné (chacun le sien), ce prop n'est alors pas utilisé. */
   montantDemande: number
+  /**
+   * Mode consultation (décision du 16/09/2026, modale « Valider les éléments
+   * de la commande » du CDS) : masque Ajouter/Remplacer/Supprimer sur le
+   * devis et les pièces complémentaires — seuls l'affichage et le
+   * téléchargement restent. Faux par défaut (comportement inchangé pour
+   * CreationDA).
+   */
+  readOnly?: boolean
+  /**
+   * Devis seul verrouillé, pièces complémentaires restant modifiables
+   * (décision du 17/09/2026 — RC, ValiderCommandeRcModal/TraiterFadRcModal) :
+   * tant que le RC n'a pas (re)transmis la FAD au N+2, il peut compléter la
+   * base documentaire mais pas toucher au devis retenu. L'icône devis reste
+   * visible mais désactivée (grisée) plutôt que masquée — Télécharger reste
+   * actif. Indépendant de `readOnly` ci-dessus (CDS, lui, n'a droit à rien
+   * du tout). Voir demandeAchat.service.ts#STATUTS_PIECES_MODIFIABLES pour
+   * le verrou équivalent côté backend.
+   */
+  devisReadOnly?: boolean
+  /**
+   * Écrans de suivi CDS/CB (décision du 18/09/2026 — corrige au passage un
+   * bug latent identique pour CDS, jamais couvert par un test d'intégration
+   * réel) : un acteur CDS/CB pur (sans rôle RC ni ADMIN_*) n'est reconnu par
+   * le backend que via ce hint explicite (voir
+   * demandeAchat.service.ts#resolveAccessContext) — sans lui, la
+   * consultation/les pièces/le téléchargement du devis d'une FAD qui n'est
+   * pas la sienne se solderaient par un 403, même en pure lecture.
+   */
+  roleHint?: 'CDS' | 'CB'
   onClose: () => void
 }
 
 /**
  * Écran unifié de gestion documentaire (bouton « Gestion documentaire »,
- * CreationDA — décision du 09/09/2026, croquis DA2.pdf page 1) : remplace le
- * dépôt de devis/pièces complémentaires depuis MarcheDA/FournisseurDA
- * (supprimé le même jour). Devis (DEVIS_CONSULTE) et pièces complémentaires
- * (PIECE_JOINTE) du fournisseur choisi dans le menu « Fournisseurs » — un
- * seul fournisseur possible en procédure Marché (le titulaire), la liste des
- * candidats consultés en Hors marché.
+ * CreationDA — décision du 09/09/2026, croquis DA2.pdf page 1 ; passé en
+ * liste de fournisseurs le 17/09/2026, esquisse fournie par l'utilisateur —
+ * remplace le sélecteur Fournisseurs à choix unique par une ligne par
+ * fournisseur, chacune avec son devis et ses pièces complémentaires propres,
+ * plus lisible dès qu'il y a plusieurs candidats en Hors Marché). Devis
+ * (DEVIS_CONSULTE) et pièces complémentaires (PIECE_JOINTE) par fournisseur —
+ * un seul fournisseur (donc une seule ligne) en procédure Marché (le
+ * titulaire), une ligne par candidat consulté en Hors marché.
  */
 export function GestionDocumentaireModal({
   idDemandeAchat,
@@ -1103,31 +1285,28 @@ export function GestionDocumentaireModal({
   objetDa,
   idFournisseurRetenu,
   montantDemande,
+  readOnly = false,
+  devisReadOnly = false,
+  roleHint,
   onClose,
 }: GestionDocumentaireModalProps) {
   const [loading, setLoading] = useState(true)
   const [candidats, setCandidats] = useState<ConsultationCandidat[]>([])
-  const [selectedIdFournisseur, setSelectedIdFournisseur] = useState<string | null>(null)
-  const [pieces, setPieces] = useState<PieceJointe[]>([])
-  const [piecesLoading, setPiecesLoading] = useState(false)
-  const [devisLoading, setDevisLoading] = useState(false)
+  const [pieceCounts, setPieceCounts] = useState<Record<number, number>>({})
   const [error, setError] = useState<string | null>(null)
-  const [addPieceModalKind, setAddPieceModalKind] = useState<'DEVIS' | 'PIECE_COMPLEMENTAIRE' | null>(null)
+  const [devisModalIdFournisseur, setDevisModalIdFournisseur] = useState<number | null>(null)
+  const [devisCreatingIdFournisseur, setDevisCreatingIdFournisseur] = useState<number | null>(null)
+  const [piecesModalIdFournisseur, setPiecesModalIdFournisseur] = useState<number | null>(null)
 
   const { fournisseurs } = useFournisseurs(idService)
   const fournisseurLabel = (idFournisseur: number) => fournisseurs.find((f) => f.id_fournisseur === idFournisseur)?.raison_sociale_service ?? '—'
-  const { items: typesPieceReferentiel } = useLibelleReferentiel('TYPE_PIECE_FAD')
-  const typePieceLabel = (code: string) => typesPieceReferentiel.find((t) => t.code === code)?.libelle ?? code
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    getConsultationDemandeAchat(idDemandeAchat)
+    getConsultationDemandeAchat(idDemandeAchat, roleHint)
       .then((rows) => {
-        if (cancelled) return
-        setCandidats(rows)
-        const initial = procedureAchat === 'MARCHE' ? idFournisseurRetenu : rows[0]?.idFournisseur ?? idFournisseurRetenu
-        setSelectedIdFournisseur(String(initial))
+        if (!cancelled) setCandidats(rows)
       })
       .catch(() => {
         if (!cancelled) setError('Impossible de charger les éléments déjà déposés.')
@@ -1138,97 +1317,64 @@ export function GestionDocumentaireModal({
     return () => {
       cancelled = true
     }
-  }, [idDemandeAchat, procedureAchat, idFournisseurRetenu])
+  }, [idDemandeAchat, roleHint])
 
-  const fournisseurOptions =
+  // Marché : une seule ligne (le titulaire), même si sa ligne DEVIS_CONSULTE n'existe pas encore.
+  // Hors marché : une ligne par candidat déjà consulté (voir FournisseurDA) — jamais de ligne de plus.
+  const rows: { idFournisseur: number; candidat: ConsultationCandidat | null }[] =
     procedureAchat === 'MARCHE'
-      ? [{ value: String(idFournisseurRetenu), label: fournisseurLabel(idFournisseurRetenu) }]
-      : candidats.map((c) => ({ value: String(c.idFournisseur), label: fournisseurLabel(c.idFournisseur) }))
+      ? [{ idFournisseur: idFournisseurRetenu, candidat: candidats.find((c) => c.idFournisseur === idFournisseurRetenu) ?? null }]
+      : candidats.map((c) => ({ idFournisseur: c.idFournisseur, candidat: c }))
 
-  const selectedIdFournisseurNum = selectedIdFournisseur !== null ? Number(selectedIdFournisseur) : null
-  const devisSelected = candidats.find((c) => c.idFournisseur === selectedIdFournisseurNum) ?? null
-  // Marché : un seul fournisseur, MONTANT_DEMANDE fait foi (DEVIS_CONSULTE.MONTANT_DEVIS non significatif — voir ForClaude/CDC/mld-phases-1-2.md).
-  // Hors marché : chaque candidat a son propre devis, montant du fournisseur sélectionné.
-  const montantAffiche = procedureAchat === 'MARCHE' ? montantDemande : devisSelected?.montantDevis ?? null
+  // Clé stable (indépendante de la référence du tableau `candidats`) pour ne recharger les
+  // compteurs de pièces que quand l'ensemble des fournisseurs affichés change réellement.
+  const rowIdsKey = rows.map((r) => r.idFournisseur).join(',')
 
   useEffect(() => {
-    if (selectedIdFournisseurNum === null) {
-      setPieces([])
+    const idsFournisseur = rowIdsKey === '' ? [] : rowIdsKey.split(',').map(Number)
+    if (idsFournisseur.length === 0) {
+      setPieceCounts({})
       return
     }
     let cancelled = false
-    setPiecesLoading(true)
-    getPiecesDemandeAchat(idDemandeAchat, selectedIdFournisseurNum)
-      .then((rows) => {
-        if (!cancelled) setPieces(rows)
+    Promise.all(idsFournisseur.map((id) => getPiecesDemandeAchat(idDemandeAchat, id, roleHint).then((list) => [id, list.length] as const)))
+      .then((entries) => {
+        if (!cancelled) setPieceCounts(Object.fromEntries(entries))
       })
       .catch(() => {
         if (!cancelled) setError('Impossible de charger les pièces complémentaires.')
       })
-      .finally(() => {
-        if (!cancelled) setPiecesLoading(false)
-      })
     return () => {
       cancelled = true
     }
-  }, [idDemandeAchat, selectedIdFournisseurNum])
+  }, [idDemandeAchat, rowIdsKey, roleHint])
 
-  /** MARCHE uniquement : la ligne DEVIS_CONSULTE peut ne pas encore exister (jamais ouverte via l'ancien bouton « Ajouter Devis » de MarcheDA) — créée à la volée. */
-  async function handleOpenDevisModal() {
-    if (devisSelected) {
-      setAddPieceModalKind('DEVIS')
+  /** MARCHE uniquement : la ligne DEVIS_CONSULTE peut ne pas encore exister (jamais ouverte via l'ancien bouton « Ajouter Devis » de MarcheDA) — créée à la volée. En Hors Marché, `candidat` existe toujours (voir `rows` ci-dessus). */
+  async function handleOpenDevisModal(idFournisseur: number, candidat: ConsultationCandidat | null) {
+    if (candidat) {
+      setDevisModalIdFournisseur(idFournisseur)
       return
     }
     setError(null)
-    setDevisLoading(true)
+    setDevisCreatingIdFournisseur(idFournisseur)
     try {
-      const candidat = await getOrCreateMarcheDevis(idDemandeAchat)
-      setCandidats((prev) => [...prev, candidat])
-      setAddPieceModalKind('DEVIS')
+      const created = await getOrCreateMarcheDevis(idDemandeAchat)
+      setCandidats((prev) => [...prev, created])
+      setDevisModalIdFournisseur(idFournisseur)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
     } finally {
-      setDevisLoading(false)
+      setDevisCreatingIdFournisseur(null)
     }
   }
 
-  async function handleSupprimerDevis() {
-    if (!devisSelected?.nomFichierOriginal) return
-    setError(null)
+  async function handleTelechargerDevis(candidat: ConsultationCandidat) {
+    if (!candidat.nomFichierOriginal) return
     try {
-      const candidat = await deleteDevisFile(idDemandeAchat, devisSelected.idDevis)
-      setCandidats((prev) => prev.map((c) => (c.idDevis === candidat.idDevis ? candidat : c)))
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
-    }
-  }
-
-  async function handleTelechargerDevis() {
-    if (!devisSelected?.nomFichierOriginal) return
-    try {
-      const blob = await downloadDevisFileBlob(idDemandeAchat, devisSelected.idDevis)
-      triggerBlobDownload(blob, devisSelected.nomFichierOriginal)
+      const blob = await downloadDevisFileBlob(idDemandeAchat, candidat.idDevis, roleHint)
+      triggerBlobDownload(blob, candidat.nomFichierOriginal)
     } catch {
       setError('Impossible de télécharger le devis.')
-    }
-  }
-
-  async function handleSupprimerPiece(idPiece: number) {
-    setError(null)
-    try {
-      await removePieceDemandeAchat(idDemandeAchat, idPiece)
-      setPieces((prev) => prev.filter((p) => p.idPiece !== idPiece))
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
-    }
-  }
-
-  async function handleTelechargerPiece(piece: PieceJointe) {
-    try {
-      const blob = await downloadPieceDemandeAchatBlob(idDemandeAchat, piece.idPiece)
-      triggerBlobDownload(blob, piece.nomFichierOriginal)
-    } catch {
-      setError('Impossible de télécharger la pièce.')
     }
   }
 
@@ -1249,160 +1395,100 @@ export function GestionDocumentaireModal({
           {loading ? (
             <p>Chargement…</p>
           ) : (
-            <>
-              <div className="row" style={{ alignItems: 'flex-start' }}>
-                <div className="gp-field" style={{ flex: 2 }}>
-                  <label className="gp-label">Fournisseurs</label>
-                  <Combobox
-                    options={fournisseurOptions}
-                    value={selectedIdFournisseur}
-                    onChange={setSelectedIdFournisseur}
-                    placeholder="Choisir un fournisseur…"
-                    ariaLabel="Fournisseur"
-                    style={{ maxWidth: 'none' }}
-                  />
-                </div>
-                <div className="gp-field" style={{ flex: '0 0 125px' }}>
-                  <label className="gp-label" htmlFor="gestiondoc-montant">
-                    Montant
-                  </label>
-                  <input
-                    id="gestiondoc-montant"
-                    className="gp-input"
-                    value={montantAffiche !== null ? CURRENCY_FORMAT.format(montantAffiche) : '—'}
-                    readOnly
-                  />
-                </div>
-              </div>
-
-              <div className="gp-field">
-                <span className="gp-label">Devis</span>
-                <div className="row" style={{ alignItems: 'center', gap: 8 }}>
-                  <input className="gp-input" style={{ flex: 1 }} value={devisSelected?.nomFichierOriginal ?? 'Aucun devis déposé'} readOnly />
-                  <div className="gp-rowacts">
-                    <button
-                      type="button"
-                      title={devisSelected?.nomFichierOriginal ? 'Remplacer le devis' : 'Ajouter le devis'}
-                      aria-label="Ajouter le devis"
-                      disabled={devisLoading}
-                      onClick={() => void handleOpenDevisModal()}
-                    >
-                      <svg className="ti" style={{ color: 'var(--gp-success)' }}>
-                        <use href="#i-circle-plus" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      title="Télécharger le devis"
-                      aria-label="Télécharger le devis"
-                      disabled={!devisSelected?.nomFichierOriginal}
-                      onClick={() => void handleTelechargerDevis()}
-                    >
-                      <svg className="ti">
-                        <use href="#i-download" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      className="del"
-                      title="Supprimer le devis"
-                      aria-label="Supprimer le devis"
-                      disabled={!devisSelected?.nomFichierOriginal}
-                      onClick={() => void handleSupprimerDevis()}
-                    >
-                      <svg className="ti">
-                        <use href="#i-trash" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="stack" style={{ gap: 8 }}>
-                <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className="gp-label">Pièces complémentaires</span>
-                  <button
-                    type="button"
-                    className="gp-btn gp-btn--secondary"
-                    disabled={selectedIdFournisseurNum === null}
-                    onClick={() => setAddPieceModalKind('PIECE_COMPLEMENTAIRE')}
-                  >
-                    <svg className="ti">
-                      <use href="#i-files" />
-                    </svg>
-                    Ajouter une pièce complémentaire
-                  </button>
-                </div>
-                <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 200, overflowY: 'auto', overflowX: 'hidden' }}>
-                  {/*
-                    table-layout:fixed — sans ça, .gp-table (white-space:nowrap partagé) laisse un nom
-                    de fichier long élargir la colonne au lieu d'être tronqué par l'ellipsis.
-                    minWidth:0 — .gp-table impose min-width:680px (pensé pour des tableaux à bien plus
-                    de colonnes), toujours supérieur à la largeur utile de cette modale (maxWidth 640) :
-                    sans cette surcharge, un défilement horizontal apparaissait même une fois les
-                    colonnes réduites. Type pièce (colonne du milieu, sans largeur fixée) absorbe le
-                    reste de la largeur disponible — tout tient sans défiler.
-                  */}
-                  <table className="gp-table" style={{ tableLayout: 'fixed', minWidth: 0, width: '100%' }}>
-                    <colgroup>
-                      <col style={{ width: 130 }} />
-                      <col />
-                      <col style={{ width: 80 }} />
-                    </colgroup>
-                    <thead>
-                      <tr>
-                        <th>Fichier PDF</th>
-                        <th>Type pièce</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {piecesLoading && (
-                        <tr>
-                          <td colSpan={3}>Chargement…</td>
-                        </tr>
-                      )}
-                      {!piecesLoading &&
-                        pieces.map((p) => (
-                          <tr key={p.idPiece}>
-                            <td
-                              title={p.nomFichierOriginal}
-                              style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                            >
-                              {p.nomFichierOriginal}
-                            </td>
-                            <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typePieceLabel(p.typePiece)}</td>
-                            <td>
-                              <div className="gp-rowacts">
-                                <button title="Télécharger" aria-label={`Télécharger ${p.nomFichierOriginal}`} onClick={() => void handleTelechargerPiece(p)}>
-                                  <svg className="ti">
-                                    <use href="#i-download" />
-                                  </svg>
-                                </button>
+            <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 360, overflowY: 'auto', overflowX: 'hidden' }}>
+              {/* table-layout:fixed/minWidth:0 — voir la même note historique sur le tableau Pièces complémentaires (PiecesComplementairesModal). */}
+              <table className="gp-table" style={{ tableLayout: 'fixed', minWidth: 0, width: '100%' }}>
+                <colgroup>
+                  <col />
+                  <col style={{ width: 120 }} />
+                  <col style={{ width: 56 }} />
+                  <col style={{ width: 56 }} />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>Fournisseur</th>
+                    <th>Montant</th>
+                    <th>Devis</th>
+                    <th>Pièces</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map(({ idFournisseur, candidat }, index) => {
+                    const label = fournisseurLabel(idFournisseur)
+                    const montant = procedureAchat === 'MARCHE' ? montantDemande : (candidat?.montantDevis ?? null)
+                    const hasDevis = Boolean(candidat?.nomFichierOriginal)
+                    const count = pieceCounts[idFournisseur] ?? 0
+                    return (
+                      <tr key={idFournisseur}>
+                        <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>
+                          {label}
+                          {rows.length > 1 && index === 0 && (
+                            <span className="gp-badge gp-badge--success" style={{ marginLeft: 6 }}>
+                              Retenu
+                            </span>
+                          )}
+                        </td>
+                        <td>{montant !== null ? CURRENCY_FORMAT.format(montant) : '—'}</td>
+                        <td>
+                          <div className="gp-rowacts">
+                            {!readOnly && (
+                              <span
+                                className="gp-tip"
+                                data-tip={devisReadOnly ? 'Devis verrouillé tant que la FAD n\'est pas (re)transmise' : hasDevis ? 'Remplacer le devis' : 'Ajouter le devis'}
+                              >
                                 <button
-                                  className="del"
-                                  title="Supprimer la pièce"
-                                  aria-label={`Supprimer ${p.nomFichierOriginal}`}
-                                  onClick={() => void handleSupprimerPiece(p.idPiece)}
+                                  type="button"
+                                  aria-label={`${hasDevis ? 'Remplacer' : 'Ajouter'} le devis — ${label}`}
+                                  disabled={devisReadOnly || devisCreatingIdFournisseur === idFournisseur}
+                                  onClick={() => void handleOpenDevisModal(idFournisseur, candidat)}
                                 >
-                                  <svg className="ti">
-                                    <use href="#i-trash" />
+                                  <svg className="ti" style={{ color: devisReadOnly ? undefined : hasDevis ? 'var(--gp-success)' : 'var(--gp-danger)' }}>
+                                    <use href="#i-file-invoice" />
                                   </svg>
                                 </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      {!piecesLoading && pieces.length === 0 && (
-                        <tr>
-                          <td colSpan={3}>Aucune pièce complémentaire.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </>
+                              </span>
+                            )}
+                            <span className="gp-tip" data-tip="Télécharger le devis">
+                              <button
+                                type="button"
+                                aria-label={`Télécharger le devis — ${label}`}
+                                disabled={!hasDevis}
+                                onClick={() => candidat && void handleTelechargerDevis(candidat)}
+                              >
+                                <svg className="ti">
+                                  <use href="#i-download" />
+                                </svg>
+                              </button>
+                            </span>
+                          </div>
+                        </td>
+                        <td>
+                          <div className="gp-rowacts">
+                            <span className="gp-tip" data-tip="Pièces complémentaires">
+                              <button
+                                type="button"
+                                aria-label={count > 0 ? `Pièces complémentaires — ${label} (${count})` : `Pièces complémentaires — ${label}`}
+                                onClick={() => setPiecesModalIdFournisseur(idFournisseur)}
+                              >
+                                <svg className="ti" style={{ color: 'var(--gp-primary)' }}>
+                                  <use href="#i-files" />
+                                </svg>
+                              </button>
+                              <PieceCountBadge count={count} />
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan={4}>Aucun fournisseur consulté.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           )}
 
           {error && (
@@ -1416,26 +1502,40 @@ export function GestionDocumentaireModal({
         </div>
         <div className="gp-modal__ft">
           <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose}>
-            Retour
-          </button>
-          <button type="button" className="gp-btn gp-btn--primary" onClick={onClose}>
-            Enregistrer
+            Fermer
           </button>
         </div>
       </div>
 
-      {addPieceModalKind && selectedIdFournisseurNum !== null && (
-        <AddPieceDaModal
-          kind={addPieceModalKind}
+      {!readOnly &&
+        devisModalIdFournisseur !== null &&
+        (() => {
+          const candidat = candidats.find((c) => c.idFournisseur === devisModalIdFournisseur) ?? null
+          return (
+            <AddPieceDaModal
+              kind="DEVIS"
+              idDemandeAchat={idDemandeAchat}
+              idDevis={candidat?.idDevis}
+              idFournisseur={devisModalIdFournisseur}
+              objetDa={objetDa}
+              fournisseurLabel={fournisseurLabel(devisModalIdFournisseur)}
+              currentNomFichier={candidat?.nomFichierOriginal ?? null}
+              onClose={() => setDevisModalIdFournisseur(null)}
+              onUploadedDevis={(updated) => setCandidats((prev) => prev.map((c) => (c.idDevis === updated.idDevis ? updated : c)))}
+            />
+          )
+        })()}
+
+      {piecesModalIdFournisseur !== null && (
+        <PiecesComplementairesModal
           idDemandeAchat={idDemandeAchat}
-          idDevis={addPieceModalKind === 'DEVIS' ? devisSelected?.idDevis : undefined}
-          idFournisseur={selectedIdFournisseurNum}
+          idFournisseur={piecesModalIdFournisseur}
+          fournisseurLabel={fournisseurLabel(piecesModalIdFournisseur)}
           objetDa={objetDa}
-          fournisseurLabel={fournisseurLabel(selectedIdFournisseurNum)}
-          currentNomFichier={addPieceModalKind === 'DEVIS' ? (devisSelected?.nomFichierOriginal ?? null) : null}
-          onClose={() => setAddPieceModalKind(null)}
-          onUploadedDevis={(candidat) => setCandidats((prev) => prev.map((c) => (c.idDevis === candidat.idDevis ? candidat : c)))}
-          onUploadedPiece={(piece) => setPieces((prev) => [...prev, piece])}
+          readOnly={readOnly}
+          roleHint={roleHint}
+          onClose={() => setPiecesModalIdFournisseur(null)}
+          onCountChange={(count) => setPieceCounts((prev) => ({ ...prev, [piecesModalIdFournisseur]: count }))}
         />
       )}
     </div>
@@ -1451,9 +1551,13 @@ export interface AddPieceDaModalProps {
   objetDa: string
   fournisseurLabel: string
   currentNomFichier: string | null
+  /** Écrans de suivi CDS/CB (décision du 18/09/2026), pertinent uniquement pour `kind === 'PIECE_COMPLEMENTAIRE'` — voir GestionDocumentaireModalProps#roleHint. */
+  roleHint?: 'CDS' | 'CB'
   onClose: () => void
-  onUploadedDevis: (candidat: ConsultationCandidat) => void
-  onUploadedPiece: (piece: PieceJointe) => void
+  /** Requis quand `kind === 'DEVIS'`. */
+  onUploadedDevis?: (candidat: ConsultationCandidat) => void
+  /** Requis quand `kind === 'PIECE_COMPLEMENTAIRE'`. */
+  onUploadedPiece?: (piece: PieceJointe) => void
 }
 
 /** FICHE_FAD est généré par le système (fiche récapitulative de la FAD, Phase 2) — jamais proposé au dépôt manuel. */
@@ -1474,6 +1578,7 @@ export function AddPieceDaModal({
   objetDa,
   fournisseurLabel,
   currentNomFichier,
+  roleHint,
   onClose,
   onUploadedDevis,
   onUploadedPiece,
@@ -1481,6 +1586,8 @@ export function AddPieceDaModal({
   const [file, setFile] = useState<File | null>(null)
   const [typePiece, setTypePiece] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { items: typesPiece } = useLibelleReferentiel('TYPE_PIECE_FAD')
@@ -1505,16 +1612,47 @@ export function AddPieceDaModal({
     try {
       if (kind === 'DEVIS') {
         const candidat = await uploadDevisFile(idDemandeAchat, idDevis as number, file)
-        onUploadedDevis(candidat)
+        onUploadedDevis?.(candidat)
       } else {
-        const piece = await addPieceDemandeAchat(idDemandeAchat, idFournisseur, typePiece as string, file)
-        onUploadedPiece(piece)
+        const piece = await addPieceDemandeAchat(idDemandeAchat, idFournisseur, typePiece as string, file, roleHint)
+        onUploadedPiece?.(piece)
       }
       onClose()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  /**
+   * Retire uniquement le fichier (la ligne DEVIS_CONSULTE reste, le
+   * fournisseur reste consulté/retenu) — voir removeConsultationCandidat
+   * pour retirer le fournisseur tout entier (écran Éléments de
+   * consultation). Confirmation obligatoire avant suppression (décision du
+   * 17/09/2026) — voir confirmDeleteOpen.
+   */
+  async function confirmDelete() {
+    setError(null)
+    setDeleting(true)
+    try {
+      const candidat = await deleteDevisFile(idDemandeAchat, idDevis as number)
+      onUploadedDevis?.(candidat)
+      setConfirmDeleteOpen(false)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleDownload() {
+    if (!currentNomFichier) return
+    try {
+      const blob = await downloadDevisFileBlob(idDemandeAchat, idDevis as number)
+      triggerBlobDownload(blob, currentNomFichier)
+    } catch {
+      setError('Impossible de télécharger le devis.')
     }
   }
 
@@ -1556,7 +1694,30 @@ export function AddPieceDaModal({
           <div className="gp-field">
             <label className="gp-label">Fichier (PDF, 10 Mo max)</label>
             {!file && currentNomFichier && kind === 'DEVIS' && (
-              <p className="gp-help">Devis actuel : {currentNomFichier} — déposer un fichier ci-dessous le remplace.</p>
+              <div className="row" style={{ alignItems: 'center', gap: 8 }}>
+                <input className="gp-input" style={{ flex: 1 }} value={currentNomFichier} readOnly />
+                <div className="gp-rowacts">
+                  <button type="button" title="Télécharger le devis" aria-label="Télécharger le devis" onClick={() => void handleDownload()}>
+                    <svg className="ti">
+                      <use href="#i-download" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="del"
+                    title="Supprimer le devis"
+                    aria-label="Supprimer le devis"
+                    onClick={() => setConfirmDeleteOpen(true)}
+                  >
+                    <svg className="ti">
+                      <use href="#i-trash" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            {!file && currentNomFichier && kind === 'DEVIS' && (
+              <p className="gp-help">Déposer un fichier ci-dessous remplace le devis actuel.</p>
             )}
             <FileDropzone accept="application/pdf" maxSizeOctets={MAX_FICHIER_TAILLE_OCTETS} file={file} onFileSelected={setFile} disabled={submitting} />
           </div>
@@ -1579,6 +1740,278 @@ export function AddPieceDaModal({
           </button>
         </div>
       </div>
+
+      {confirmDeleteOpen && (
+        <div className="gp-overlay is-open">
+          <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="deleteDevisModalTitle">
+            <div className="gp-modal__hd">
+              <h3 className="gp-modal__title" id="deleteDevisModalTitle">
+                Supprimer le devis
+              </h3>
+              <button className="gp-modal__close" aria-label="Fermer" onClick={() => setConfirmDeleteOpen(false)}>
+                <svg className="ti">
+                  <use href="#i-x" />
+                </svg>
+              </button>
+            </div>
+            <div className="gp-modal__bd gp-scroll stack">
+              <p>Supprimer définitivement « {currentNomFichier} » ? Cette action est irréversible.</p>
+            </div>
+            <div className="gp-modal__ft">
+              <button type="button" className="gp-btn gp-btn--secondary" onClick={() => setConfirmDeleteOpen(false)}>
+                Annuler
+              </button>
+              <button type="button" className="gp-btn gp-btn--danger" disabled={deleting} onClick={() => void confirmDelete()}>
+                {deleting ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export interface PiecesComplementairesModalProps {
+  idDemandeAchat: number
+  idFournisseur: number
+  fournisseurLabel: string
+  objetDa: string
+  readOnly: boolean
+  /** Écrans de suivi CDS/CB (décision du 18/09/2026) — voir GestionDocumentaireModalProps#roleHint. */
+  roleHint?: 'CDS' | 'CB'
+  onClose: () => void
+  /** Prévient GestionDocumentaireModal du nouveau total, pour mettre à jour le badge de la ligne sans tout recharger. */
+  onCountChange: (count: number) => void
+}
+
+/**
+ * Gestion des pièces complémentaires d'un fournisseur de la DA (icône
+ * « Pièces », une par ligne de GestionDocumentaireModal, esquisse fournie
+ * par l'utilisateur le 17/09/2026) : reprend telle quelle l'ancienne section
+ * « Pièces complémentaires » de GestionDocumentaireModal, sortie dans sa
+ * propre modale pour rester consultable/modifiable fournisseur par
+ * fournisseur sans sélecteur.
+ */
+export function PiecesComplementairesModal({
+  idDemandeAchat,
+  idFournisseur,
+  fournisseurLabel,
+  objetDa,
+  readOnly,
+  roleHint,
+  onClose,
+  onCountChange,
+}: PiecesComplementairesModalProps) {
+  const [pieces, setPieces] = useState<PieceJointe[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [pieceToDelete, setPieceToDelete] = useState<PieceJointe | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  const { items: typesPieceReferentiel } = useLibelleReferentiel('TYPE_PIECE_FAD')
+  const typePieceLabel = (code: string) => typesPieceReferentiel.find((t) => t.code === code)?.libelle ?? code
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getPiecesDemandeAchat(idDemandeAchat, idFournisseur, roleHint)
+      .then((rows) => {
+        if (!cancelled) setPieces(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setError('Impossible de charger les pièces complémentaires.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [idDemandeAchat, idFournisseur, roleHint])
+
+  /** Confirmation obligatoire avant toute suppression (décision du 17/09/2026) — voir pieceToDelete. */
+  async function confirmSupprimerPiece() {
+    if (!pieceToDelete) return
+    setError(null)
+    setDeleting(true)
+    try {
+      await removePieceDemandeAchat(idDemandeAchat, pieceToDelete.idPiece, roleHint)
+      // setPieces(next) direct (pas de callback fonctionnel) : appeler onCountChange — un setState
+      // du parent GestionDocumentaireModal — depuis l'intérieur d'un callback de mise à jour de
+      // setPieces déclenchait « Cannot update a component while rendering a different component ».
+      const next = pieces.filter((p) => p.idPiece !== pieceToDelete.idPiece)
+      setPieces(next)
+      onCountChange(next.length)
+      setPieceToDelete(null)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  async function handleTelechargerPiece(piece: PieceJointe) {
+    try {
+      const blob = await downloadPieceDemandeAchatBlob(idDemandeAchat, piece.idPiece, roleHint)
+      triggerBlobDownload(blob, piece.nomFichierOriginal)
+    } catch {
+      setError('Impossible de télécharger la pièce.')
+    }
+  }
+
+  return (
+    <div className="gp-overlay is-open">
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="piecesComplementairesModalTitle" style={{ maxWidth: 560 }}>
+        <div className="gp-modal__hd">
+          <h3 className="gp-modal__title" id="piecesComplementairesModalTitle">
+            Pièces complémentaires
+          </h3>
+          <button className="gp-modal__close" aria-label="Fermer" onClick={onClose}>
+            <svg className="ti">
+              <use href="#i-x" />
+            </svg>
+          </button>
+        </div>
+        <div className="gp-modal__bd gp-scroll stack">
+          <div className="stack" style={{ gap: 2 }}>
+            <span className="gp-help">{objetDa || '—'}</span>
+            <span className="gp-label">{fournisseurLabel}</span>
+          </div>
+
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
+            {!readOnly && (
+              <button type="button" className="gp-btn gp-btn--secondary" onClick={() => setAddModalOpen(true)}>
+                <svg className="ti">
+                  <use href="#i-files" />
+                </svg>
+                Ajouter une pièce complémentaire
+              </button>
+            )}
+          </div>
+
+          {/* table-layout:fixed/minWidth:0 — voir la note historique de ce tableau, reprise à l'identique depuis l'ancienne section inline de GestionDocumentaireModal. */}
+          <div className="gp-table-wrap gp-scroll" style={{ maxHeight: 280, overflowY: 'auto', overflowX: 'hidden' }}>
+            <table className="gp-table" style={{ tableLayout: 'fixed', minWidth: 0, width: '100%' }}>
+              <colgroup>
+                <col style={{ width: 130 }} />
+                <col />
+                <col style={{ width: 80 }} />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>Fichier PDF</th>
+                  <th>Type pièce</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading && (
+                  <tr>
+                    <td colSpan={3}>Chargement…</td>
+                  </tr>
+                )}
+                {!loading &&
+                  pieces.map((p) => (
+                    <tr key={p.idPiece}>
+                      <td title={p.nomFichierOriginal} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {p.nomFichierOriginal}
+                      </td>
+                      <td style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{typePieceLabel(p.typePiece)}</td>
+                      <td>
+                        <div className="gp-rowacts">
+                          <button title="Télécharger" aria-label={`Télécharger ${p.nomFichierOriginal}`} onClick={() => void handleTelechargerPiece(p)}>
+                            <svg className="ti">
+                              <use href="#i-download" />
+                            </svg>
+                          </button>
+                          {!readOnly && (
+                            <button
+                              className="del"
+                              title="Supprimer la pièce"
+                              aria-label={`Supprimer ${p.nomFichierOriginal}`}
+                              onClick={() => setPieceToDelete(p)}
+                            >
+                              <svg className="ti">
+                                <use href="#i-trash" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                {!loading && pieces.length === 0 && (
+                  <tr>
+                    <td colSpan={3}>Aucune pièce complémentaire.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {error && (
+            <p className="gp-errmsg">
+              <svg className="ti">
+                <use href="#i-alert-circle" />
+              </svg>
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="gp-modal__ft">
+          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose}>
+            Retour
+          </button>
+        </div>
+      </div>
+
+      {!readOnly && addModalOpen && (
+        <AddPieceDaModal
+          kind="PIECE_COMPLEMENTAIRE"
+          idDemandeAchat={idDemandeAchat}
+          idFournisseur={idFournisseur}
+          objetDa={objetDa}
+          fournisseurLabel={fournisseurLabel}
+          currentNomFichier={null}
+          roleHint={roleHint}
+          onClose={() => setAddModalOpen(false)}
+          onUploadedPiece={(piece) => {
+            const next = [...pieces, piece]
+            setPieces(next)
+            onCountChange(next.length)
+          }}
+        />
+      )}
+
+      {pieceToDelete && (
+        <div className="gp-overlay is-open">
+          <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="deletePieceDaModalTitle">
+            <div className="gp-modal__hd">
+              <h3 className="gp-modal__title" id="deletePieceDaModalTitle">
+                Supprimer la pièce
+              </h3>
+              <button className="gp-modal__close" aria-label="Fermer" onClick={() => setPieceToDelete(null)}>
+                <svg className="ti">
+                  <use href="#i-x" />
+                </svg>
+              </button>
+            </div>
+            <div className="gp-modal__bd gp-scroll stack">
+              <p>Supprimer définitivement « {pieceToDelete.nomFichierOriginal} » ? Cette action est irréversible.</p>
+            </div>
+            <div className="gp-modal__ft">
+              <button type="button" className="gp-btn gp-btn--secondary" onClick={() => setPieceToDelete(null)}>
+                Annuler
+              </button>
+              <button type="button" className="gp-btn gp-btn--danger" disabled={deleting} onClick={() => void confirmSupprimerPiece()}>
+                {deleting ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

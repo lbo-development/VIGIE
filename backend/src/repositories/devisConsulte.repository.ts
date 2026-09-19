@@ -27,6 +27,9 @@ export interface DevisConsulte {
   id_demande_achat: number
   id_fournisseur: number
   montant_devis: number | null
+  // Délai annoncé par l'entreprise consultée (migration 20260919090000) — affiché sur la
+  // fiche FAD papier générée par la CB, voir demandeAchat.service.ts#genererFadPdf.
+  delai_livraison: string | null
   nom_fichier_original: string | null
   storage_path: string | null
   taille_octets: number | null
@@ -34,7 +37,8 @@ export interface DevisConsulte {
   ordre: number
 }
 
-const SELECT_COLUMNS = 'id_devis, id_demande_achat, id_fournisseur, montant_devis, nom_fichier_original, storage_path, taille_octets, retenu, ordre'
+const SELECT_COLUMNS =
+  'id_devis, id_demande_achat, id_fournisseur, montant_devis, delai_livraison, nom_fichier_original, storage_path, taille_octets, retenu, ordre'
 
 export async function existsForFournisseur(idFournisseur: number): Promise<boolean> {
   const { data, error } = await supabase
@@ -80,6 +84,7 @@ export async function create(input: DevisConsulteCreateInput): Promise<DevisCons
 
 export interface DevisConsulteUpdate {
   montant_devis?: number | null
+  delai_livraison?: string | null
   ordre?: number
   retenu?: boolean
   nom_fichier_original?: string | null

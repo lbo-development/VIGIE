@@ -78,3 +78,10 @@
 .accueil-da-card {
   padding: 10px 16px;
 }
+
+/* Icônes d'action un peu plus grandes que le défaut .gp-rowacts (17px) — décision du 16/09/2026,
+   propre aux cartes DA/FAD (pages/Home.tsx et pages/SuiviRc.tsx) : la taille par défaut du design
+   system reste inchangée partout ailleurs. */
+.accueil-da-card .gp-rowacts button {
+  font-size: 20px;
+}

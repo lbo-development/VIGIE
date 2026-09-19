@@ -130,6 +130,7 @@ export function Home() {
   const [daToDelete, setDaToDelete] = useState<DemandeAchatRow | null>(null)
   const [gestionDocumentaireDa, setGestionDocumentaireDa] = useState<DemandeAchatRow | null>(null)
   const [historiqueDa, setHistoriqueDa] = useState<DemandeAchatRow | null>(null)
+  const [confirmTransmettreDa, setConfirmTransmettreDa] = useState<DemandeAchatRow | null>(null)
 
   async function handleNouvelleDemande() {
     if (!matricule) return
@@ -152,6 +153,7 @@ export function Home() {
     setTransmettingId(da.id_demande_achat)
     try {
       await transmettreRc(da.id_demande_achat)
+      setConfirmTransmettreDa(null)
       refetchAll()
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
@@ -245,14 +247,22 @@ export function Home() {
               </div>
             </div>
 
-            {activeTab === 'A_FINALISER' && (
-              <button type="button" className="gp-btn gp-btn--primary" disabled={!matricule || creating} onClick={() => void handleNouvelleDemande()}>
-                {creating ? 'Création…' : 'Nouvelle demande'}
+            <div className="row">
+              <button type="button" className="gp-btn gp-btn--neutral gp-btn--icon" aria-label="Actualiser la liste" onClick={() => refetchAll()}>
+                <svg className="ti">
+                  <use href="#i-refresh" />
+                </svg>
               </button>
-            )}
+              {activeTab === 'A_FINALISER' && (
+                <button type="button" className="gp-btn gp-btn--primary" disabled={!matricule || creating} onClick={() => void handleNouvelleDemande()}>
+                  {creating ? 'Création…' : 'Nouvelle demande'}
+                </button>
+              )}
+            </div>
           </div>
 
-          {actionError && (
+          {/* La confirmation de transmission (confirmTransmettreDa) affiche actionError elle-même — éviter le doublon ici. */}
+          {actionError && !confirmTransmettreDa && (
             <p className="gp-errmsg">
               <svg className="ti">
                 <use href="#i-alert-circle" />
@@ -314,11 +324,7 @@ export function Home() {
                             </button>
                           </span>
                           <span className="gp-tip" data-tip="Transmettre au RC">
-                            <button
-                              aria-label="Transmettre au RC"
-                              disabled={transmettingId === da.id_demande_achat}
-                              onClick={() => void handleTransmettreRc(da)}
-                            >
+                            <button aria-label="Transmettre au RC" onClick={() => setConfirmTransmettreDa(da)}>
                               <svg className="ti">
                                 <use href="#i-log-out" />
                               </svg>
@@ -426,6 +432,55 @@ export function Home() {
             refetchAll()
           }}
         />
+      )}
+
+      {confirmTransmettreDa && (
+        <div className="gp-overlay is-open">
+          <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="transmettreRcModalTitle">
+            <div className="gp-modal__hd">
+              <h3 className="gp-modal__title" id="transmettreRcModalTitle">
+                Transmettre au RC
+              </h3>
+              <button className="gp-modal__close" aria-label="Fermer" onClick={() => setConfirmTransmettreDa(null)}>
+                <svg className="ti">
+                  <use href="#i-x" />
+                </svg>
+              </button>
+            </div>
+            <div className="gp-modal__bd gp-scroll stack">
+              <p>
+                Transmettre la DA {confirmTransmettreDa.numero} ({confirmTransmettreDa.objet_rc || 'sans objet'}) au RC ?
+                Vous ne pourrez plus la modifier tant qu'elle n'aura pas été renvoyée pour complément.
+              </p>
+              {actionError && (
+                <p className="gp-errmsg">
+                  <svg className="ti">
+                    <use href="#i-alert-circle" />
+                  </svg>
+                  {actionError}
+                </p>
+              )}
+            </div>
+            <div className="gp-modal__ft">
+              <button
+                type="button"
+                className="gp-btn gp-btn--secondary"
+                onClick={() => setConfirmTransmettreDa(null)}
+                disabled={transmettingId === confirmTransmettreDa.id_demande_achat}
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                className="gp-btn gp-btn--primary"
+                onClick={() => void handleTransmettreRc(confirmTransmettreDa)}
+                disabled={transmettingId === confirmTransmettreDa.id_demande_achat}
+              >
+                {transmettingId === confirmTransmettreDa.id_demande_achat ? 'Transmission…' : 'Transmettre'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {gestionDocumentaireDa && gestionDocumentaireDa.id_fournisseur_retenu !== null && (

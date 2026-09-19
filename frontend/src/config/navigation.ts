@@ -31,40 +31,72 @@ export interface NavItem {
  *
  * Règle générale (30/08/2026) : chaque onglet du header est associé à son
  * propre contenu de sidebar (liste vide si aucun, comme "Fournisseurs" et
- * "Accueil" ci-dessous) — jamais partagé entre deux onglets. C'est pour ça
+ * "Mes demandes" ci-dessous) — jamais partagé entre deux onglets. C'est pour ça
  * que "Fournisseurs" vit sur `/fournisseurs` et non `/parametres/fournisseurs`
  * (renommé le 30/08/2026) : rester sous `/parametres/...` aurait fait
  * apparaître à tort la sidebar de "Paramètres" sur cette page, `isParametresSection`
  * ne faisant qu'un test de préfixe sur le chemin.
+ *
+ * "Mes demandes" (décision du 17/09/2026) : sorti de la sidebar "Accueil"
+ * pour devenir son propre onglet, juste après "Accueil" — `/` (Accueil)
+ * redirige désormais vers la page de suivi du rôle actif de l'utilisateur
+ * (AccueilRedirect.tsx), "Mes demandes" (`/mes-demandes`, pages/Home.tsx)
+ * restant accessible en permanence à tout utilisateur, avec ou sans rôle.
  */
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Accueil', icon: 'i-home' },
+  { to: '/mes-demandes', label: 'Mes demandes', icon: '' },
   { to: '/marches', label: 'Marchés', icon: '' },
   { to: '/commandes', label: 'Commandes PGI', icon: '' },
   { to: '/investissements', label: 'Investissements', icon: '' },
   { to: '/fournisseurs', label: 'Fournisseurs', icon: '' },
+  { to: '/manuel', label: 'Manuel', icon: '' },
 ]
 
 /**
- * Contenu de la sidebar de la section "Accueil" (écran de suivi RC, décision
- * du 15/09/2026) — construite à l'exécution plutôt que filtrée depuis un
- * tableau statique (seule fonction de ce fichier dans ce cas) : le libellé
- * dépend d'une donnée runtime (le nom de la cellule du rôle RC), pas
- * seulement d'une combinaison de booléens de rôle comme les autres filtres
- * ci-dessous. Masquée pour qui n'a pas de rôle RC actif (titulaire ou
- * suppléant — `currentUser.roles` vient déjà de roleEffectifService côté
+ * Contenu de la sidebar de la section "Accueil" (décision du 16/09/2026,
+ * étend le chantier écran de suivi RC du 15/09/2026 ; "Mes demandes d'achat"
+ * sorti de cette liste le 17/09/2026 — devenu son propre onglet du header,
+ * voir NAV_ITEMS et AccueilRedirect.tsx) — construite à l'exécution plutôt
+ * que filtrée depuis un tableau statique (seule fonction de ce fichier dans
+ * ce cas) : le libellé de chaque item dépend d'une donnée runtime (le nom de
+ * la cellule/du service du rôle), pas seulement d'une combinaison de
+ * booléens de rôle comme les autres filtres ci-dessous.
+ *
+ * Une entrée par rôle actif de l'utilisateur courant, chacune pointant vers
+ * l'écran de suivi propre à ce rôle : RC ("FAD — <cellule>") et, depuis le
+ * 16/09/2026, CDS ("FAD (N+2) — <service>", préfixe distinct de RC pour
+ * qu'un agent cumulant les deux rôles distingue les deux entrées au premier
+ * coup d'œil) — masquées sans le rôle correspondant actif, titulaire ou
+ * suppléant (`currentUser.roles` vient déjà de roleEffectifService côté
  * serveur, voir me.service.ts#getCurrentUser, donc couvre la suppléance sans
- * traitement supplémentaire ici).
+ * traitement supplémentaire ici) ; liste vide sans aucun rôle (l'utilisateur
+ * est alors redirigé vers "Mes demandes" par AccueilRedirect.tsx, jamais
+ * vers cette section). Un futur écran de suivi CB/DS rejoindrait cette même
+ * liste plutôt que d'ajouter un mécanisme parallèle.
+ *
+ * Icône par rôle (décision du 17/09/2026, nomenclature #iv-xxx — voir
+ * assets/icons-vigie.svg pour l'exception documentée au sprite GPMM) : une
+ * icône dédiée par rôle pour distinguer les rôles au premier coup d'œil dans
+ * la sidebar (utile en particulier pour un acteur qui cumule plusieurs
+ * rôles). #iv-cb/#iv-ds existent déjà dans le sprite — #iv-cb utilisée
+ * depuis le 18/09/2026 (écran de suivi CB), #iv-ds prête pour le futur écran
+ * de suivi DS (pas encore construit).
  */
 export function getAccueilSidebarItems(currentUser: MeResponse | null): NavItem[] {
+  const items: NavItem[] = []
   const rcRole = currentUser?.roles.find((r) => r.typeRole === 'RC')
-  if (!rcRole) return []
-  return [{ to: '/suivi-rc', label: `FAD — ${rcRole.perimeterLabel ?? ''}`, icon: '' }]
+  if (rcRole) items.push({ to: '/suivi-rc', label: `FAD — ${rcRole.perimeterLabel ?? ''}`, icon: 'iv-rc' })
+  const cdsRole = currentUser?.roles.find((r) => r.typeRole === 'CDS')
+  if (cdsRole) items.push({ to: '/suivi-cds', label: `FAD (N+2) — ${cdsRole.perimeterLabel ?? ''}`, icon: 'iv-cds' })
+  const cbRole = currentUser?.roles.find((r) => r.typeRole === 'CB')
+  if (cbRole) items.push({ to: '/suivi-cb', label: `FAD (CB) — ${cbRole.perimeterLabel ?? ''}`, icon: 'iv-cb' })
+  return items
 }
 
-/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC — voir AppShell.tsx). */
+/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC + suivi CDS + suivi CB — voir AppShell.tsx). */
 export function isHomeSection(pathname: string): boolean {
-  return pathname === '/' || pathname.startsWith('/suivi-rc')
+  return pathname === '/' || pathname.startsWith('/suivi-rc') || pathname.startsWith('/suivi-cds') || pathname.startsWith('/suivi-cb')
 }
 
 /**
@@ -193,6 +225,28 @@ export function filterInvestissementsSidebarItems(
   return items.filter((item) => item.label !== 'Importation investissements PGI')
 }
 
+/**
+ * Racine de la section "Manuel" (16/09/2026) — manuel d'utilisation HTML
+ * rédigé au fil du développement (un fichier par module fonctionnel, voir
+ * frontend/src/assets/manuel/*.html et pages/Manuel.tsx), accessible aux
+ * utilisateurs authentifiés comme n'importe quelle autre page de l'app —
+ * pas de route publique dédiée, ni de fichier statique servi hors de
+ * l'authentification.
+ */
+export const MANUEL_SECTION_PATH = '/manuel'
+
+/**
+ * Un item par module documenté — ajouter une entrée ici en même temps que
+ * le fichier frontend/src/assets/manuel/<slug>.html correspondant (voir
+ * pages/Manuel.tsx, qui charge le contenu par le même slug).
+ */
+export const MANUEL_SIDEBAR_ITEMS: NavItem[] = [{ to: '/manuel/accueil', label: 'Accueil', icon: '' }]
+
+/** Vrai si la route courante appartient à la section "Manuel" (voir AppShell.tsx). */
+export function isManuelSection(pathname: string): boolean {
+  return pathname === MANUEL_SECTION_PATH || pathname.startsWith(`${MANUEL_SECTION_PATH}/`)
+}
+
 /** Racine de la section "Paramètres" (voir `isParametresSection`). */
 export const PARAMETRES_SECTION_PATH = '/parametres'
 
@@ -223,6 +277,10 @@ export const PARAMETRES_ITEMS: NavItem[] = [
   // 10/09/2026, ForClaude/CDC/mot-phases-1-2.md.
   { to: '/parametres/utilisateurs', label: 'Utilisateurs', icon: '', separatorBefore: true },
   { to: '/parametres/roles', label: 'Rôles', icon: '' },
+  // Signatures (dépôt/remplacement de l'image de signature d'un acteur, ADMIN_APP +
+  // ADMIN_SERVICE scopé à son service, même périmètre que Rôles) — décision du 19/09/2026,
+  // alimente la fiche FAD papier générée par la CB (demandeAchat.service.ts#genererFadPdf).
+  { to: '/parametres/signatures', label: 'Signatures', icon: '' },
   { to: '/parametres/reglages', label: 'Réglages', icon: '', separatorBefore: true },
 ]
 

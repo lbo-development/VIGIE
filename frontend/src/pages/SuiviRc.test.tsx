@@ -21,6 +21,7 @@ const DA_A_TRAITER: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
   code_site: null,
@@ -37,6 +38,7 @@ const DA_A_TRAITER: DemandeAchatRow = {
   updated_at: '2026-09-08T10:00:00Z',
 }
 
+const DA_VALIDEE: DemandeAchatRow = { ...DA_A_TRAITER, id_demande_achat: 5, numero: '2026-09-09-001', code_statut: 'DA_VALIDEE_RC' }
 const EN_COURS: DemandeAchatRow = { ...DA_A_TRAITER, id_demande_achat: 2, numero: '2026-09-07-001', code_statut: 'FAD_TRANSMISE_RC_CDS' }
 const FAD_COMMANDEE: DemandeAchatRow = { ...DA_A_TRAITER, id_demande_achat: 3, numero: '2026-08-01-001', code_statut: 'FAD_COMMANDEE' }
 const DA_REJETEE: DemandeAchatRow = { ...DA_A_TRAITER, id_demande_achat: 4, numero: '2026-08-02-001', code_statut: 'DA_REJETEE_RC' }
@@ -50,6 +52,7 @@ let currentUserData: MeResponse | null = null
 const listMock = vi.fn()
 const syntheseMock = vi.fn()
 const decisionRcMock = vi.fn()
+const devaliderRcMock = vi.fn()
 const transmettreFadMock = vi.fn()
 const retransmettreCbMock = vi.fn()
 const getHistoriqueMock = vi.fn()
@@ -108,12 +111,16 @@ vi.mock('../hooks/useCug', () => ({
 vi.mock('../hooks/useInvestissementsPgi', () => ({
   useInvestissementsPgi: () => ({ investissements: [], loading: false }),
 }))
+const enregistrerFadMock = vi.fn()
+
 vi.mock('../hooks/useDemandeAchat', () => ({
   useDemandeAchatList: (...args: unknown[]) => listMock(...args),
   useAccueilSynthese: (...args: unknown[]) => syntheseMock(...args),
   decisionRc: (...args: unknown[]) => decisionRcMock(...args),
+  devaliderRc: (...args: unknown[]) => devaliderRcMock(...args),
   transmettreFad: (...args: unknown[]) => transmettreFadMock(...args),
   retransmettreCb: (...args: unknown[]) => retransmettreCbMock(...args),
+  enregistrerFad: (...args: unknown[]) => enregistrerFadMock(...args),
   getHistoriqueStatuts: (...args: unknown[]) => getHistoriqueMock(...args),
   updateDemandeAchat: (...args: unknown[]) => updateMock(...args),
   selectMarcheDemandeAchat: (...args: unknown[]) => selectMarcheMock(...args),
@@ -132,6 +139,24 @@ vi.mock('../hooks/useDemandeAchat', () => ({
   deleteDemandeAchat: (...args: unknown[]) => deleteMock(...args),
 }))
 
+/**
+ * Une instance de refetch stable par scope (contrairement à un `vi.fn()` frais à chaque rendu) —
+ * permet aux tests d'observer qu'« Enregistrer » (TraiterFadRcModal, sans fermer la modale)
+ * rafraîchit bien les listes en tâche de fond via `onProgressSaved`/`refetchAll`.
+ */
+const refetchMocks: Record<AccueilScope, ReturnType<typeof vi.fn>> = {
+  A_FINALISER: vi.fn(),
+  SUIVI_FAD: vi.fn(),
+  A_TRAITER: vi.fn(),
+  EN_COURS: vi.fn(),
+  A_TRAITER_CDS: vi.fn(),
+  EN_COURS_CDS: vi.fn(),
+  A_TRAITER_CB: vi.fn(),
+  EN_COURS_CB: vi.fn(),
+  FAD_COMMANDEES: vi.fn(),
+  REJETEES_ANNULEES: vi.fn(),
+}
+
 /** Route listMock par `params.scope` — même principe que pages/Home.test.tsx. */
 function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) {
   const byScope: Record<AccueilScope, DemandeAchatRow[]> = {
@@ -139,6 +164,10 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
     SUIVI_FAD: [],
     A_TRAITER: [],
     EN_COURS: [],
+    A_TRAITER_CDS: [],
+    EN_COURS_CDS: [],
+    A_TRAITER_CB: [],
+    EN_COURS_CB: [],
     FAD_COMMANDEES: [],
     REJETEES_ANNULEES: [],
     ...overrides,
@@ -147,7 +176,7 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
     demandesAchat: params.scope ? byScope[params.scope] : [],
     loading: false,
     error: null,
-    refetch: vi.fn(),
+    refetch: params.scope ? refetchMocks[params.scope] : vi.fn(),
   }))
 }
 
@@ -155,6 +184,7 @@ beforeEach(() => {
   listMock.mockReset()
   syntheseMock.mockReset().mockReturnValue({ data: SYNTHESE_VIDE, loading: false, error: null, refetch: vi.fn() })
   decisionRcMock.mockReset()
+  devaliderRcMock.mockReset()
   transmettreFadMock.mockReset()
   retransmettreCbMock.mockReset()
   getHistoriqueMock.mockReset().mockResolvedValue([])
@@ -173,6 +203,8 @@ beforeEach(() => {
   removePieceMock.mockReset()
   downloadPieceBlobMock.mockReset()
   deleteMock.mockReset()
+  enregistrerFadMock.mockReset()
+  Object.values(refetchMocks).forEach((m) => m.mockReset())
 
   mockLists({ A_TRAITER: [DA_A_TRAITER] })
   currentUserData = {
@@ -248,48 +280,53 @@ describe('SuiviRc — onglets', () => {
 })
 
 describe('SuiviRc — actions par ligne', () => {
-  it('sur "À traiter", propose Traiter/Gestion documentaire (désactivée sans fournisseur)/Voir/Historique', () => {
+  it('sur "À traiter", pour DA_TRANSMISE_DEM_RC, propose "Valider les éléments de la commande"/Historique — pas Traiter', () => {
     render(<SuiviRc />)
     const row = within(screen.getByText('2026-09-08-001').closest('article')!)
 
-    expect(row.getByRole('button', { name: 'Traiter la demande' })).toBeInTheDocument()
-    expect(row.getByRole('button', { name: 'Gérer les documents liés à la demande' })).toBeDisabled()
-    expect(row.getByRole('button', { name: 'Voir les éléments de la demande' })).toBeInTheDocument()
+    expect(row.queryByRole('button', { name: 'Traiter la demande' })).not.toBeInTheDocument()
+    expect(row.getByRole('button', { name: 'Valider les éléments de la commande' })).toBeInTheDocument()
     expect(row.getByRole('button', { name: 'Historique des statuts' })).toBeInTheDocument()
   })
 
-  it('sur les autres onglets, pas de bouton Traiter ni Gestion documentaire', () => {
+  it('sur "À traiter", pour DA_VALIDEE_RC, propose Traiter ET "Valider les éléments de la commande" (pour Dévalider)', () => {
+    mockLists({ A_TRAITER: [DA_VALIDEE] })
+    render(<SuiviRc />)
+    const row = within(screen.getByText('2026-09-09-001').closest('article')!)
+
+    expect(row.getByRole('button', { name: 'Traiter la demande' })).toBeInTheDocument()
+    expect(row.getByRole('button', { name: 'Valider les éléments de la commande' })).toBeInTheDocument()
+  })
+
+  it('sur les autres onglets, pas de bouton Traiter, "Voir les éléments de la demande" (pas renommé)', () => {
     mockLists({ EN_COURS: [EN_COURS] })
     render(<SuiviRc />)
     fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
     const row = within(screen.getByText('2026-09-07-001').closest('article')!)
 
     expect(row.queryByRole('button', { name: 'Traiter la demande' })).not.toBeInTheDocument()
-    expect(row.queryByRole('button', { name: 'Gérer les documents liés à la demande' })).not.toBeInTheDocument()
     expect(row.getByRole('button', { name: 'Voir les éléments de la demande' })).toBeInTheDocument()
   })
 
-  it('"Gestion documentaire" ouvre la modale en modification quand un fournisseur est retenu', () => {
-    const daAvecFournisseur = { ...DA_A_TRAITER, id_fournisseur_retenu: 42 }
-    mockLists({ A_TRAITER: [daAvecFournisseur] })
+  it('"Voir les éléments de la demande" (statuts hors décision) ouvre la DA en lecture seule (pied de modale réduit à "Fermer")', () => {
+    mockLists({ EN_COURS: [EN_COURS] })
     render(<SuiviRc />)
-    const row = within(screen.getByText('2026-09-08-001').closest('article')!)
-
-    expect(row.getByRole('button', { name: 'Gérer les documents liés à la demande' })).toBeEnabled()
-    fireEvent.click(row.getByRole('button', { name: 'Gérer les documents liés à la demande' }))
-
-    expect(screen.getByRole('dialog', { name: 'Gestion documentaire' })).toBeInTheDocument()
-  })
-
-  it('"Voir" ouvre la DA en lecture seule (pied de modale réduit à "Fermer")', () => {
-    render(<SuiviRc />)
-    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
+    fireEvent.click(within(screen.getByText('2026-09-07-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
 
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     // Pied de modale readOnly : "Fermer" (pas "Retour"), sans "Enregistrer" — deux boutons portent
     // ce nom accessible (la croix ✕ et le pied de modale), d'où getAllByRole.
     expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(2)
     expect(screen.queryByRole('button', { name: 'Enregistrer' })).not.toBeInTheDocument()
+  })
+
+  it('"Valider les éléments de la commande" ouvre ValiderCommandeRcModal pour DA_TRANSMISE_DEM_RC/DA_VALIDEE_RC', () => {
+    render(<SuiviRc />)
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Valider les éléments de la commande' }))
+
+    expect(screen.getByText(/Valider les éléments de la commande/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Valider' })).toBeInTheDocument()
   })
 
   it('"Historique" ouvre la modale d\'historique des statuts', () => {
@@ -299,10 +336,30 @@ describe('SuiviRc — actions par ligne', () => {
     expect(screen.getByRole('dialog', { name: /Historique des statuts/ })).toBeInTheDocument()
   })
 
-  it('"Traiter" ouvre la modale adaptative TraiterFadRcModal selon le statut de la ligne', () => {
+  it('"Traiter" ouvre la modale de complétion/transmission pour DA_VALIDEE_RC', () => {
+    mockLists({ A_TRAITER: [DA_VALIDEE] })
     render(<SuiviRc />)
-    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Traiter la demande' }))
+    fireEvent.click(within(screen.getByText('2026-09-09-001').closest('article')!).getByRole('button', { name: 'Traiter la demande' }))
 
-    expect(screen.getByText(/Statuer sur l'opportunité/)).toBeInTheDocument()
+    expect(screen.getByText(/Compléter et transmettre au CDS/)).toBeInTheDocument()
+  })
+
+  it('« Enregistrer » (complétion FAD) ne ferme pas la modale et rafraîchit les listes en tâche de fond — évite l\'affichage de données obsolètes à la réouverture', async () => {
+    mockLists({ A_TRAITER: [DA_VALIDEE] })
+    enregistrerFadMock.mockResolvedValue({ ...DA_VALIDEE, code_site: 'S1' })
+    render(<SuiviRc />)
+    fireEvent.click(within(screen.getByText('2026-09-09-001').closest('article')!).getByRole('button', { name: 'Traiter la demande' }))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await screen.findByText('Enregistré.')
+    // Contrairement à « Transmettre au CDS », la modale reste ouverte.
+    expect(screen.getByText(/Compléter et transmettre au CDS/)).toBeInTheDocument()
+    // Les listes sont rafraîchies en tâche de fond (refetchAll) — sinon rouvrir cette même ligne
+    // après « Retour » réafficherait encore ses anciennes valeurs.
+    expect(refetchMocks.A_TRAITER).toHaveBeenCalled()
+    expect(refetchMocks.EN_COURS).toHaveBeenCalled()
+    expect(refetchMocks.FAD_COMMANDEES).toHaveBeenCalled()
+    expect(refetchMocks.REJETEES_ANNULEES).toHaveBeenCalled()
   })
 })

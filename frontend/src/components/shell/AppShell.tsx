@@ -12,6 +12,7 @@ import {
   MARCHES_SIDEBAR_ITEMS,
   COMMANDES_SIDEBAR_ITEMS,
   INVESTISSEMENTS_SIDEBAR_ITEMS,
+  MANUEL_SIDEBAR_ITEMS,
   filterParametresItems,
   filterMarchesSidebarItems,
   filterCommandesSidebarItems,
@@ -22,6 +23,7 @@ import {
   isMarchesSection,
   isCommandesSection,
   isInvestissementsSection,
+  isManuelSection,
   isParametresSection,
 } from '../../config/navigation'
 import { Header } from './Header'
@@ -95,6 +97,7 @@ export function AppShell() {
   const inMarchesSection = isMarchesSection(location.pathname)
   const inCommandesSection = isCommandesSection(location.pathname)
   const inInvestissementsSection = isInvestissementsSection(location.pathname)
+  const inManuelSection = isManuelSection(location.pathname)
   const inParametresSection = isParametresSection(location.pathname)
   const sidebarItems = inHomeSection
     ? accueilItems
@@ -104,9 +107,11 @@ export function AppShell() {
         ? commandesItems
         : inInvestissementsSection
           ? investissementsItems
-          : inParametresSection
-            ? parametresItems
-            : []
+          : inManuelSection
+            ? MANUEL_SIDEBAR_ITEMS
+            : inParametresSection
+              ? parametresItems
+              : []
 
   const inactivityDelayMinutes = useParametre(
     'auth.inactivite_delai_minutes',

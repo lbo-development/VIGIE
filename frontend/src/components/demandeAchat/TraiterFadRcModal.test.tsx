@@ -20,6 +20,7 @@ const DA: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
   code_site: null,
@@ -31,21 +32,42 @@ const DA: DemandeAchatRow = {
   nummarche: null,
   id_marche_tiers: null,
   id_fournisseur_retenu: 42,
-  code_statut: 'DA_TRANSMISE_DEM_RC',
+  code_statut: 'DA_VALIDEE_RC',
   created_at: '2026-09-08T10:00:00Z',
   updated_at: '2026-09-08T10:00:00Z',
 }
 
-const decisionRcMock = vi.fn()
 const transmettreFadMock = vi.fn()
 const retransmettreCbMock = vi.fn()
+const enregistrerFadMock = vi.fn()
 const getHistoriqueMock = vi.fn()
+const getConsultationMock = vi.fn()
+const getPiecesMock = vi.fn()
 
 vi.mock('../../hooks/useDemandeAchat', () => ({
-  decisionRc: (...args: unknown[]) => decisionRcMock(...args),
   transmettreFad: (...args: unknown[]) => transmettreFadMock(...args),
   retransmettreCb: (...args: unknown[]) => retransmettreCbMock(...args),
+  enregistrerFad: (...args: unknown[]) => enregistrerFadMock(...args),
   getHistoriqueStatuts: (...args: unknown[]) => getHistoriqueMock(...args),
+  // GestionDocumentaireModal (rendue à l'intérieur de la modale, ouverte via le bouton "Gestion
+  // documentaire") importe tout ce module — ces exports doivent exister même non exercés ici, sinon
+  // la modale plante au montage ("n'est pas une fonction"). Couverture détaillée de son propre
+  // comportement déjà assurée ailleurs (Home.test.tsx, via DemandeAchatModal).
+  updateDemandeAchat: vi.fn(),
+  selectMarcheDemandeAchat: vi.fn(),
+  getConsultationDemandeAchat: (...args: unknown[]) => getConsultationMock(...args),
+  addConsultationCandidat: vi.fn(),
+  removeConsultationCandidat: vi.fn(),
+  saveConsultationDemandeAchat: vi.fn(),
+  getOrCreateMarcheDevis: vi.fn(),
+  uploadDevisFile: vi.fn(),
+  downloadDevisFileBlob: vi.fn(),
+  deleteDevisFile: vi.fn(),
+  getPiecesDemandeAchat: (...args: unknown[]) => getPiecesMock(...args),
+  addPieceDemandeAchat: vi.fn(),
+  removePieceDemandeAchat: vi.fn(),
+  downloadPieceDemandeAchatBlob: vi.fn(),
+  deleteDemandeAchat: vi.fn(),
 }))
 
 vi.mock('../../hooks/useFournisseurs', () => ({
@@ -76,10 +98,75 @@ vi.mock('../../hooks/useCug', () => ({
 vi.mock('../../hooks/useInvestissementsPgi', () => ({
   useInvestissementsPgi: () => ({
     investissements: [
-      { numero_operation: 'OP001', libelle: 'Opération 1', libelle_service: 'Opération 1', id_service: 10, code_cug: 'CUG1', statut: 'ACTIF', actif: true, utilisable: true },
+      {
+        numero_operation: 'OP001',
+        libelle: 'Opération 1',
+        libelle_service: 'Rénovation quai 3',
+        id_service: 10,
+        code_cug: 'CUG1',
+        statut: 'ACTIF',
+        actif: true,
+        utilisable: true,
+        mt_initial: 100000,
+        mt_travaux: 80000,
+        mt_fesi: 20000,
+        mt_budget_ap1: 10000,
+        mt_engage_ap1: 0,
+        mt_liquide_ap1: 0,
+        mt_solde_ap1: 10000,
+        mt_budget_ap8: 20000,
+        mt_engage_ap8: 0,
+        mt_liquide_ap8: 0,
+        mt_solde_ap8: 20000,
+        mt_budget_cp1: 30000,
+        mt_engage_cp1: 0,
+        mt_liquide_cp1: 0,
+        mt_solde_cp1: 30000,
+        mt_budget_cp8: 40000,
+        mt_engage_cp8: 0,
+        mt_liquide_cp8: 0,
+        mt_solde_cp8: 40000,
+        nombre_pieces: 0,
+      },
+      {
+        numero_operation: 'OP002',
+        libelle: 'Opération 2',
+        libelle_service: 'Réfection voie B',
+        id_service: 10,
+        code_cug: 'CUG1',
+        statut: 'ACTIF',
+        actif: true,
+        utilisable: false,
+        mt_initial: 50000,
+        mt_travaux: 40000,
+        mt_fesi: 10000,
+        mt_budget_ap1: 5000,
+        mt_engage_ap1: 0,
+        mt_liquide_ap1: 0,
+        mt_solde_ap1: 5000,
+        mt_budget_ap8: 5000,
+        mt_engage_ap8: 0,
+        mt_liquide_ap8: 0,
+        mt_solde_ap8: 5000,
+        mt_budget_cp1: 5000,
+        mt_engage_cp1: 0,
+        mt_liquide_cp1: 0,
+        mt_solde_cp1: 5000,
+        mt_budget_cp8: 5000,
+        mt_engage_cp8: 0,
+        mt_liquide_cp8: 0,
+        mt_solde_cp8: 5000,
+        nombre_pieces: 0,
+      },
     ],
     loading: false,
   }),
+}))
+vi.mock('../../hooks/useServices', () => ({
+  useServices: () => ({ services: [{ id_service: 10, code_service: 'S1', libelle_service: 'Service Voyageurs', id_direction: 1, actif: true }], loading: false }),
+}))
+vi.mock('../../hooks/useLibelleReferentiel', () => ({
+  useLibelleReferentiel: () => ({ items: [], loading: false }),
 }))
 
 function selectComboboxOption(ariaLabel: string, optionText: string) {
@@ -89,68 +176,49 @@ function selectComboboxOption(ariaLabel: string, optionText: string) {
   fireEvent.click(within(menu).getByText(optionText))
 }
 
+const CHAMPS_OBLIGATOIRES = { codeSite: 'S1', codeSecteur: 'SEC1', codeCug: 'CUG1', typeAchat: 'FOURNITURES', typeFad: 'FERMEE', imputationComptable: 'FONCTIONNEMENT' }
+
+function remplirChampsObligatoires() {
+  selectComboboxOption('Site', 'Site Nord')
+  selectComboboxOption('Secteur', 'Secteur Nord')
+  selectComboboxOption('CUG', 'CUG1 — Fournitures bureau')
+  selectComboboxOption("Type d'achat", 'Fournitures')
+  selectComboboxOption('Type de FAD', 'Fermée (action unique, prix forfaitaire)')
+  selectComboboxOption('Imputation comptable', 'Fonctionnement')
+}
+
 beforeEach(() => {
-  decisionRcMock.mockReset()
   transmettreFadMock.mockReset()
   retransmettreCbMock.mockReset()
+  enregistrerFadMock.mockReset()
   getHistoriqueMock.mockReset().mockResolvedValue([])
+  getConsultationMock.mockReset().mockResolvedValue([])
+  getPiecesMock.mockReset().mockResolvedValue([])
 })
 
-describe('TraiterFadRcModal — DA_TRANSMISE_DEM_RC (décision)', () => {
-  it('affiche le résumé lecture seule (objet, montant, procédure, fournisseur)', () => {
+describe('TraiterFadRcModal — DA_VALIDEE_RC/FAD_A_COMPLETER_CDS (complétion + transmission au CDS)', () => {
+  it('refuse la transmission sans les champs obligatoires', async () => {
     render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
-
-    expect(screen.getByDisplayValue('Achat de fournitures diverses')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('1 200,00 €')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Hors marché')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('ACME')).toBeInTheDocument()
-  })
-
-  it('refuse Rejeter sans commentaire', async () => {
-    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Rejeter' }))
-
-    expect(await screen.findByText('Un commentaire est requis pour justifier ce choix.')).toBeInTheDocument()
-    expect(decisionRcMock).not.toHaveBeenCalled()
-  })
-
-  it('Valider ne nécessite aucun commentaire et appelle decisionRc', async () => {
-    const onSaved = vi.fn()
-    decisionRcMock.mockResolvedValue(DA)
-    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={onSaved} />)
-
-    fireEvent.click(screen.getByRole('button', { name: 'Valider' }))
-
-    await waitFor(() => expect(decisionRcMock).toHaveBeenCalledWith(1, { decision: 'VALIDER', commentaireStatut: undefined }))
-    expect(onSaved).toHaveBeenCalled()
-  })
-
-  it('Rejeter avec commentaire transmet le motif', async () => {
-    decisionRcMock.mockResolvedValue(DA)
-    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
-
-    fireEvent.change(screen.getByLabelText('Commentaire (obligatoire sauf pour Valider)'), { target: { value: 'Hors budget' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Rejeter' }))
-
-    await waitFor(() => expect(decisionRcMock).toHaveBeenCalledWith(1, { decision: 'REJETER', commentaireStatut: 'Hors budget' }))
-  })
-})
-
-describe('TraiterFadRcModal — DA_VALIDEE_RC (complétion + transmission au CDS)', () => {
-  const DA_VALIDEE: DemandeAchatRow = { ...DA, code_statut: 'DA_VALIDEE_RC' }
-
-  it('refuse la transmission sans les champs obligatoires (site/secteur/CUG/type achat/imputation)', async () => {
-    render(<TraiterFadRcModal demandeAchat={DA_VALIDEE} onClose={vi.fn()} onSaved={vi.fn()} />)
 
     fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
 
-    expect(await screen.findByText("Site, secteur, CUG, type d'achat et imputation comptable sont obligatoires.")).toBeInTheDocument()
+    expect(
+      await screen.findByText('Site, secteur, CUG, type d\'achat, type de FAD et imputation comptable sont obligatoires.'),
+    ).toBeInTheDocument()
     expect(transmettreFadMock).not.toHaveBeenCalled()
   })
 
+  it('affiche Motif du choix en Hors Marché, masqué en Marché', () => {
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Motif du choix' })).toBeInTheDocument()
+
+    const daMarche: DemandeAchatRow = { ...DA, procedure_achat: 'MARCHE' }
+    render(<TraiterFadRcModal demandeAchat={daMarche} onClose={vi.fn()} onSaved={vi.fn()} />)
+    expect(screen.getAllByRole('button', { name: 'Motif du choix' })).toHaveLength(1) // le second rendu n'en ajoute pas
+  })
+
   it("n'affiche le champ Numéro d'opération que pour une imputation Investissement", () => {
-    render(<TraiterFadRcModal demandeAchat={DA_VALIDEE} onClose={vi.fn()} onSaved={vi.fn()} />)
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
 
     expect(screen.queryByLabelText("Numéro d'opération")).not.toBeInTheDocument()
 
@@ -159,33 +227,105 @@ describe('TraiterFadRcModal — DA_VALIDEE_RC (complétion + transmission au CDS
     expect(screen.getByLabelText("Numéro d'opération")).toBeInTheDocument()
   })
 
-  it('remplit le formulaire et transmet au CDS via transmettreFad', async () => {
+  it('sélectionne le numéro d\'opération via la modale dédiée, limitée aux opérations utilisables, avec recherche', async () => {
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    selectComboboxOption('Imputation comptable', 'Investissement')
+    fireEvent.click(screen.getByLabelText("Numéro d'opération"))
+
+    const dialog = await screen.findByRole('dialog', { name: /Sélectionner une opération d'investissement/ })
+    expect(within(dialog).getByText('OP001')).toBeInTheDocument()
+    // OP002 n'est pas UTILISABLE — absente de la liste.
+    expect(within(dialog).queryByText('OP002')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('80 000 €')).toBeInTheDocument() // Montant travaux
+
+    fireEvent.change(within(dialog).getByLabelText('Recherche sur numéro, libellé opération'), { target: { value: 'quai' } })
+    expect(within(dialog).getByText('Rénovation quai 3')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByText('OP001'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Enregistrer' }))
+
+    expect(screen.queryByRole('dialog', { name: /Sélectionner une opération d'investissement/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: "Numéro d'opération" })).toHaveTextContent('OP001 — Rénovation quai 3')
+  })
+
+  it('remplit le formulaire et transmet au CDS via transmettreFad, avec typeFad', async () => {
     const onSaved = vi.fn()
-    transmettreFadMock.mockResolvedValue(DA_VALIDEE)
-    render(<TraiterFadRcModal demandeAchat={DA_VALIDEE} onClose={vi.fn()} onSaved={onSaved} />)
+    transmettreFadMock.mockResolvedValue(DA)
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={onSaved} />)
 
-    selectComboboxOption('Site', 'Site Nord')
-    selectComboboxOption('Secteur', 'Secteur Nord')
-    selectComboboxOption('CUG', 'Fournitures bureau')
-    selectComboboxOption("Type d'achat", 'Fournitures')
-    selectComboboxOption('Imputation comptable', 'Fonctionnement')
-
+    remplirChampsObligatoires()
     fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
 
-    await waitFor(() =>
-      expect(transmettreFadMock).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          codeSite: 'S1',
-          codeSecteur: 'SEC1',
-          codeCug: 'CUG1',
-          typeAchat: 'FOURNITURES',
-          imputationComptable: 'FONCTIONNEMENT',
-          numeroOperation: null,
-        }),
-      ),
-    )
+    await waitFor(() => expect(transmettreFadMock).toHaveBeenCalledWith(1, expect.objectContaining({ ...CHAMPS_OBLIGATOIRES, numeroOperation: null })))
     expect(onSaved).toHaveBeenCalled()
+  })
+
+  it('exige le libellé du motif quand motifChoix vaut "Autre" (Hors Marché)', async () => {
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    remplirChampsObligatoires()
+    selectComboboxOption('Motif du choix', 'Autre')
+    fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
+
+    expect(await screen.findByText('Le libellé du motif est obligatoire quand le motif est "Autre".')).toBeInTheDocument()
+    expect(transmettreFadMock).not.toHaveBeenCalled()
+  })
+
+  it('Gestion documentaire est désactivée sans fournisseur retenu, activée sinon', () => {
+    const sansFournisseur: DemandeAchatRow = { ...DA, id_fournisseur_retenu: null }
+    render(<TraiterFadRcModal demandeAchat={sansFournisseur} onClose={vi.fn()} onSaved={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Gestion documentaire' })).toBeDisabled()
+  })
+
+  it('Gestion documentaire : devis verrouillé (décision du 17/09/2026 — tant que le RC n\'a pas (re)transmis la FAD)', async () => {
+    getConsultationMock.mockResolvedValue([
+      { idDevis: 1, idFournisseur: 42, montantDevis: 1200, ordre: 1, retenu: true, nomFichierOriginal: null, tailleOctets: null },
+    ])
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gestion documentaire' }))
+
+    expect(await screen.findByRole('dialog', { name: 'Gestion documentaire' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ajouter le devis — ACME' })).toBeDisabled()
+  })
+
+  it('Enregistrer sauvegarde la saisie en cours via enregistrerFad, sans fermer la modale ni exiger les champs obligatoires', async () => {
+    const onSaved = vi.fn()
+    enregistrerFadMock.mockResolvedValue(DA)
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={onSaved} />)
+
+    selectComboboxOption('CUG', 'CUG1 — Fournitures bureau')
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(enregistrerFadMock).toHaveBeenCalledWith(1, expect.objectContaining({ codeCug: 'CUG1' })))
+    expect(await screen.findByText('Enregistré.')).toBeInTheDocument()
+    // Contrairement à Transmettre au CDS, aucun champ obligatoire n'est exigé et la modale reste ouverte.
+    expect(transmettreFadMock).not.toHaveBeenCalled()
+    expect(onSaved).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Transmettre au CDS' })).toBeInTheDocument()
+  })
+
+  it('Enregistrer transmet la ligne à jour au parent via onProgressSaved (sinon rouvrir après Retour réaffiche les anciennes valeurs)', async () => {
+    const onProgressSaved = vi.fn()
+    const DA_MISE_A_JOUR: DemandeAchatRow = { ...DA, code_cug: 'CUG1' }
+    enregistrerFadMock.mockResolvedValue(DA_MISE_A_JOUR)
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} onProgressSaved={onProgressSaved} />)
+
+    selectComboboxOption('CUG', 'CUG1 — Fournitures bureau')
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(onProgressSaved).toHaveBeenCalledWith(DA_MISE_A_JOUR))
+  })
+
+  it('Enregistrer exige le libellé du motif quand motifChoix vaut "Autre" (Hors Marché)', async () => {
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    selectComboboxOption('Motif du choix', 'Autre')
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await screen.findByText('Le libellé du motif est obligatoire quand le motif est "Autre".')).toBeInTheDocument()
+    expect(enregistrerFadMock).not.toHaveBeenCalled()
   })
 })
 
@@ -197,6 +337,7 @@ describe('TraiterFadRcModal — FAD_A_MODIFIER_CB (reprise, retransmission direc
     code_secteur: 'SEC1',
     code_cug: 'CUG1',
     type_achat: 'FOURNITURES',
+    type_fad: 'FERMEE',
     imputation_comptable: 'FONCTIONNEMENT',
   }
 
@@ -237,7 +378,17 @@ describe('TraiterFadRcModal — FAD_A_MODIFIER_CB (reprise, retransmission direc
 
     fireEvent.click(screen.getByRole('button', { name: 'Retransmettre à la CB' }))
 
-    await waitFor(() => expect(retransmettreCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ codeSite: 'S1', codeCug: 'CUG1' })))
+    await waitFor(() => expect(retransmettreCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ codeSite: 'S1', codeCug: 'CUG1', typeFad: 'FERMEE' })))
     expect(onSaved).toHaveBeenCalled()
+  })
+
+  it('Enregistrer reste disponible en reprise CB, sans transmettre', async () => {
+    enregistrerFadMock.mockResolvedValue(DA_A_MODIFIER)
+    render(<TraiterFadRcModal demandeAchat={DA_A_MODIFIER} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(enregistrerFadMock).toHaveBeenCalledWith(1, expect.anything()))
+    expect(retransmettreCbMock).not.toHaveBeenCalled()
   })
 })

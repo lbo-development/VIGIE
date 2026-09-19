@@ -84,7 +84,16 @@ export const STATUTS_REJETEES_ANNULEES = [
  * le filtrage réel est appliqué côté serveur via `scope`).
  */
 export const ACCUEIL_SCOPE_STATUTS: Record<
-  'A_FINALISER' | 'SUIVI_FAD' | 'A_TRAITER' | 'EN_COURS' | 'FAD_COMMANDEES' | 'REJETEES_ANNULEES',
+  | 'A_FINALISER'
+  | 'SUIVI_FAD'
+  | 'A_TRAITER'
+  | 'EN_COURS'
+  | 'A_TRAITER_CDS'
+  | 'EN_COURS_CDS'
+  | 'A_TRAITER_CB'
+  | 'EN_COURS_CB'
+  | 'FAD_COMMANDEES'
+  | 'REJETEES_ANNULEES',
   string[]
 > = {
   A_FINALISER: ['DA_EN_PREPARATION', 'DA_A_COMPLETER_RC'],
@@ -126,6 +135,30 @@ export const ACCUEIL_SCOPE_STATUTS: Record<
     'FAD_TRANSMISE_DS_CB',
     'FAD_A_COMMANDER',
   ],
+  // Écran de suivi CDS (16/09/2026) : A_TRAITER_CDS/EN_COURS_CDS regroupent différemment les mêmes
+  // codes (persona CDS), en partageant FAD_COMMANDEES/REJETEES_ANNULEES avec les personas
+  // Demandeur/RC — voir demandeAchat.service.ts#ACCUEIL_SCOPE_STATUTS. Aucun code DA_* : le CDS
+  // n'intervient qu'une fois l'objet devenu FAD (FAD_TRANSMISE_RC_CDS), jamais sur une DA.
+  A_TRAITER_CDS: ['FAD_TRANSMISE_RC_CDS', 'FAD_VALIDEE_CDS'],
+  EN_COURS_CDS: [
+    'FAD_A_COMPLETER_CDS',
+    'FAD_MODIFIEE_TRANSMISE_RC_CB',
+    'FAD_TRANSMISE_CDS_CB',
+    'FAD_VALIDEE_CB',
+    'FAD_A_MODIFIER_CB',
+    'FAD_TRANSMISE_CB_DS',
+    'FAD_VALIDEE_DS',
+    'FAD_VALIDEE_DS_SEUIL',
+    'FAD_A_COMPLETER_CB',
+    'FAD_TRANSMISE_DS_CB',
+    'FAD_A_COMMANDER',
+  ],
+  // Écran de suivi CB (18/09/2026) : A_TRAITER_CB/EN_COURS_CB regroupent différemment les mêmes
+  // codes (persona CB), en partageant FAD_COMMANDEES/REJETEES_ANNULEES avec les autres personas —
+  // voir demandeAchat.service.ts#ACCUEIL_SCOPE_STATUTS. Contrairement à RC/CDS, la CB ne voit
+  // jamais une FAD avant FAD_TRANSMISE_CDS_CB (pas de visibilité amont sur le circuit CDS).
+  A_TRAITER_CB: ['FAD_TRANSMISE_CDS_CB', 'FAD_MODIFIEE_TRANSMISE_RC_CB', 'FAD_VALIDEE_CB', 'FAD_A_COMPLETER_CB', 'FAD_A_COMMANDER'],
+  EN_COURS_CB: ['FAD_A_MODIFIER_CB', 'FAD_TRANSMISE_CB_DS', 'FAD_VALIDEE_DS', 'FAD_VALIDEE_DS_SEUIL', 'FAD_TRANSMISE_DS_CB'],
   FAD_COMMANDEES: ['FAD_COMMANDEE'],
   REJETEES_ANNULEES: STATUTS_REJETEES_ANNULEES,
 }

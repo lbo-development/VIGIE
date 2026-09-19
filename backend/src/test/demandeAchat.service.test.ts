@@ -127,12 +127,42 @@ vi.mock('../repositories/marcheTiers.repository.js', () => ({
 vi.mock('../services/marche.service.js', () => ({
   resolveMarcheIdService: (...args: unknown[]) => resolveMarcheIdService(...args),
 }))
+const fournisseurFindById = vi.fn()
 vi.mock('../repositories/fournisseur.repository.js', () => ({
   findIdsByRaisonSociale: (...args: unknown[]) => fournisseurFindIdsByRaisonSociale(...args),
   findAll: (...args: unknown[]) => fournisseurFindAll(...args),
+  findById: (...args: unknown[]) => fournisseurFindById(...args),
 }))
 vi.mock('../services/libelleReferentiel.service.js', () => ({
   assertCodeActif: (...args: unknown[]) => assertCodeActif(...args),
+}))
+const siteFindByCode = vi.fn()
+vi.mock('../repositories/site.repository.js', () => ({
+  findByCode: (...args: unknown[]) => siteFindByCode(...args),
+}))
+const sousSiteFindBySites = vi.fn()
+vi.mock('../repositories/sousSite.repository.js', () => ({
+  findBySites: (...args: unknown[]) => sousSiteFindBySites(...args),
+}))
+const secteurFindByCode = vi.fn()
+vi.mock('../repositories/secteur.repository.js', () => ({
+  findByCode: (...args: unknown[]) => secteurFindByCode(...args),
+}))
+const sousSecteurFindBySecteurs = vi.fn()
+vi.mock('../repositories/sousSecteur.repository.js', () => ({
+  findBySecteurs: (...args: unknown[]) => sousSecteurFindBySecteurs(...args),
+}))
+const directionFindById = vi.fn()
+vi.mock('../repositories/direction.repository.js', () => ({
+  findById: (...args: unknown[]) => directionFindById(...args),
+}))
+const signatureGetBufferForPdf = vi.fn()
+vi.mock('../services/signatureActeur.service.js', () => ({
+  getSignatureBufferForPdf: (...args: unknown[]) => signatureGetBufferForPdf(...args),
+}))
+const genererFadPdfBufferMock = vi.fn()
+vi.mock('../pdf/fadPdfGenerator.js', () => ({
+  genererFadPdfBuffer: (...args: unknown[]) => genererFadPdfBufferMock(...args),
 }))
 
 const {
@@ -142,7 +172,9 @@ const {
   deleteDemandeAchat,
   transmettreRc,
   decisionRc,
+  devaliderRc,
   transmettreFad,
+  enregistrerFad,
   decisionCds,
   transmettreCb,
   decisionCb,
@@ -168,10 +200,12 @@ const {
   addPieceDemandeAchat,
   removePieceDemandeAchat,
   downloadPieceDemandeAchat,
+  genererFadPdf,
 } = await import('../services/demandeAchat.service.js')
 
 const DEMANDEUR = '10001'
 const RC = '20001'
+const CDS = '22001'
 const CB = '25001'
 const ADMIN_SERVICE = '30001'
 const AUTRE_DEMANDEUR = '10002'
@@ -479,6 +513,124 @@ describe('listDemandeAchat', () => {
   })
 })
 
+describe('listDemandeAchat — écran de suivi CDS (roleHint, décision du 16/09/2026)', () => {
+  it('CDS avec role: "CDS" voit tout son service (pas de cellule pour CDS)', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'CDS', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(CDS, { role: 'CDS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    expect(findAllByCellule).not.toHaveBeenCalled()
+  })
+
+  it('bug corrigé le 16/09/2026 : un suppléant CDS pur (aucune role_attribution directe) voit le service qu\'il supplée', async () => {
+    findEffectiveRolesMock.mockResolvedValue([
+      { idRole: 1, typeRole: 'CDS', idCellule: null, idService: ID_SERVICE, idDirection: null, idSuppleance: 99 },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(CDS, { role: 'CDS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+  })
+
+  it('sans role: "CDS" explicite, un titulaire CDS pur (pas RC) retombe en Demandeur — le hint est indispensable, pas déduit automatiquement', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'CDS', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(CDS, {})
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [CDS] }))
+  })
+
+  it('correctif du cumul RC+CDS : role: "CDS" bascule sur la vue CDS (service) même pour un acteur qui a aussi un rôle RC actif', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'RC', id_cellule: ID_CELLULE_RC, id_service: null, id_direction: null },
+      { id_role: 2, type_role: 'CDS', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(RC, { role: 'CDS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    expect(findAllByCellule).not.toHaveBeenCalled()
+  })
+
+  it('même acteur cumulant RC+CDS : sans hint (appel de l\'écran RC), le comportement RC reste strictement inchangé', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'RC', id_cellule: ID_CELLULE_RC, id_service: null, id_direction: null },
+      { id_role: 2, type_role: 'CDS', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    celluleFindById.mockResolvedValue({ id_cellule: ID_CELLULE_RC, id_service: ID_SERVICE, code_cellule: 'C1', libelle_cellule: 'C1', actif: true })
+    findAllByCellule.mockResolvedValue([{ matricule: DEMANDEUR, nom: 'X', prenom: 'Y', fonction: '', id_cellule: ID_CELLULE_RC }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(RC, {})
+
+    expect(findAllByCellule).toHaveBeenCalledWith(ID_CELLULE_RC)
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [DEMANDEUR] }))
+  })
+
+  it('ADMIN_SERVICE reste prioritaire sur role: "CDS" (transverse à tout le service, pas besoin d\'un vrai rôle CDS)', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(ADMIN_SERVICE, { role: 'CDS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+  })
+})
+
+describe('listDemandeAchat — écran de suivi CB (roleHint, décision du 18/09/2026)', () => {
+  it('CB avec role: "CB" voit tout son service (pas de cellule pour CB, jamais de suppléance)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(CB, { role: 'CB' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    expect(findAllByCellule).not.toHaveBeenCalled()
+  })
+
+  it('sans role: "CB" explicite, un titulaire CB pur (pas RC) retombe en Demandeur — le hint est indispensable', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(CB, {})
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [CB] }))
+  })
+
+  it('correctif du cumul RC+CB : role: "CB" bascule sur la vue CB (service) même pour un acteur qui a aussi un rôle RC actif', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'RC', id_cellule: ID_CELLULE_RC, id_service: null, id_direction: null },
+      { id_role: 2, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(RC, { role: 'CB' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    expect(findAllByCellule).not.toHaveBeenCalled()
+  })
+
+  it('ADMIN_SERVICE reste prioritaire sur role: "CB" (transverse à tout le service, pas besoin d\'un vrai rôle CB)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(ADMIN_SERVICE, { role: 'CB' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+  })
+})
+
 describe('listDemandeAchat — scope et filtre fournisseur (écran d\'accueil)', () => {
   it('traduit query.scope en liste de statuts fixe quand aucun statut précis n\'est choisi', async () => {
     findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
@@ -568,6 +720,57 @@ describe('couverture ACCUEIL_SCOPE_STATUTS (garde-fou anti-dérive)', () => {
     const codesAttendus = TOUS_LES_CODES_STATUT.filter((code) => code !== 'DA_EN_PREPARATION')
 
     expect(union).not.toContain('DA_EN_PREPARATION')
+    expect(union.length).toBe(codesAttendus.length)
+    expect(new Set(union)).toEqual(new Set(codesAttendus))
+  })
+
+  // Écran de suivi CDS (16/09/2026) : A_TRAITER_CDS/EN_COURS_CDS partagent FAD_COMMANDEES/
+  // REJETEES_ANNULEES avec les onglets Demandeur/RC — regroupement alternatif des mêmes codes.
+  // Les 4 codes DA_* (DA_EN_PREPARATION/DA_TRANSMISE_DEM_RC/DA_VALIDEE_RC/DA_A_COMPLETER_RC) sont
+  // exclus : le CDS n'intervient qu'une fois l'objet devenu FAD (FAD_TRANSMISE_RC_CDS), jamais sur
+  // une DA. D'où 21 codes, pas 25.
+  it('les 4 onglets CDS (A_TRAITER_CDS/EN_COURS_CDS/FAD_COMMANDEES/REJETEES_ANNULEES) couvrent exactement les 21 codes FAD_*, sans trou ni recouvrement', () => {
+    const scopes = [
+      ACCUEIL_SCOPE_STATUTS.A_TRAITER_CDS,
+      ACCUEIL_SCOPE_STATUTS.EN_COURS_CDS,
+      ACCUEIL_SCOPE_STATUTS.FAD_COMMANDEES,
+      ACCUEIL_SCOPE_STATUTS.REJETEES_ANNULEES,
+    ]
+    const union = scopes.flat()
+    const codesExclus = ['DA_EN_PREPARATION', 'DA_TRANSMISE_DEM_RC', 'DA_VALIDEE_RC', 'DA_A_COMPLETER_RC']
+    const codesAttendus = TOUS_LES_CODES_STATUT.filter((code) => !codesExclus.includes(code))
+
+    for (const code of codesExclus) expect(union).not.toContain(code)
+    expect(union.length).toBe(codesAttendus.length)
+    expect(new Set(union)).toEqual(new Set(codesAttendus))
+  })
+
+  // Écran de suivi CB (18/09/2026) : A_TRAITER_CB/EN_COURS_CB partagent FAD_COMMANDEES/
+  // REJETEES_ANNULEES avec les autres onglets — regroupement alternatif des mêmes codes. Exclus :
+  // les 4 codes DA_* (la CB n'intervient jamais sur une DA) + les 3 codes du seul ressort du CDS
+  // avant que la FAD n'atteigne la CB (FAD_TRANSMISE_RC_CDS/FAD_A_COMPLETER_CDS/FAD_VALIDEE_CDS,
+  // contrairement à RC/CDS qui gardent une visibilité amont, la CB ne voit jamais une FAD avant
+  // FAD_TRANSMISE_CDS_CB). D'où 18 codes, pas 25.
+  it('les 4 onglets CB (A_TRAITER_CB/EN_COURS_CB/FAD_COMMANDEES/REJETEES_ANNULEES) couvrent exactement les 18 codes pertinents pour la CB, sans trou ni recouvrement', () => {
+    const scopes = [
+      ACCUEIL_SCOPE_STATUTS.A_TRAITER_CB,
+      ACCUEIL_SCOPE_STATUTS.EN_COURS_CB,
+      ACCUEIL_SCOPE_STATUTS.FAD_COMMANDEES,
+      ACCUEIL_SCOPE_STATUTS.REJETEES_ANNULEES,
+    ]
+    const union = scopes.flat()
+    const codesExclus = [
+      'DA_EN_PREPARATION',
+      'DA_TRANSMISE_DEM_RC',
+      'DA_VALIDEE_RC',
+      'DA_A_COMPLETER_RC',
+      'FAD_TRANSMISE_RC_CDS',
+      'FAD_A_COMPLETER_CDS',
+      'FAD_VALIDEE_CDS',
+    ]
+    const codesAttendus = TOUS_LES_CODES_STATUT.filter((code) => !codesExclus.includes(code))
+
+    for (const code of codesExclus) expect(union).not.toContain(code)
     expect(union.length).toBe(codesAttendus.length)
     expect(new Set(union)).toEqual(new Set(codesAttendus))
   })
@@ -709,6 +912,134 @@ describe('getSynthese', () => {
       const result = await getSynthese(RC)
 
       expect(result.mesDemandes.enCours).toEqual({ nombre: 1, montant: 50 })
+    })
+  })
+
+  // Écran de suivi CDS (16/09/2026) : mêmes tuiles, scopées sur le service du CDS — appelé avec
+  // le hint explicite `roleHint: 'CDS'` (voir resolveAccessContext).
+  describe('vue CDS (écran de suivi CDS)', () => {
+    beforeEach(() => {
+      findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CDS', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    })
+
+    it('interroge les DA/FAD du service, pas seulement celles du CDS lui-même, sans passer par les cellules', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(CDS, 'CDS')
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+      expect(findAllByCellule).not.toHaveBeenCalled()
+    })
+
+    it('"En transit" ne compte que RC/DS/CB — jamais CDS, même sur un statut EN_TRANSIT=CDS', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_TRANSMISE_DEM_RC', montant_demande: 100 },
+        { code_statut: 'FAD_TRANSMISE_RC_CDS', montant_demande: 200 },
+        { code_statut: 'FAD_TRANSMISE_CB_DS', montant_demande: 300 },
+        { code_statut: 'FAD_A_COMMANDER', montant_demande: 400 },
+      ])
+
+      const result = await getSynthese(CDS, 'CDS')
+
+      expect(result.enTransit).toEqual({
+        RC: { nombre: 1, montant: 100 },
+        CDS: { nombre: 0, montant: 0 },
+        DS: { nombre: 1, montant: 300 },
+        CB: { nombre: 1, montant: 400 },
+      })
+    })
+
+    it('DA_EN_PREPARATION est exclue de "FAD du service" (mesDemandes)', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_EN_PREPARATION', montant_demande: 999 },
+        { code_statut: 'FAD_TRANSMISE_RC_CDS', montant_demande: 50 },
+      ])
+
+      const result = await getSynthese(CDS, 'CDS')
+
+      expect(result.mesDemandes.enCours).toEqual({ nombre: 1, montant: 50 })
+    })
+
+    it('sans le hint, un titulaire CDS pur retombe en Demandeur (interroge uniquement ses propres DA)', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(CDS)
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [CDS] }))
+    })
+
+    it("bug corrigé le 18/09/2026 (Audrey VATANIAN, cumul ADMIN_SERVICE+CB) : un ADMIN_SERVICE avec le hint CDS voit la vue service, pas le repli Demandeur", async () => {
+      findActiveByMatricule.mockResolvedValue([
+        { id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+      ])
+      findAll.mockResolvedValue([])
+
+      await getSynthese(ADMIN_SERVICE, 'CDS')
+
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    })
+  })
+
+  // Écran de suivi CB (18/09/2026) : mêmes tuiles, scopées sur le service de la CB — appelé avec
+  // le hint explicite `roleHint: 'CB'` (voir resolveAccessContext). Jamais de suppléance CB.
+  describe('vue CB (écran de suivi CB)', () => {
+    beforeEach(() => {
+      findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    })
+
+    it('interroge les DA/FAD du service, pas seulement celles de la CB elle-même, sans passer par les cellules', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(CB, 'CB')
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+      expect(findAllByCellule).not.toHaveBeenCalled()
+    })
+
+    it('"En transit" ne compte que RC/CDS/DS — jamais CB, même sur un statut EN_TRANSIT=CB', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_TRANSMISE_DEM_RC', montant_demande: 100 },
+        { code_statut: 'FAD_TRANSMISE_RC_CDS', montant_demande: 200 },
+        { code_statut: 'FAD_TRANSMISE_CB_DS', montant_demande: 300 },
+        { code_statut: 'FAD_A_COMMANDER', montant_demande: 400 },
+      ])
+
+      const result = await getSynthese(CB, 'CB')
+
+      expect(result.enTransit).toEqual({
+        RC: { nombre: 1, montant: 100 },
+        CDS: { nombre: 1, montant: 200 },
+        DS: { nombre: 1, montant: 300 },
+        CB: { nombre: 0, montant: 0 },
+      })
+    })
+
+    it('DA_EN_PREPARATION est exclue de "FAD du service" (mesDemandes)', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_EN_PREPARATION', montant_demande: 999 },
+        { code_statut: 'FAD_TRANSMISE_CDS_CB', montant_demande: 50 },
+      ])
+
+      const result = await getSynthese(CB, 'CB')
+
+      expect(result.mesDemandes.enCours).toEqual({ nombre: 1, montant: 50 })
+    })
+
+    it('sans le hint, un titulaire CB pur retombe en Demandeur (interroge uniquement ses propres DA)', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(CB)
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [CB] }))
+    })
+
+    it("bug corrigé le 18/09/2026 (Audrey VATANIAN, cumul ADMIN_SERVICE+CB) : un ADMIN_SERVICE avec le hint CB voit la vue service, pas le repli Demandeur", async () => {
+      findActiveByMatricule.mockResolvedValue([
+        { id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+      ])
+      findAll.mockResolvedValue([
+        { code_statut: 'FAD_TRANSMISE_RC_CDS', montant_demande: 200 },
+        { code_statut: 'FAD_TRANSMISE_CB_DS', montant_demande: 300 },
+      ])
+
+      const result = await getSynthese(ADMIN_SERVICE, 'CB')
+
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+      expect(result.enTransit.CDS).toEqual({ nombre: 1, montant: 200 })
+      expect(result.enTransit.DS).toEqual({ nombre: 1, montant: 300 })
+      expect(result.enTransit.CB).toEqual({ nombre: 0, montant: 0 })
     })
   })
 })
@@ -884,15 +1215,68 @@ describe('decisionRc', () => {
   })
 })
 
+describe('devaliderRc', () => {
+  const DA_VALIDEE = { ...DA, code_statut: 'DA_VALIDEE_RC' }
+
+  beforeEach(() => {
+    findById.mockResolvedValue(DA_VALIDEE)
+    findByMatricule.mockResolvedValue(ACTEUR_DEMANDEUR)
+    assertHasEffectiveRole.mockResolvedValue(ROLE_RC_EFFECTIF)
+    historiqueCreate.mockResolvedValue({})
+  })
+
+  it('rejette sans authentification (401)', async () => {
+    await expect(devaliderRc(null, 1)).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('rejette si la DA est introuvable (404)', async () => {
+    findById.mockResolvedValue(null)
+    await expect(devaliderRc(RC, 1)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('rejette si la DA n\'est pas DA_VALIDEE_RC (409)', async () => {
+    findById.mockResolvedValue({ ...DA_VALIDEE, code_statut: 'DA_TRANSMISE_DEM_RC' })
+    await expect(devaliderRc(RC, 1)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('rejette (403) si l\'appelant n\'est pas RC sur la cellule du demandeur', async () => {
+    assertHasEffectiveRole.mockRejectedValue(Object.assign(new Error('Droits insuffisants'), { status: 403 }))
+    await expect(devaliderRc(RC, 1)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('réinsère DA_TRANSMISE_DEM_RC dans l\'historique, sans commentaire', async () => {
+    await devaliderRc(RC, 1)
+    expect(historiqueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ id_demande_achat: 1, code_statut: 'DA_TRANSMISE_DEM_RC', matricule_acteur: RC, commentaire_statut: null }),
+    )
+  })
+
+  it('trace l\'ID_SUPPLEANCE quand l\'appelant agit en tant que suppléant', async () => {
+    assertHasEffectiveRole.mockResolvedValue({ ...ROLE_RC_EFFECTIF, idSuppleance: 42 })
+    await devaliderRc(RC, 1)
+    expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ id_suppleance: 42 }))
+  })
+})
+
 describe('transmettreFad', () => {
   const FAD_INPUT = {
     codeSite: 'S1',
     codeSecteur: 'SEC1',
     codeCug: 'CUG1',
     typeAchat: 'FOURNITURES',
+    typeFad: 'FERMEE',
     imputationComptable: 'FONCTIONNEMENT',
   }
-  const DA_VALIDEE = { ...DA, code_statut: 'DA_VALIDEE_RC' }
+  const DA_VALIDEE = {
+    ...DA,
+    code_statut: 'DA_VALIDEE_RC',
+    objet_rc: 'Fourniture de bureaux pour le service',
+    description_rc: 'Renouvellement du mobilier de bureau',
+    montant_demande: 1200,
+    id_fournisseur_retenu: 77,
+    nummarche: 'M2026001',
+    id_marche_tiers: null,
+  }
 
   beforeEach(() => {
     findById.mockResolvedValue(DA_VALIDEE)
@@ -959,6 +1343,79 @@ describe('transmettreFad', () => {
   it('force numero_operation à null en fonctionnement, même si fourni', async () => {
     await transmettreFad(RC, 1, { ...FAD_INPUT, numeroOperation: 'OP999' })
     expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ numero_operation: null }))
+  })
+
+  it('exige typeFad (obligatoire, définition métier du 16/09/2026) — 400 si absent', async () => {
+    const sansTypeFad = { codeSite: 'S1', codeSecteur: 'SEC1', codeCug: 'CUG1', typeAchat: 'FOURNITURES', imputationComptable: 'FONCTIONNEMENT' }
+    await expect(transmettreFad(RC, 1, sansTypeFad)).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('exige le libellé du motif quand motifChoix vaut "Autre" (400)', async () => {
+    await expect(transmettreFad(RC, 1, { ...FAD_INPUT, motifChoix: 'Autre' })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('enregistre motifChoix/libelleMotifChoix quand fournis (Hors Marché)', async () => {
+    await transmettreFad(RC, 1, { ...FAD_INPUT, motifChoix: 'Autre', libelleMotifChoix: 'Urgence chantier' })
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ motif_choix: 'Autre', libelle_motif_choix: 'Urgence chantier' }))
+  })
+
+  describe('garde de complétude (assertFadTransmissible, décision du 16/09/2026)', () => {
+    it('rejette si OBJET_RC serait vide (ni fourni dans cet appel, ni déjà en base) — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, objet_rc: '' })
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('rejette si DESCRIPTION_RC serait vide (ni fournie dans cet appel, ni déjà en base) — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, description_rc: '' })
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('accepte si objet/description sont fournis dans cet appel alors que OBJET_RC/DESCRIPTION_RC existants sont vides', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, objet_rc: '', description_rc: '' })
+      await expect(
+        transmettreFad(RC, 1, { ...FAD_INPUT, objet: 'Objet reformulé par le RC pour le CDS', description: 'Description reformulée' }),
+      ).resolves.toBeTruthy()
+    })
+
+    it('rejette si le montant de la demande n\'est plus renseigné (état existant corrompu) — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, montant_demande: 0 })
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('rejette si aucun fournisseur n\'est retenu (état existant corrompu) — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, id_fournisseur_retenu: null })
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('rejette en procédure Marché sans numéro de marché ni marché tiers (état existant corrompu) — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, nummarche: null, id_marche_tiers: null })
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('rejette en Hors Marché sans aucune entreprise consultée — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, procedure_achat: 'HORS_MARCHE' })
+      devisFindAllByDemandeAchat.mockResolvedValue([])
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('rejette en Hors Marché si une entreprise consultée n\'a pas de devis déposé — 409', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, procedure_achat: 'HORS_MARCHE' })
+      devisFindAllByDemandeAchat.mockResolvedValue([{ nom_fichier_original: null }])
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).rejects.toMatchObject({ status: 409 })
+      expect(update).not.toHaveBeenCalled()
+    })
+
+    it('accepte en Hors Marché quand toutes les entreprises consultées ont un devis déposé', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, procedure_achat: 'HORS_MARCHE' })
+      devisFindAllByDemandeAchat.mockResolvedValue([{ nom_fichier_original: 'devis.pdf' }])
+      await expect(transmettreFad(RC, 1, FAD_INPUT)).resolves.toBeTruthy()
+    })
   })
 })
 
@@ -1205,6 +1662,87 @@ describe('retransmettreCb', () => {
     await retransmettreCb(RC, 1, { codeSite: 'S2' })
     expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ code_statut: 'FAD_MODIFIEE_TRANSMISE_RC_CB' }))
   })
+
+  it('typeFad reste optionnel (reprise CB) — retransmet sans erreur si absent', async () => {
+    await expect(retransmettreCb(RC, 1, { codeSite: 'S2' })).resolves.toBeTruthy()
+  })
+
+  it('exige le libellé du motif quand motifChoix vaut "Autre" (400)', async () => {
+    await expect(retransmettreCb(RC, 1, { motifChoix: 'Autre' })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('enregistre motifChoix/libelleMotifChoix/typeFad quand fournis', async () => {
+    await retransmettreCb(RC, 1, { motifChoix: 'Technique', typeFad: 'CONTRAT' })
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ motif_choix: 'Technique', libelle_motif_choix: null, type_fad: 'CONTRAT' }))
+  })
+})
+
+describe('enregistrerFad', () => {
+  const DA_VALIDEE = { ...DA, code_statut: 'DA_VALIDEE_RC' }
+
+  beforeEach(() => {
+    findById.mockResolvedValue(DA_VALIDEE)
+    findByMatricule.mockResolvedValue(ACTEUR_DEMANDEUR)
+    assertHasEffectiveRole.mockResolvedValue(ROLE_RC_EFFECTIF)
+    update.mockResolvedValue(DA_VALIDEE)
+    historiqueCreate.mockResolvedValue({})
+  })
+
+  it('rejette sans authentification (401)', async () => {
+    await expect(enregistrerFad(null, 1, {})).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('accepte un enregistrement partiel, sans aucun champ obligatoire', async () => {
+    await expect(enregistrerFad(RC, 1, { codeCug: 'CUG1' })).resolves.toBeTruthy()
+  })
+
+  it.each(['DA_VALIDEE_RC', 'FAD_A_COMPLETER_CDS', 'FAD_A_MODIFIER_CB'])(
+    'accepte le statut %s',
+    async (statut) => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, code_statut: statut })
+      await expect(enregistrerFad(RC, 1, { codeCug: 'CUG1' })).resolves.toBeTruthy()
+    },
+  )
+
+  it('rejette un statut hors de la modale de complétion (409)', async () => {
+    findById.mockResolvedValue({ ...DA_VALIDEE, code_statut: 'DA_TRANSMISE_DEM_RC' })
+    await expect(enregistrerFad(RC, 1, { codeCug: 'CUG1' })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('propage le 403 d\'assertHasEffectiveRole', async () => {
+    assertHasEffectiveRole.mockRejectedValue(Object.assign(new Error('Droits insuffisants'), { status: 403 }))
+    await expect(enregistrerFad(RC, 1, { codeCug: 'CUG1' })).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('n\'écrit aucune ligne HISTORIQUE_STATUT (pas de transition)', async () => {
+    await enregistrerFad(RC, 1, { codeCug: 'CUG1' })
+    expect(historiqueCreate).not.toHaveBeenCalled()
+  })
+
+  it('enregistre uniquement les champs fournis (partiel)', async () => {
+    await enregistrerFad(RC, 1, { codeCug: 'CUG-PROVISOIRE' })
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ code_cug: 'CUG-PROVISOIRE' }))
+    const patch = update.mock.calls[0][1]
+    expect(patch.code_site).toBeUndefined()
+  })
+
+  it('la reformulation RC écrit OBJET_RC/DESCRIPTION_RC seuls (décision du 15/09/2026)', async () => {
+    await enregistrerFad(RC, 1, { objet: 'Objet en cours de saisie par le RC', description: 'Description en cours' })
+    const patch = update.mock.calls[0][1]
+    expect(patch.objet_rc).toBe('Objet en cours de saisie par le RC')
+    expect(patch.description_rc).toBe('Description en cours')
+    expect(patch.objet_demandeur).toBeUndefined()
+    expect(patch.description_demandeur).toBeUndefined()
+  })
+
+  it('exige le libellé du motif quand motifChoix vaut "Autre" (400)', async () => {
+    await expect(enregistrerFad(RC, 1, { motifChoix: 'Autre' })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('force numero_operation à null en fonctionnement, même si fourni', async () => {
+    await enregistrerFad(RC, 1, { imputationComptable: 'FONCTIONNEMENT', numeroOperation: 'OP999' })
+    expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ numero_operation: null }))
+  })
 })
 
 const ROLE_DS_EFFECTIF = { idRole: 4, typeRole: 'DS', idCellule: null, idService: null, idDirection: 9, idSuppleance: null }
@@ -1252,6 +1790,23 @@ describe('transmettreDsOuSeuil', () => {
     await transmettreDsOuSeuil(CB, 1)
     expect(historiqueCreate).toHaveBeenNthCalledWith(1, expect.objectContaining({ code_statut: 'FAD_VALIDEE_DS_SEUIL' }))
     expect(historiqueCreate).toHaveBeenNthCalledWith(2, expect.objectContaining({ code_statut: 'FAD_A_COMMANDER', id_suppleance: null }))
+  })
+
+  // Décision du 18/09/2026 : FAD_VALIDEE_DS_SEUIL est transitoire (chaînée aussitôt sur
+  // FAD_A_COMMANDER ci-dessus) — VALIDEE_SUR_SEUIL_DS est la seule trace durable de ce parcours.
+  it('montant < seuil → pose VALIDEE_SUR_SEUIL_DS=true avant l\'écriture de l\'historique', async () => {
+    seuilFindByService.mockResolvedValue({ id_service: ID_SERVICE, seuil_fonctionnement: 5000, seuil_investissement: 0 })
+    update.mockResolvedValue({ ...FAD_VALIDEE_CB, validee_sur_seuil_ds: true })
+
+    await transmettreDsOuSeuil(CB, 1)
+
+    expect(update).toHaveBeenCalledWith(1, { validee_sur_seuil_ds: true })
+  })
+
+  it('montant >= seuil → ne pose jamais VALIDEE_SUR_SEUIL_DS (transmission humaine au DS)', async () => {
+    seuilFindByService.mockResolvedValue({ id_service: ID_SERVICE, seuil_fonctionnement: 500, seuil_investissement: 0 })
+    await transmettreDsOuSeuil(CB, 1)
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('utilise seuil_investissement quand IMPUTATION_COMPTABLE=INVESTISSEMENT', async () => {
@@ -1430,6 +1985,19 @@ describe('getHistoriqueStatuts', () => {
 
   it('même règle d\'accès que getDemandeAchat — un tiers non habilité est rejeté (403)', async () => {
     await expect(getHistoriqueStatuts(AUTRE_DEMANDEUR, 1)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('roleHint \'CB\' (décision du 18/09/2026) autorise une CB de même service sur une FAD qui n\'est pas la sienne', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    historiqueFindAllByDemandeAchat.mockResolvedValue([])
+
+    await expect(getHistoriqueStatuts(CB, 1, 'CB')).resolves.toEqual([])
+  })
+
+  it('sans le roleHint \'CB\', une CB pure retombe en Demandeur et se voit refuser l\'accès (403)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+
+    await expect(getHistoriqueStatuts(CB, 1)).rejects.toMatchObject({ status: 403 })
   })
 
   it('renvoie une liste vide si aucun historique', async () => {
@@ -1793,6 +2361,23 @@ describe('listConsultationDemandeAchat', () => {
     expect(result).toEqual([
       { idDevis: 1, idFournisseur: 42, montantDevis: 1000, ordre: 1, retenu: true, nomFichierOriginal: 'devis.pdf', tailleOctets: 2048 },
     ])
+  })
+
+  it('roleHint \'CB\' (décision du 18/09/2026) autorise une CB de même service sur une FAD qui n\'est pas la sienne', async () => {
+    findById.mockResolvedValue({ ...DA, procedure_achat: 'HORS_MARCHE' })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    devisFindAllByDemandeAchat.mockResolvedValue([])
+
+    await expect(listConsultationDemandeAchat(CB, 1, 'CB')).resolves.toEqual([])
+  })
+
+  it('sans le roleHint \'CB\', une CB pure retombe en Demandeur et se voit refuser l\'accès (403)', async () => {
+    findById.mockResolvedValue({ ...DA, procedure_achat: 'HORS_MARCHE' })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+
+    await expect(listConsultationDemandeAchat(CB, 1)).rejects.toMatchObject({ status: 403 })
   })
 })
 
@@ -2269,6 +2854,65 @@ describe('addPieceDemandeAchat', () => {
     ).rejects.toThrow('insert failed')
     expect(pieceRemoveFile).toHaveBeenCalledWith('1/42/uuid.pdf')
   })
+
+  it('rejette si le statut ne fait plus partie du cycle RC/Demandeur (409)', async () => {
+    findById.mockResolvedValue({ ...MARCHE_DA, code_statut: 'FAD_TRANSMISE_RC_CDS' })
+
+    await expect(
+      addPieceDemandeAchat(DEMANDEUR, 1, { idFournisseur: 42, typePiece: 'PLAN' }, { buffer: PDF_BUFFER, originalname: 'x.pdf', size: 18 }),
+    ).rejects.toMatchObject({ status: 409 })
+    expect(pieceCreate).not.toHaveBeenCalled()
+  })
+
+  it('autorise le dépôt tant que le RC est "pour action" (ex. DA_TRANSMISE_DEM_RC), avant transmission au CDS (décision du 17/09/2026)', async () => {
+    findById.mockResolvedValue({ ...MARCHE_DA, code_statut: 'DA_TRANSMISE_DEM_RC' })
+    pieceBuildStoragePath.mockReturnValue('1/42/uuid.pdf')
+    pieceCreate.mockResolvedValue({
+      id_piece: 5,
+      id_demande_achat: 1,
+      id_fournisseur: 42,
+      type_piece: 'PLAN',
+      origine: 'UTILISATEUR',
+      nom_fichier_original: 'plan.pdf',
+      storage_path: '1/42/uuid.pdf',
+      taille_octets: 18,
+    })
+
+    await expect(
+      addPieceDemandeAchat(DEMANDEUR, 1, { idFournisseur: 42, typePiece: 'PLAN' }, { buffer: PDF_BUFFER, originalname: 'plan.pdf', size: 18 }),
+    ).resolves.toMatchObject({ idPiece: 5 })
+  })
+
+  it('autorise le dépôt par la CB (roleHint) tant qu\'elle est "pour action" (ex. FAD_TRANSMISE_CDS_CB), décision du 18/09/2026', async () => {
+    findById.mockResolvedValue({ ...MARCHE_DA, code_statut: 'FAD_TRANSMISE_CDS_CB' })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    pieceBuildStoragePath.mockReturnValue('1/42/uuid.pdf')
+    pieceCreate.mockResolvedValue({
+      id_piece: 6,
+      id_demande_achat: 1,
+      id_fournisseur: 42,
+      type_piece: 'PLAN',
+      origine: 'UTILISATEUR',
+      nom_fichier_original: 'plan.pdf',
+      storage_path: '1/42/uuid.pdf',
+      taille_octets: 18,
+    })
+
+    await expect(
+      addPieceDemandeAchat(CB, 1, { idFournisseur: 42, typePiece: 'PLAN' }, { buffer: PDF_BUFFER, originalname: 'plan.pdf', size: 18 }, 'CB'),
+    ).resolves.toMatchObject({ idPiece: 6 })
+  })
+
+  it('sans le roleHint \'CB\' explicite, une CB pure (pas RC/demandeur) est rejetée (403) — le hint est indispensable', async () => {
+    findById.mockResolvedValue({ ...MARCHE_DA, code_statut: 'FAD_TRANSMISE_CDS_CB' })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+
+    await expect(
+      addPieceDemandeAchat(CB, 1, { idFournisseur: 42, typePiece: 'PLAN' }, { buffer: PDF_BUFFER, originalname: 'plan.pdf', size: 18 }),
+    ).rejects.toMatchObject({ status: 403 })
+  })
 })
 
 describe('removePieceDemandeAchat', () => {
@@ -2296,6 +2940,34 @@ describe('removePieceDemandeAchat', () => {
 
     expect(pieceRemove).toHaveBeenCalledWith(3)
     expect(pieceRemoveFile).toHaveBeenCalledWith('1/42/x.pdf')
+  })
+
+  it('rejette si le statut ne fait plus partie du cycle RC/Demandeur (409)', async () => {
+    findById.mockResolvedValue({ ...DA, code_statut: 'FAD_TRANSMISE_RC_CDS' })
+    pieceFindById.mockResolvedValue({ id_piece: 3, id_demande_achat: 1, origine: 'UTILISATEUR', storage_path: '1/42/x.pdf' })
+
+    await expect(removePieceDemandeAchat(DEMANDEUR, 1, 3)).rejects.toMatchObject({ status: 409 })
+    expect(pieceRemove).not.toHaveBeenCalled()
+  })
+
+  it('autorise la suppression tant que le RC est "pour action" (ex. FAD_A_MODIFIER_CB), avant retransmission (décision du 17/09/2026)', async () => {
+    findById.mockResolvedValue({ ...DA, code_statut: 'FAD_A_MODIFIER_CB' })
+    pieceFindById.mockResolvedValue({ id_piece: 3, id_demande_achat: 1, origine: 'UTILISATEUR', storage_path: '1/42/x.pdf' })
+
+    await removePieceDemandeAchat(DEMANDEUR, 1, 3)
+
+    expect(pieceRemove).toHaveBeenCalledWith(3)
+  })
+
+  it('autorise la suppression par la CB (roleHint) tant qu\'elle est "pour action" (ex. FAD_VALIDEE_CB), décision du 18/09/2026', async () => {
+    findById.mockResolvedValue({ ...DA, code_statut: 'FAD_VALIDEE_CB' })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    pieceFindById.mockResolvedValue({ id_piece: 3, id_demande_achat: 1, origine: 'UTILISATEUR', storage_path: '1/42/x.pdf' })
+
+    await removePieceDemandeAchat(CB, 1, 3, 'CB')
+
+    expect(pieceRemove).toHaveBeenCalledWith(3)
   })
 })
 
@@ -2360,5 +3032,204 @@ describe('deleteDemandeAchat', () => {
     expect(piecesOrder).toBeLessThan(devisOrder)
     expect(devisOrder).toBeLessThan(histoOrder)
     expect(histoOrder).toBeLessThan(removeOrder)
+  })
+})
+
+describe('genererFadPdf', () => {
+  const DEMANDEUR_ACTEUR = { matricule: DEMANDEUR, nom: 'Lamoise', prenom: 'Cédric', fonction: 'Chef de groupe', id_cellule: ID_CELLULE_RC, actif: true }
+  const RC_ACTEUR = { matricule: RC, nom: 'Bohbot', prenom: 'Laurent', fonction: 'Responsable de section', id_cellule: ID_CELLULE_RC, actif: true }
+  const CDS_ACTEUR = { matricule: CDS, nom: 'Hinchliffe', prenom: 'Matthieu', fonction: 'Chef de service', id_cellule: ID_CELLULE_RC, actif: true }
+
+  const FAD_TRANSMISE: Record<string, unknown> = {
+    id_demande_achat: 1,
+    numero: '2026-09-08-001',
+    id_service: ID_SERVICE,
+    matricule_demandeur: DEMANDEUR,
+    code_statut: 'FAD_TRANSMISE_CB_DS',
+    procedure_achat: 'HORS_MARCHE',
+    objet_rc: 'Remplacement de batterie SCES TDP',
+    description_rc: 'Description détaillée',
+    code_site: 'TDP',
+    code_sous_site: null,
+    code_secteur: 'SSI',
+    code_sous_secteur: null,
+    code_cug: '271',
+    numero_operation: null,
+    nummarche: 'P2503329',
+    id_marche_tiers: null,
+    id_fournisseur_retenu: null,
+    type_achat: 'TRAVAUX',
+    imputation_comptable: 'FONCTIONNEMENT',
+    motif_choix: 'Prix',
+    libelle_motif_choix: null,
+    montant_demande: 2563.93,
+    montant_retenu: 2563.93,
+    montant_commande: null,
+    validee_sur_seuil_ds: false,
+    date_creation: '2026-07-15T08:00:00.000Z',
+  }
+
+  const HISTORIQUE_COMPLET = [
+    { id_histo: 1, id_demande_achat: 1, code_statut: 'DA_TRANSMISE_DEM_RC', matricule_acteur: DEMANDEUR, id_suppleance: null, date_heure: '2026-07-15T08:00:00.000Z', commentaire_statut: null },
+    { id_histo: 2, id_demande_achat: 1, code_statut: 'DA_VALIDEE_RC', matricule_acteur: RC, id_suppleance: null, date_heure: '2026-07-15T09:00:00.000Z', commentaire_statut: null },
+    { id_histo: 3, id_demande_achat: 1, code_statut: 'FAD_TRANSMISE_RC_CDS', matricule_acteur: RC, id_suppleance: null, date_heure: '2026-07-15T09:30:00.000Z', commentaire_statut: null },
+    { id_histo: 4, id_demande_achat: 1, code_statut: 'FAD_VALIDEE_CDS', matricule_acteur: CDS, id_suppleance: null, date_heure: '2026-07-15T10:00:00.000Z', commentaire_statut: null },
+    { id_histo: 5, id_demande_achat: 1, code_statut: 'FAD_TRANSMISE_CDS_CB', matricule_acteur: CDS, id_suppleance: null, date_heure: '2026-07-15T10:30:00.000Z', commentaire_statut: null },
+    { id_histo: 6, id_demande_achat: 1, code_statut: 'FAD_VALIDEE_CB', matricule_acteur: CB, id_suppleance: null, date_heure: '2026-07-15T11:00:00.000Z', commentaire_statut: null },
+  ]
+
+  const DEVIS_COMPLET = [{ id_devis: 7, id_demande_achat: 1, id_fournisseur: 42, montant_devis: 2563.93, delai_livraison: '2026-12-31', retenu: true, ordre: 1 }]
+  const FOURNISSEUR = { id_fournisseur: 42, id_service: ID_SERVICE, raison_sociale_service: 'INEO', cp: '13100', ville: 'Aix-en-Provence' }
+
+  beforeEach(() => {
+    findById.mockReset()
+    assertHasEffectiveRole.mockReset()
+    historiqueFindAllByDemandeAchat.mockReset()
+    findByMatricule.mockReset()
+    devisFindAllByDemandeAchat.mockReset()
+    fournisseurFindById.mockReset()
+    celluleFindById.mockReset()
+    serviceFindById.mockReset()
+    directionFindById.mockReset()
+    siteFindByCode.mockReset()
+    sousSiteFindBySites.mockReset()
+    secteurFindByCode.mockReset()
+    sousSecteurFindBySecteurs.mockReset()
+    seuilFindByService.mockReset()
+    signatureGetBufferForPdf.mockReset()
+    genererFadPdfBufferMock.mockReset()
+
+    findById.mockResolvedValue(FAD_TRANSMISE)
+    assertHasEffectiveRole.mockResolvedValue({ idRole: 1, typeRole: 'CB', idCellule: null, idService: ID_SERVICE, idDirection: null, idSuppleance: null })
+    historiqueFindAllByDemandeAchat.mockResolvedValue(HISTORIQUE_COMPLET)
+    findByMatricule.mockImplementation((matricule: string) => {
+      if (matricule === DEMANDEUR) return Promise.resolve(DEMANDEUR_ACTEUR)
+      if (matricule === RC) return Promise.resolve(RC_ACTEUR)
+      if (matricule === CDS) return Promise.resolve(CDS_ACTEUR)
+      return Promise.resolve(null)
+    })
+    devisFindAllByDemandeAchat.mockResolvedValue(DEVIS_COMPLET)
+    fournisseurFindById.mockResolvedValue(FOURNISSEUR)
+    celluleFindById.mockResolvedValue({ id_cellule: ID_CELLULE_RC, libelle_cellule: 'Administration', id_service: ID_SERVICE })
+    serviceFindById.mockResolvedValue({ id_service: ID_SERVICE, libelle_service: 'Service Voyageurs', id_direction: 1 })
+    directionFindById.mockResolvedValue({ id_direction: 1, code_direction: 'DSER', libelle_direction: 'Direction des Services de l\'Exploitation et des réseaux', actif: true })
+    siteFindByCode.mockResolvedValue({ code_site: 'TDP', lib_site: 'TDP Embarcadères', ordre_site: 1, id_service: ID_SERVICE, actif: true })
+    sousSiteFindBySites.mockResolvedValue([])
+    secteurFindByCode.mockResolvedValue({ code_secteur: 'SSI', lib_secteur: 'SSI-Alimentation de secours', ordre_secteur: 1, id_service: ID_SERVICE, actif: true })
+    sousSecteurFindBySecteurs.mockResolvedValue([])
+    seuilFindByService.mockResolvedValue({ id_service: ID_SERVICE, seuil_fonctionnement: 90000, seuil_investissement: 45000 })
+    signatureGetBufferForPdf.mockResolvedValue({ buffer: Buffer.from('sig'), extension: 'png' })
+    genererFadPdfBufferMock.mockResolvedValue(Buffer.from('%PDF-1.4'))
+  })
+
+  it('rejette sans authentification (401)', async () => {
+    await expect(genererFadPdf(null, 1)).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('rejette si la DA est introuvable (404)', async () => {
+    findById.mockResolvedValue(null)
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 404 })
+  })
+
+  it('propage le 403 si le matricule n\'a pas le rôle CB sur le service de la FAD', async () => {
+    assertHasEffectiveRole.mockRejectedValue(Object.assign(new Error('Droits insuffisants'), { status: 403 }))
+    await expect(genererFadPdf(DEMANDEUR, 1)).rejects.toMatchObject({ status: 403 })
+    expect(genererFadPdfBufferMock).not.toHaveBeenCalled()
+  })
+
+  it('rejette si le statut n\'est ni FAD_TRANSMISE_CB_DS ni une exemption de seuil (409)', async () => {
+    findById.mockResolvedValue({ ...FAD_TRANSMISE, code_statut: 'FAD_VALIDEE_CB' })
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 409 })
+    expect(genererFadPdfBufferMock).not.toHaveBeenCalled()
+  })
+
+  it('accepte FAD_A_COMMANDER quand validee_sur_seuil_ds=true (exemption de seuil DS)', async () => {
+    findById.mockResolvedValue({ ...FAD_TRANSMISE, code_statut: 'FAD_A_COMMANDER', validee_sur_seuil_ds: true })
+    const result = await genererFadPdf(CB, 1)
+    expect(result.nomFichier).toBe('FAD-2026-09-08-001.pdf')
+  })
+
+  it('rejette FAD_A_COMMANDER sans exemption de seuil (409) — DS attendu, pas la CB', async () => {
+    findById.mockResolvedValue({ ...FAD_TRANSMISE, code_statut: 'FAD_A_COMMANDER', validee_sur_seuil_ds: false })
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('rejette si aucune validation RC retrouvée dans l\'historique (409)', async () => {
+    historiqueFindAllByDemandeAchat.mockResolvedValue(HISTORIQUE_COMPLET.filter((r) => r.code_statut !== 'DA_VALIDEE_RC'))
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('rejette si le CDS n\'a jamais transmis à la CB (ni FAD_TRANSMISE_CDS_CB ni FAD_MODIFIEE_TRANSMISE_RC_CB, 409)', async () => {
+    historiqueFindAllByDemandeAchat.mockResolvedValue(HISTORIQUE_COMPLET.filter((r) => r.code_statut !== 'FAD_TRANSMISE_CDS_CB'))
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('rejette si le délai est manquant sur un devis affiché (400, message explicite)', async () => {
+    devisFindAllByDemandeAchat.mockResolvedValue([{ ...DEVIS_COMPLET[0], delai_livraison: null }])
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 400 })
+    expect(genererFadPdfBufferMock).not.toHaveBeenCalled()
+  })
+
+  it('rejette si la signature du chef de service (CDS) est manquante (400, message explicite)', async () => {
+    signatureGetBufferForPdf.mockImplementation((matricule: string) => (matricule === CDS ? Promise.resolve(null) : Promise.resolve({ buffer: Buffer.from('sig'), extension: 'png' })))
+    await expect(genererFadPdf(CB, 1)).rejects.toMatchObject({ status: 400 })
+    expect(genererFadPdfBufferMock).not.toHaveBeenCalled()
+  })
+
+  it('génère le PDF avec les bonnes données agrégées quand tout est complet', async () => {
+    const result = await genererFadPdf(CB, 1)
+
+    expect(result).toEqual({ buffer: Buffer.from('%PDF-1.4'), nomFichier: 'FAD-2026-09-08-001.pdf' })
+    expect(genererFadPdfBufferMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        direction: 'Direction des Services de l\'Exploitation et des réseaux',
+        service: 'Service Voyageurs',
+        cellule: 'Administration',
+        numero: 'FAD-2026-09-08-001',
+        objet: 'Remplacement de batterie SCES TDP',
+        typeAchat: 'TRAVAUX',
+        imputationComptable: 'FONCTIONNEMENT',
+        procedureAchat: 'HORS_MARCHE',
+        nummarche: null, // HORS_MARCHE : jamais affiché même si NUMMARCHE est renseigné
+        montant: 2563.93,
+        cug: '271',
+        entrepriseRetenue: 'INEO',
+        seuilBasLabel: `de 0 à ${(90000).toLocaleString('fr-FR')}€ H.T.`,
+        seuilHautLabel: `> à ${(90000).toLocaleString('fr-FR')}€ H.T.`,
+      }),
+    )
+    const args = genererFadPdfBufferMock.mock.calls[0][0]
+    expect(args.demandeur.nomPrenom).toBe('Cédric Lamoise')
+    expect(args.responsableSection.nomPrenom).toBe('Laurent Bohbot')
+    // Date RC = transmission au CDS (FAD_TRANSMISE_RC_CDS), pas la décision RC elle-même (DA_VALIDEE_RC).
+    expect(args.responsableSection.date).toBe('15/07/2026')
+    expect(args.chefService.nomPrenom).toBe('Matthieu Hinchliffe')
+    expect(args.entreprisesConsultees).toEqual([
+      { nom: 'INEO', codePostal: '13100', ville: 'Aix-en-Provence', montantHt: 2563.93, delai: '31/12/2026' },
+    ])
+  })
+
+  it('utilise le seuil investissement (pas fonctionnement) quand imputation_comptable=INVESTISSEMENT', async () => {
+    findById.mockResolvedValue({ ...FAD_TRANSMISE, imputation_comptable: 'INVESTISSEMENT', numero_operation: 'OP-123' })
+
+    await genererFadPdf(CB, 1)
+
+    const args = genererFadPdfBufferMock.mock.calls[0][0]
+    expect(args.seuilBasLabel).toBe(`de 0 à ${(45000).toLocaleString('fr-FR')}€ H.T.`)
+    expect(args.seuilHautLabel).toBe(`> à ${(45000).toLocaleString('fr-FR')}€ H.T.`)
+    expect(args.numeroOperation).toBe('OP-123')
+  })
+
+  it('procédure MARCHE : résout le titulaire via id_fournisseur_retenu et ne consulte pas les devis', async () => {
+    findById.mockResolvedValue({ ...FAD_TRANSMISE, procedure_achat: 'MARCHE', id_fournisseur_retenu: 42, nummarche: 'P2503329' })
+
+    await genererFadPdf(CB, 1)
+
+    expect(devisFindAllByDemandeAchat).not.toHaveBeenCalled()
+    const args = genererFadPdfBufferMock.mock.calls[0][0]
+    expect(args.procedureAchat).toBe('MARCHE')
+    expect(args.nummarche).toBe('P2503329')
+    expect(args.entrepriseRetenue).toBe('INEO')
+    expect(args.entreprisesConsultees).toEqual([])
   })
 })

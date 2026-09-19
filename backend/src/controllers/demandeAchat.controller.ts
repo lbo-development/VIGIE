@@ -16,7 +16,23 @@ export async function postDemandeAchat(req: Request, res: Response, next: NextFu
   }
 }
 
-const ACCUEIL_SCOPES = new Set(['A_FINALISER', 'SUIVI_FAD', 'A_TRAITER', 'EN_COURS', 'FAD_COMMANDEES', 'REJETEES_ANNULEES'])
+const ACCUEIL_SCOPES = new Set([
+  'A_FINALISER',
+  'SUIVI_FAD',
+  'A_TRAITER',
+  'EN_COURS',
+  'A_TRAITER_CDS',
+  'EN_COURS_CDS',
+  'A_TRAITER_CB',
+  'EN_COURS_CB',
+  'FAD_COMMANDEES',
+  'REJETEES_ANNULEES',
+])
+
+/** Écrans de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — voir demandeAchat.service.ts#resolveAccessContext. */
+function parseRoleHint(raw: unknown): 'CDS' | 'CB' | undefined {
+  return raw === 'CDS' || raw === 'CB' ? raw : undefined
+}
 
 export async function getDemandeAchat(req: Request, res: Response, next: NextFunction) {
   try {
@@ -26,6 +42,8 @@ export async function getDemandeAchat(req: Request, res: Response, next: NextFun
     const idFournisseurRetenu = typeof idFournisseurRetenuRaw === 'string' && idFournisseurRetenuRaw.trim() !== '' ? Number(idFournisseurRetenuRaw) : undefined
     const scopeRaw = req.query.scope
     const scope = typeof scopeRaw === 'string' && ACCUEIL_SCOPES.has(scopeRaw) ? (scopeRaw as demandeAchatService.AccueilScope) : undefined
+    // Écrans de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — voir demandeAchat.service.ts#resolveAccessContext.
+    const role = parseRoleHint(req.query.role)
 
     const demandesAchat = await demandeAchatService.listDemandeAchat(req.matricule ?? null, {
       idCellule: idCellule !== undefined && Number.isFinite(idCellule) ? idCellule : undefined,
@@ -34,6 +52,7 @@ export async function getDemandeAchat(req: Request, res: Response, next: NextFun
       scope,
       search: typeof req.query.search === 'string' ? req.query.search : undefined,
       idFournisseurRetenu: idFournisseurRetenu !== undefined && Number.isFinite(idFournisseurRetenu) ? idFournisseurRetenu : undefined,
+      role,
     })
     res.json(demandesAchat)
   } catch (err) {
@@ -43,7 +62,8 @@ export async function getDemandeAchat(req: Request, res: Response, next: NextFun
 
 export async function getDemandeAchatSynthese(req: Request, res: Response, next: NextFunction) {
   try {
-    const synthese = await demandeAchatService.getSynthese(req.matricule ?? null)
+    const role = parseRoleHint(req.query.role)
+    const synthese = await demandeAchatService.getSynthese(req.matricule ?? null, role)
     res.json(synthese)
   } catch (err) {
     next(err)
@@ -73,7 +93,9 @@ export async function putDemandeAchat(req: Request, res: Response, next: NextFun
 export async function getDemandeAchatHistorique(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
-    const historique = await demandeAchatService.getHistoriqueStatuts(req.matricule ?? null, id)
+    // Écrans de suivi CDS/CB (décisions du 17/09/2026 puis 18/09/2026) — voir demandeAchat.service.ts#getHistoriqueStatuts.
+    const role = parseRoleHint(req.query.role)
+    const historique = await demandeAchatService.getHistoriqueStatuts(req.matricule ?? null, id, role)
     res.json(historique)
   } catch (err) {
     next(err)
@@ -93,7 +115,10 @@ export async function putDemandeAchatMarche(req: Request, res: Response, next: N
 export async function getDemandeAchatConsultation(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
-    const candidats = await demandeAchatService.listConsultationDemandeAchat(req.matricule ?? null, id)
+    // Écran de suivi CB (décision du 18/09/2026) — GestionDocumentaireModal.tsx en a besoin pour
+    // construire sa liste de fournisseurs, voir demandeAchat.service.ts#listConsultationDemandeAchat.
+    const role = parseRoleHint(req.query.role)
+    const candidats = await demandeAchatService.listConsultationDemandeAchat(req.matricule ?? null, id, role)
     res.json(candidats)
   } catch (err) {
     next(err)
@@ -130,10 +155,30 @@ export async function postDemandeAchatDecisionRc(req: Request, res: Response, ne
   }
 }
 
+export async function postDemandeAchatDevaliderRc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.devaliderRc(req.matricule ?? null, id)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function postDemandeAchatTransmettreFad(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
     const demandeAchat = await demandeAchatService.transmettreFad(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function putDemandeAchatFad(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.enregistrerFad(req.matricule ?? null, id, req.body)
     res.json(demandeAchat)
   } catch (err) {
     next(err)
@@ -288,7 +333,10 @@ export async function getDevisFichier(req: Request, res: Response, next: NextFun
   try {
     const id = parseId(req.params.id)
     const idDevis = parseId(req.params.idDevis)
-    const { buffer, nomFichier } = await demandeAchatService.downloadDevisFile(req.matricule ?? null, id, idDevis)
+    // Écran de suivi CB (décision du 18/09/2026) — le devis reste verrouillé pour la CB mais le
+    // téléchargement doit rester accessible, voir demandeAchat.service.ts#downloadDevisFile.
+    const role = parseRoleHint(req.query.role)
+    const { buffer, nomFichier } = await demandeAchatService.downloadDevisFile(req.matricule ?? null, id, idDevis, role)
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(nomFichier)}"`)
     res.send(buffer)
@@ -314,7 +362,8 @@ export async function getDemandeAchatPieces(req: Request, res: Response, next: N
     const idFournisseurRaw = req.query.idFournisseur
     const idFournisseur = typeof idFournisseurRaw === 'string' ? Number(idFournisseurRaw) : NaN
     if (!Number.isFinite(idFournisseur)) throw new AppError('idFournisseur requis.', 400)
-    const pieces = await demandeAchatService.listPiecesDemandeAchat(req.matricule ?? null, id, idFournisseur)
+    const role = parseRoleHint(req.query.role)
+    const pieces = await demandeAchatService.listPiecesDemandeAchat(req.matricule ?? null, id, idFournisseur, role)
     res.json(pieces)
   } catch (err) {
     next(err)
@@ -325,7 +374,10 @@ export async function postDemandeAchatPiece(req: Request, res: Response, next: N
   try {
     const id = parseId(req.params.id)
     const file = req.file ? { buffer: req.file.buffer, size: req.file.size, originalname: req.file.originalname } : undefined
-    const piece = await demandeAchatService.addPieceDemandeAchat(req.matricule ?? null, id, req.body, file)
+    // Écran de suivi CB (décision du 18/09/2026) — pièces éditables tant que la CB est « pour
+    // action », voir demandeAchat.service.ts#STATUTS_PIECES_MODIFIABLES.
+    const role = parseRoleHint(req.query.role)
+    const piece = await demandeAchatService.addPieceDemandeAchat(req.matricule ?? null, id, req.body, file, role)
     res.status(201).json(piece)
   } catch (err) {
     next(err)
@@ -336,7 +388,8 @@ export async function deleteDemandeAchatPiece(req: Request, res: Response, next:
   try {
     const id = parseId(req.params.id)
     const idPiece = parseId(req.params.idPiece)
-    await demandeAchatService.removePieceDemandeAchat(req.matricule ?? null, id, idPiece)
+    const role = parseRoleHint(req.query.role)
+    await demandeAchatService.removePieceDemandeAchat(req.matricule ?? null, id, idPiece, role)
     res.status(204).end()
   } catch (err) {
     next(err)
@@ -347,7 +400,21 @@ export async function getDemandeAchatPieceFichier(req: Request, res: Response, n
   try {
     const id = parseId(req.params.id)
     const idPiece = parseId(req.params.idPiece)
-    const { buffer, nomFichier } = await demandeAchatService.downloadPieceDemandeAchat(req.matricule ?? null, id, idPiece)
+    const role = parseRoleHint(req.query.role)
+    const { buffer, nomFichier } = await demandeAchatService.downloadPieceDemandeAchat(req.matricule ?? null, id, idPiece, role)
+    res.setHeader('Content-Type', 'application/pdf')
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(nomFichier)}"`)
+    res.send(buffer)
+  } catch (err) {
+    next(err)
+  }
+}
+
+/** Fiche FAD papier (PDF) — bouton réservé au rôle CB, décision du 19/09/2026. Jamais stockée, générée à la volée à chaque appel — voir demandeAchat.service.ts#genererFadPdf. */
+export async function getDemandeAchatFadPdf(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const { buffer, nomFichier } = await demandeAchatService.genererFadPdf(req.matricule ?? null, id)
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(nomFichier)}"`)
     res.send(buffer)

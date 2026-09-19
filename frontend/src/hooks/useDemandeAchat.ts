@@ -3,6 +3,7 @@ import { api } from '../services/api'
 
 export type ProcedureAchat = 'MARCHE' | 'HORS_MARCHE'
 export type MotifChoix = 'Prix' | 'Délai' | 'Technique' | 'Autre'
+export type TypeFad = 'CONTRAT' | 'OUVERTE' | 'FERMEE'
 
 export interface DemandeAchat {
   id_demande_achat: number
@@ -23,6 +24,8 @@ export interface DemandeAchat {
   libelle_motif_choix: string | null
   montant_retenu: number | null
   montant_commande: number | null
+  /** Posée une seule fois à l'exemption du seuil de validation DS (décision du 18/09/2026) — voir DemandeAchatCard.tsx (badge « Seuil DS »). */
+  validee_sur_seuil_ds: boolean
   date_creation: string
   matricule_demandeur: string
   code_site: string | null
@@ -43,7 +46,17 @@ export interface DemandeAchat {
  * Onglet de l'écran d'accueil (décision du 15/09/2026) — traduit côté backend en une liste
  * fixe de statuts (voir demandeAchat.service.ts#ACCUEIL_SCOPE_STATUTS), prioritaire sur `statut`.
  */
-export type AccueilScope = 'A_FINALISER' | 'SUIVI_FAD' | 'A_TRAITER' | 'EN_COURS' | 'FAD_COMMANDEES' | 'REJETEES_ANNULEES'
+export type AccueilScope =
+  | 'A_FINALISER'
+  | 'SUIVI_FAD'
+  | 'A_TRAITER'
+  | 'EN_COURS'
+  | 'A_TRAITER_CDS'
+  | 'EN_COURS_CDS'
+  | 'A_TRAITER_CB'
+  | 'EN_COURS_CB'
+  | 'FAD_COMMANDEES'
+  | 'REJETEES_ANNULEES'
 
 export interface DemandeAchatListParams {
   idCellule?: number | null
@@ -53,6 +66,13 @@ export interface DemandeAchatListParams {
   search?: string
   /** Filtre "Fournisseurs" des onglets de l'écran d'accueil — correspondance exacte. */
   idFournisseurRetenu?: number | null
+  /**
+   * Écrans de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — indique explicitement au
+   * backend quel rôle scoper (voir demandeAchat.service.ts#resolveAccessContext) : un acteur peut
+   * cumuler RC/CDS/CB, la résolution par défaut ne suffit pas à distinguer les écrans
+   * (pages/SuiviRc.tsx ne le fournit jamais, pages/SuiviCds.tsx/SuiviCb.tsx le fournissent toujours).
+   */
+  role?: 'CDS' | 'CB'
 }
 
 /** Filtres de la page DemandeAchat / des onglets de l'accueil — voir demandeAchat.service.ts#listDemandeAchat pour la portée exacte appliquée côté backend selon le rôle. */
@@ -71,6 +91,7 @@ export function useDemandeAchatList(params: DemandeAchatListParams) {
     if (params.scope) query.set('scope', params.scope)
     if (params.search) query.set('search', params.search)
     if (params.idFournisseurRetenu != null) query.set('idFournisseurRetenu', String(params.idFournisseurRetenu))
+    if (params.role) query.set('role', params.role)
     const qs = query.toString()
 
     return api
@@ -78,7 +99,7 @@ export function useDemandeAchatList(params: DemandeAchatListParams) {
       .then((data) => setDemandesAchat(data))
       .catch(() => setError('Impossible de charger les demandes d\'achat.'))
       .finally(() => setLoading(false))
-  }, [params.idCellule, params.matriculeDemandeur, params.statut, params.scope, params.search, params.idFournisseurRetenu])
+  }, [params.idCellule, params.matriculeDemandeur, params.statut, params.scope, params.search, params.idFournisseurRetenu, params.role])
 
   useEffect(() => {
     void refetch()
@@ -123,6 +144,8 @@ export interface ConsultationCandidat {
   idDevis: number
   idFournisseur: number
   montantDevis: number | null
+  /** Délai annoncé par l'entreprise consultée (format ISO YYYY-MM-DD) — affiché sur la fiche FAD papier (SuiviCb, bouton « Générer la fiche FAD »). */
+  delaiLivraison: string | null
   ordre: number
   retenu: boolean
   nomFichierOriginal: string | null
@@ -130,8 +153,9 @@ export interface ConsultationCandidat {
 }
 
 /** Écran FournisseurDA (bouton « Éléments de consultation »), à l'ouverture. */
-export async function getConsultationDemandeAchat(idDemandeAchat: number): Promise<ConsultationCandidat[]> {
-  return api.get<ConsultationCandidat[]>(`/demandes-achat/${idDemandeAchat}/consultation`)
+/** `role: 'CB'` (décision du 18/09/2026) — GestionDocumentaireModal en a besoin pour construire sa liste de fournisseurs sur une FAD qui n'est pas celle de la CB. */
+export async function getConsultationDemandeAchat(idDemandeAchat: number, role?: 'CDS' | 'CB'): Promise<ConsultationCandidat[]> {
+  return api.get<ConsultationCandidat[]>(`/demandes-achat/${idDemandeAchat}/consultation${role ? `?role=${role}` : ''}`)
 }
 
 /**
@@ -150,7 +174,7 @@ export async function removeConsultationCandidat(idDemandeAchat: number, idDevis
 }
 
 export interface SaveConsultationInput {
-  candidats: { idDevis: number; montantDevis: number }[]
+  candidats: { idDevis: number; montantDevis: number; delaiLivraison?: string | null }[]
   motifChoix: MotifChoix
   libelleMotifChoix?: string | null
 }
@@ -182,9 +206,9 @@ export async function uploadDevisFile(idDemandeAchat: number, idDevis: number, f
   return api.postForm<ConsultationCandidat>(`/demandes-achat/${idDemandeAchat}/devis/${idDevis}/fichier`, formData)
 }
 
-/** Écran de gestion documentaire — télécharge le PDF déposé pour un devis. */
-export async function downloadDevisFileBlob(idDemandeAchat: number, idDevis: number): Promise<Blob> {
-  return api.getBlob(`/demandes-achat/${idDemandeAchat}/devis/${idDevis}/fichier`)
+/** Écran de gestion documentaire — télécharge le PDF déposé pour un devis. `role: 'CB'` (décision du 18/09/2026) : le devis reste verrouillé pour la CB, mais le téléchargement doit rester accessible sur une FAD qui n'est pas la sienne. */
+export async function downloadDevisFileBlob(idDemandeAchat: number, idDevis: number, role?: 'CDS' | 'CB'): Promise<Blob> {
+  return api.getBlob(`/demandes-achat/${idDemandeAchat}/devis/${idDevis}/fichier${role ? `?role=${role}` : ''}`)
 }
 
 /**
@@ -205,26 +229,41 @@ export interface PieceJointe {
   tailleOctets: number
 }
 
-/** Écran de gestion documentaire — pièces complémentaires d'un fournisseur de la DA (voir demandeAchat.service.ts#listPiecesDemandeAchat). */
-export async function getPiecesDemandeAchat(idDemandeAchat: number, idFournisseur: number): Promise<PieceJointe[]> {
-  return api.get<PieceJointe[]>(`/demandes-achat/${idDemandeAchat}/pieces?idFournisseur=${idFournisseur}`)
+/** Écran de gestion documentaire — pièces complémentaires d'un fournisseur de la DA (voir demandeAchat.service.ts#listPiecesDemandeAchat). `role: 'CB'` (décision du 18/09/2026), voir addPieceDemandeAchat ci-dessous. */
+export async function getPiecesDemandeAchat(idDemandeAchat: number, idFournisseur: number, role?: 'CDS' | 'CB'): Promise<PieceJointe[]> {
+  return api.get<PieceJointe[]>(`/demandes-achat/${idDemandeAchat}/pieces?idFournisseur=${idFournisseur}${role ? `&role=${role}` : ''}`)
 }
 
-/** Dépôt d'une pièce complémentaire — une pièce n'existe qu'avec son fichier (voir demandeAchat.service.ts#addPieceDemandeAchat). */
-export async function addPieceDemandeAchat(idDemandeAchat: number, idFournisseur: number, typePiece: string, file: File): Promise<PieceJointe> {
+/**
+ * Dépôt d'une pièce complémentaire — une pièce n'existe qu'avec son fichier (voir
+ * demandeAchat.service.ts#addPieceDemandeAchat). `role: 'CB'` (décision du 18/09/2026, écran de
+ * suivi CB) : contrairement au RC (résolu par défaut, sans hint), la CB n'est reconnue que via ce
+ * paramètre explicite — les pièces complémentaires restent modifiables tant qu'elle est « pour
+ * action » (STATUTS_PIECES_MODIFIABLES côté backend), contrairement au devis.
+ */
+export async function addPieceDemandeAchat(idDemandeAchat: number, idFournisseur: number, typePiece: string, file: File, role?: 'CDS' | 'CB'): Promise<PieceJointe> {
   const formData = new FormData()
   formData.append('fichier', file)
   formData.append('idFournisseur', String(idFournisseur))
   formData.append('typePiece', typePiece)
-  return api.postForm<PieceJointe>(`/demandes-achat/${idDemandeAchat}/pieces`, formData)
+  return api.postForm<PieceJointe>(`/demandes-achat/${idDemandeAchat}/pieces${role ? `?role=${role}` : ''}`, formData)
 }
 
-export async function removePieceDemandeAchat(idDemandeAchat: number, idPiece: number): Promise<void> {
-  return api.delete(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}`)
+export async function removePieceDemandeAchat(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB'): Promise<void> {
+  return api.delete(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}${role ? `?role=${role}` : ''}`)
 }
 
-export async function downloadPieceDemandeAchatBlob(idDemandeAchat: number, idPiece: number): Promise<Blob> {
-  return api.getBlob(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}/fichier`)
+export async function downloadPieceDemandeAchatBlob(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB'): Promise<Blob> {
+  return api.getBlob(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}/fichier${role ? `?role=${role}` : ''}`)
+}
+
+/**
+ * Écran de suivi CB — fiche FAD papier (PDF), bouton réservé au rôle CB, actif uniquement sur
+ * FAD_TRANSMISE_CB_DS ou FAD_A_COMMANDER avec validee_sur_seuil_ds (voir SuiviCb.tsx et
+ * demandeAchat.service.ts#genererFadPdf). Jamais stockée, régénérée à chaque appel.
+ */
+export async function downloadFadPdfBlob(idDemandeAchat: number): Promise<Blob> {
+  return api.getBlob(`/demandes-achat/${idDemandeAchat}/fad-pdf`)
 }
 
 export async function deleteDemandeAchat(idDemandeAchat: number): Promise<void> {
@@ -247,20 +286,38 @@ export async function transmettreRc(idDemandeAchat: number): Promise<DemandeAcha
   return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-rc`, {})
 }
 
-/** OP1.2 — file RC. */
+/**
+ * OP1.2 — file RC. Purement décisionnelle (décision du 16/09/2026, revient sur la fusion
+ * décision+complétion du 15/09/2026) — appelée depuis la modale « Valider les éléments de la
+ * commande » (visualisation seule), sans aucun champ de complétion OP1.2b (déplacés dans
+ * transmettreFad, modale « Traiter »).
+ */
 export async function decisionRc(idDemandeAchat: number, input: DecisionInput): Promise<DemandeAchat> {
   return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/decision-rc`, input)
+}
+
+/**
+ * Reprise OP1.2 (décision du 16/09/2026, écran de suivi RC) — « Dévalider » une DA_VALIDEE_RC :
+ * retour à DA_TRANSMISE_DEM_RC, aucun commentaire (simple correction de sa propre décision,
+ * distinct d'un rejet/d'une annulation, tous deux terminaux et jamais réversibles).
+ */
+export async function devaliderRc(idDemandeAchat: number): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/devalider-rc`, {})
 }
 
 export interface TransmettreFadInput {
   objet?: string
   description?: string
+  motifChoix?: MotifChoix
+  libelleMotifChoix?: string | null
   codeSite: string
   codeSousSite?: string | null
   codeSecteur: string
   codeSousSecteur?: string | null
   codeCug: string
   typeAchat: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  /** Définition métier du 16/09/2026 (jamais documentée avant ce chantier) — obligatoire. */
+  typeFad: TypeFad
   imputationComptable: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
   numeroOperation?: string | null
 }
@@ -268,6 +325,32 @@ export interface TransmettreFadInput {
 /** OP1.2b — bascule DA → FAD, transmission au CDS (et reprise depuis FAD_A_COMPLETER_CDS). */
 export async function transmettreFad(idDemandeAchat: number, input: TransmettreFadInput): Promise<DemandeAchat> {
   return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-fad`, input)
+}
+
+export interface EnregistrerFadInput {
+  objet?: string
+  description?: string
+  motifChoix?: MotifChoix
+  libelleMotifChoix?: string | null
+  codeSite?: string
+  codeSousSite?: string | null
+  codeSecteur?: string
+  codeSousSecteur?: string | null
+  codeCug?: string
+  typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  typeFad?: TypeFad
+  imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
+  numeroOperation?: string | null
+}
+
+/**
+ * Enregistrement intermédiaire (décision du 16/09/2026, modale « Traiter ») — sauvegarde la
+ * saisie en cours du formulaire de complétion FAD sans transmettre ni changer de statut, pour
+ * permettre une saisie en plusieurs fois. Tous les champs sont optionnels — contrairement à
+ * transmettreFad.
+ */
+export async function enregistrerFad(idDemandeAchat: number, input: EnregistrerFadInput): Promise<DemandeAchat> {
+  return api.put<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/fad`, input)
 }
 
 /** OP1.3 — file CDS. */
@@ -298,12 +381,15 @@ export async function decisionCb(idDemandeAchat: number, input: DecisionCbInput)
 export interface RetransmettreCbInput {
   objet?: string
   description?: string
+  motifChoix?: MotifChoix
+  libelleMotifChoix?: string | null
   codeSite?: string
   codeSousSite?: string | null
   codeSecteur?: string
   codeSousSecteur?: string | null
   codeCug?: string
   typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
+  typeFad?: TypeFad
   imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
   numeroOperation?: string | null
 }
@@ -358,8 +444,9 @@ export interface HistoriqueStatutView {
   commentaireStatut: string | null
 }
 
-export async function getHistoriqueStatuts(idDemandeAchat: number): Promise<HistoriqueStatutView[]> {
-  return api.get<HistoriqueStatutView[]>(`/demandes-achat/${idDemandeAchat}/historique`)
+/** `role: 'CDS' | 'CB'` — même raison que DemandeAchatListParams.role : pages/SuiviCds.tsx/SuiviCb.tsx doivent le fournir pour rester consultables sur une FAD qui n'est pas la leur. */
+export async function getHistoriqueStatuts(idDemandeAchat: number, role?: 'CDS' | 'CB'): Promise<HistoriqueStatutView[]> {
+  return api.get<HistoriqueStatutView[]>(`/demandes-achat/${idDemandeAchat}/historique${role ? `?role=${role}` : ''}`)
 }
 
 export interface SyntheseBucket {
@@ -378,9 +465,12 @@ export interface AccueilSynthese {
  * DA/FAD) sur pages/Home.tsx, vue RC (DA/FAD de sa cellule, hors DA_EN_PREPARATION) sur
  * pages/SuiviRc.tsx — même hook, même endpoint, réutilisé tel quel (décision du 15/09/2026, second
  * chantier RC). Renommé depuis useAccueilDemandeurSynthese, qui ne décrivait plus que la moitié des
- * appelants.
+ * appelants. Vue CDS (DA/FAD du service, décision du 16/09/2026, pages/SuiviCds.tsx) : passer
+ * `role: 'CDS' | 'CB'` — même raison que DemandeAchatListParams.role, un acteur peut cumuler
+ * RC/CDS/CB. Vue CB (décision du 18/09/2026, pages/SuiviCb.tsx) : FAD du service, "En transit"
+ * porte 3 compartiments (RC/CDS/DS), "Mes demandes" devient "FAD du service" comme pour CDS.
  */
-export function useAccueilSynthese() {
+export function useAccueilSynthese(role?: 'CDS' | 'CB') {
   const [data, setData] = useState<AccueilSynthese | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -389,11 +479,11 @@ export function useAccueilSynthese() {
     setLoading(true)
     setError(null)
     return api
-      .get<AccueilSynthese>('/demandes-achat/synthese')
+      .get<AccueilSynthese>(`/demandes-achat/synthese${role ? `?role=${role}` : ''}`)
       .then((result) => setData(result))
       .catch(() => setError('Impossible de charger la synthèse.'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [role])
 
   useEffect(() => {
     void refetch()

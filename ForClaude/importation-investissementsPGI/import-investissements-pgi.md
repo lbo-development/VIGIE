@@ -3,7 +3,9 @@
 > **Statut** : construit (04/09/2026) — import (preview/confirm), page de consultation en cartes,
 > modification manuelle (`libelle_service`/`actif`/`utilisable`), modale de filtre et système de
 > pièces jointes (table `investissement_piece`, bucket Storage, backend, composants React) sont
-> implémentés et testés (backend 73 tests, frontend 45 tests côté page + composants dédiés).
+> implémentés et testés (backend 80 tests, frontend 45 tests côté page + composants dédiés). ACTIF
+> et UTILISABLE sont repilotés par STATUT à chaque import depuis le 17/09/2026 (§6/§14, revient
+> partiellement sur la décision du 04/09/2026 qui les rendait purement manuels).
 > Fonctionnalité non prévue au CDC initial sous cette forme (ajout demandé par l'utilisateur), mais
 > la table cible `finances.operation_investissement` existe déjà et est référencée dans le MCD/MLD
 > (`ForClaude/CDC/mcd-phases-1-2.md` §OPERATION_INVESTISSEMENT, `mld-phases-1-2.md` §2.2) — créée
@@ -193,17 +195,37 @@ commande), donc pas de suppression en masse. Séquence :
    deux appels) puis, pour le service cible de l'import : pour chaque opération éligible du fichier,
    **upsert** par `numero_operation` — création si absente, mise à jour sinon (`libelle`,
    `code_cug`, `id_service`, `statut`, `mt_initial`, les 16 montants des 4 tranches
-   AP.1/AP.8/CP.1/CP.8). Puis met à jour `last.import.investissement.pgi` avec la date/heure de
-   l'import (§7 — ici l'horodatage serveur, pas une date extraite du fichier, cf. §1).
+   AP.1/AP.8/CP.1/CP.8, et `ACTIF`/`UTILISABLE` selon la règle ci-dessous). Puis met à jour
+   `last.import.investissement.pgi` avec la date/heure de l'import (§7 — ici l'horodatage serveur,
+   pas une date extraite du fichier, cf. §1).
 
-   **Correction du 04/09/2026** : contrairement à la conception initiale, une opération déjà en
-   base mais absente du nouveau lot éligible (sortie du fichier, statut ∉ {A, F}, ou CUG hors
-   service) **n'est plus automatiquement flaguée inactive**. `ACTIF` est devenu un champ purement
-   manuel au même titre que `LIBELLE_SERVICE`/`UTILISABLE` (§11) — l'import ne le fixe qu'à la
-   création (défaut de colonne `true`) et ne le touche plus jamais ensuite ; seule une
-   modification manuelle (icône « Modifier », `investissement.service.ts#updateManagedFields`)
-   change ce champ désormais. Le compte-rendu ne porte donc plus de compteur d'opérations
-   désactivées.
+   Une opération déjà en base mais absente du nouveau lot éligible (sortie du fichier, statut ∉
+   {A, F}, ou CUG hors service) reste inchangée — pas de ligne à upserter pour elle, donc ni
+   `ACTIF` ni `UTILISABLE` n'y sont touchés dans ce cas précis. Le compte-rendu ne porte pas de
+   compteur d'opérations désactivées.
+
+   **Correction du 17/09/2026 — `ACTIF`/`UTILISABLE` repilotés par `STATUT`** : revient sur la
+   décision du 04/09/2026 qui les rendait purement manuels (§14/§16). Règle appliquée dans
+   `investissementImport.service.ts#confirm` à chaque ligne éligible, selon le statut importé et le
+   statut précédent de l'opération en base (lu juste avant l'upsert via un `findAll` scopé au
+   service) :
+   - **Statut `F`** (opération nouvelle ou déjà en base, quel que soit son statut précédent) :
+     `ACTIF=FAUX` et `UTILISABLE=FAUX`, systématiquement.
+   - **Statut `A`, opération absente de la base ou dont le statut précédent était `F`** (création ou
+     sortie de `F`) : `ACTIF=VRAI` et `UTILISABLE=VRAI`, ensemble.
+   - **Statut `A`, opération déjà en base et déjà à `A` lors de l'import précédent** : seul
+     `ACTIF=VRAI` est forcé — `UTILISABLE` est délibérément absent de la charge de cet upsert
+     (jamais mis à `NULL` ni réécrit) : une modification manuelle faite entre deux imports via
+     l'icône « Modifier » y survit tant que l'opération reste au statut `A` d'un import à l'autre.
+
+   `ACTIF` n'est donc plus un champ manuel au sens strict : une modification faite via « Modifier »
+   peut être écrasée par le prochain import (systématiquement sur `F` ; sur `A`, à chaque import).
+   `UTILISABLE` reste modifiable durablement tant que l'opération reste continûment au statut `A`.
+   Implémentation : deux lots homogènes sont upsertés séparément
+   (`OperationInvestissementUpsertComplet` pour le premier cas, `OperationInvestissementUpsertActifSeul`
+   pour le second) — PostgREST dérive les colonnes de la clause `ON CONFLICT ... DO UPDATE SET` de
+   l'ensemble des clés présentes dans le lot ; un lot hétérogène écraserait `UTILISABLE` à `NULL`
+   sur les lignes qui ne le portent pas, d'où la séparation stricte en deux appels `upsertMany`.
 5. **Compte-rendu final** — à l'écran et téléchargeable, même principe que les deux imports
    précédents.
 
@@ -273,7 +295,7 @@ created_at, updated_at
 | Ajout | `id_service` | `bigint not null references finances.service(id_service)` — stampé depuis le service cible de l'import, pas dérivé du CUG (même choix que `commande_pgi`/`marche_piece`) |
 | Ajout | `code_cug` | `text not null references finances.cug(code_cug)` |
 | Ajout | `statut` | `text not null` — valeur brute `A`/`F` (correction du 03/09/2026 : conservée telle quelle, revient sur la simplification initialement proposée, voir §14) |
-| Ajout | `actif` | `boolean not null default true` — **champ manuel depuis le 04/09/2026** (revient sur la conception initiale, §6) : l'import le fixe uniquement à la création (défaut de colonne), jamais réécrit ensuite, y compris quand une opération sort du lot éligible — modifiable uniquement via l'icône « Modifier » (`investissement.service.ts#updateManagedFields`), distinct de `statut` qui reste la dernière valeur PGI connue |
+| Ajout | `actif` | `boolean not null default true` — **repiloté par `STATUT` à chaque import depuis le 17/09/2026** (§6/§14, revient sur la décision du 04/09/2026 de le rendre purement manuel) : `FAUX` sur statut `F`, `VRAI` sur statut `A`, à chaque import, y compris quand l'opération était déjà en base — reste modifiable via l'icône « Modifier » (`investissement.service.ts#updateManagedFields`), mais une modification manuelle peut être écrasée par le prochain import. Distinct de `statut` qui reste la dernière valeur PGI connue |
 | Suppression | `mt_ap1`, `mt_ap8`, `mt_cp1`, `mt_cp8` | remplacées par les 16 colonnes ci-dessous — les 4 tranches du schéma CDC initial (AP.1, AP.8, CP.1, CP.8, §3/§4) sont conservées, mais chacune détaillée en 4 sous-montants (Budget/Engagement/Réel/Disponible) plutôt qu'une valeur unique |
 | Ajout | `mt_budget_ap1`, `mt_engage_ap1`, `mt_liquide_ap1`, `mt_solde_ap1` | `numeric not null default 0` chacune |
 | Ajout | `mt_budget_ap8`, `mt_engage_ap8`, `mt_liquide_ap8`, `mt_solde_ap8` | `numeric not null default 0` chacune |
@@ -284,7 +306,7 @@ created_at, updated_at
 | Ajout (04/09/2026) | `libelle_service` | `text`, nullable — libellé propre au service, distinct de `libelle` (PGI). À la création, un trigger `BEFORE INSERT` (impossible via un simple `DEFAULT`, qui ne peut ni référencer une autre colonne de la ligne ni appliquer une logique conditionnelle) calcule sa valeur : si `libelle` commence par `numero_operation` (ex. `libelle` = « IN025393 - REAMENAGEMENT DU POSTE RORO 93-94 », `numero_operation` = « IN025393 »), ce préfixe et les séparateurs qui suivent (espaces, tirets) sont retirés (→ « REAMENAGEMENT DU POSTE RORO 93-94 ») ; sinon `libelle_service` reçoit `libelle` tel quel. Modifiable ensuite via l'icône « Modifier » (§12) ; **jamais réécrit par un import suivant** — garanti côté backend en ne l'incluant jamais dans la charge de l'upsert, absent donc de la clause `ON CONFLICT ... DO UPDATE SET` générée par PostgREST (le trigger, lui, ne se déclenche qu'à l'insertion). Voir `20260904120000_operation_investissement_libelle_service.sql`. |
 | Ajout (04/09/2026) | `mt_travaux` | `numeric not null default 0` — alimenté par `Montant travaux` (OP, col. 18, §2.1). Revient sur la décision du 03/09/2026 de ne pas le stocker (§14). |
 | Ajout (04/09/2026) | `mt_fesi` | `numeric generated always as (mt_initial - mt_travaux) stored` — colonne **calculée par Postgres**, jamais écrite par l'import (impossible d'assigner explicitement une colonne générée), même mécanique que `finances.marche.utilisable`. Revient sur la décision du 03/09/2026 de ne pas le stocker (§14). |
-| Ajout (04/09/2026) | `utilisable` | `boolean not null default true` — champ manuel, distinct d'`actif`, ajouté directement en base par l'utilisateur puis documenté par `20260904110000_operation_investissement_utilisable.sql` ; aucun second critère de calcul documenté (contrairement à `ACTIF`/`COMPLETUDE` → `UTILISABLE` sur `finances.marche`) — jamais alimenté ni réécrit par l'import (même mécanique que `libelle_service`), modifiable uniquement via l'icône « Modifier ». Revient sur la décision du 03/09/2026 de ne pas le stocker (§14). |
+| Ajout (04/09/2026) | `utilisable` | `boolean not null default true` — distinct d'`actif`, ajouté directement en base par l'utilisateur puis documenté par `20260904110000_operation_investissement_utilisable.sql` ; aucun second critère de calcul documenté (contrairement à `ACTIF`/`COMPLETUDE` → `UTILISABLE` sur `finances.marche`). **Repiloté par `STATUT` depuis le 17/09/2026** (§6/§14), mais seulement sur statut `F` (toujours `FAUX`) ou sur une opération qui vient de passer de `F` à `A` (`VRAI`) — jamais réécrit par l'import tant que l'opération reste continûment au statut `A` d'un import à l'autre, modifiable alors durablement via l'icône « Modifier ». Revient sur la décision du 03/09/2026 de ne pas le stocker (§14). |
 
 RLS proposée, sur le modèle de `commande_pgi` (`20260903090000_create_commande_pgi.sql`) :
 - `select` : scopé service (`finances.current_user_id_service()`) + `ADMIN_APP` libre.
@@ -306,8 +328,9 @@ simplification demandée par l'utilisateur par rapport à la liste littérale de
 
 `InvestissementsPGI.tsx` (montée `/investissements`), « État des investissements PGI du service »
 dans la sidebar — lecture ouverte à tout utilisateur authentifié pour son propre service
-(`ADMIN_APP` libre du service consulté), la table n'étant alimentée que par l'import (les champs
-manuels `libelle_service`/`actif`/`utilisable` en sont l'exception, §11).
+(`ADMIN_APP` libre du service consulté), la table n'étant alimentée que par l'import ; `libelle_service`
+reste purement manuel, `actif`/`utilisable` sont repilotés par l'import selon `statut` depuis le
+17/09/2026 mais restent aussi modifiables entre deux imports via l'icône « Modifier » (§6/§11).
 
 Représentation en **cartes** (maquette utilisateur du 04/09/2026, pas un tableau comme
 `CommandesPGI.tsx`) : filtre Direction → Service + recherche texte (numéro d'opération/libellé)
@@ -347,7 +370,7 @@ service.ts` (`PARAMETRE_SCHEMAS['last.import.investissement.pgi']`) ; pièces jo
 `controllers/investissementPiece.controller.ts`, `routes/investissementPiece.routes.ts` (montée
 `/api/investissements/pieces`). Tests : `test/investissementImport.service.test.ts`,
 `test/investissement.service.test.ts`, `test/investissementPiece.service.test.ts`,
-`test/investissementPiece.routes.test.ts` (73 tests au total sur le périmètre investissement).
+`test/investissementPiece.routes.test.ts` (80 tests au total sur le périmètre investissement).
 
 Frontend : `hooks/useInvestissementImport.ts`, `hooks/useLastImportInvestissement.ts`,
 `hooks/useInvestissementsPgi.ts`, `hooks/usePiecesInvestissement.ts`, `pages/
@@ -438,6 +461,23 @@ d'inactivation automatique disparaît entièrement (`investissementRepository.
 findActiveNumerosByService`/`deactivateExcept` supprimés, `ImportReport.nbInactivees` retiré du
 compte-rendu) — une opération qui sort du lot éligible reste désormais inchangée en base tant
 qu'un humain ne la modifie pas explicitement.
+
+**Correction du 17/09/2026 — `ACTIF`/`UTILISABLE` repilotés par `STATUT`** : revient sur la
+décision ci-dessus. Constat utilisateur : une opération au statut `F` doit systématiquement être
+`ACTIF=FAUX`/`UTILISABLE=FAUX`, ce que le caractère purement manuel des deux champs ne garantissait
+plus (une opération créée `F` restait `VRAI`/`VRAI` par défaut de colonne tant que personne ne la
+modifiait). Règle retenue après clarification (deux questions posées, réponses utilisateur) :
+- Statut `F` : `ACTIF=FAUX`/`UTILISABLE=FAUX`, toujours, sans condition sur l'état précédent.
+- Statut `A`, opération créée ou sortant de `F` : `ACTIF=VRAI`/`UTILISABLE=VRAI`, ensemble.
+- Statut `A`, opération déjà à `A` à l'import précédent : `ACTIF=VRAI` forcé seul — `UTILISABLE`
+  n'est plus touché, pour ne pas écraser une modification manuelle faite entre deux imports tant
+  que l'opération reste active en continu.
+
+`ACTIF` n'est donc plus un champ manuel au sens strict (repiloté à chaque import, quel que soit le
+statut) ; `UTILISABLE` conserve un statut manuel partiel (préservé uniquement en `A`→`A`).
+L'icône « Modifier » reste inchangée (les deux champs restent éditables) — voir détail
+d'implémentation en §6, types `OperationInvestissementUpsertComplet`/`...ActifSeul`
+(`investissement.repository.ts`).
 
 # 15. Point de vigilance CDC
 
