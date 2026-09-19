@@ -70,7 +70,7 @@ export function ValiderCommandeCdsModal({ demandeAchat, onClose, onSaved }: Vali
     if (demandeAchat.procedure_achat !== 'HORS_MARCHE') return
     let cancelled = false
     setCandidatsLoading(true)
-    getConsultationDemandeAchat(demandeAchat.id_demande_achat)
+    getConsultationDemandeAchat(demandeAchat.id_demande_achat, 'CDS')
       .then((rows) => {
         if (!cancelled) setCandidats([...rows].sort((a, b) => a.ordre - b.ordre))
       })
