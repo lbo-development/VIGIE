@@ -148,7 +148,7 @@ const CELLS = {
   directionNomDs: 'S43',
 } as const
 
-// Plage fusionnée (image ancrée dessus, remplit exactement la boîte) par signataire.
+// Plage fusionnée (image ancrée dedans, voir addSignatureImage) par signataire.
 const SIGNATURE_RANGES = {
   demandeur: 'B37:P37',
   rc: 'S37:AG37',
@@ -187,30 +187,93 @@ function parseRangeBounds(range: string): { startCol: number; startRow: number; 
   return { startCol: s.col, startRow: s.row, endCol: e.col, endRow: e.row }
 }
 
-/**
- * Ancrage réduit à `SIGNATURE_FILL_RATIO` de la plage donnée, centré — voir Anchor#col/row
- * (node_modules/exceljs/lib/doc/anchor.js) : un `col`/`row` fractionnaire est interprété comme
- * une position continue dans le repère de la feuille (partie entière = colonne/ligne 0-based,
- * partie décimale = fraction de sa largeur/hauteur réelle), donc une simple interpolation
- * linéaire entre les coins de la plage donne une réduction proportionnelle correcte même si les
- * colonnes traversées ont des largeurs différentes.
- */
-function shrinkRangeToFraction(range: string, fraction: number): { tl: { col: number; row: number }; br: { col: number; row: number } } {
+// Largeur en pixels du chiffre "0" de la police par défaut d'Excel (Calibri 11 à 96 DPI) —
+// utilisée par la formule officielle de conversion largeur de colonne (caractères) → pixels
+// (ECMA-376). Constante standard, valable pour la très large majorité des classeurs Excel (dont
+// ce gabarit).
+const MAX_DIGIT_WIDTH_PX = 7
+const DEFAULT_COLUMN_WIDTH_CHARS = 9
+const DEFAULT_ROW_HEIGHT_POINTS = 15
+
+function excelColumnWidthToPixels(chars: number): number {
+  return Math.floor(((256 * chars + Math.floor(128 / MAX_DIGIT_WIDTH_PX)) / 256) * MAX_DIGIT_WIDTH_PX)
+}
+
+function excelRowHeightToPixels(points: number): number {
+  return Math.round((points * 96) / 72)
+}
+
+/** Dimensions réelles (pixels) de la plage — somme des largeurs de colonnes et hauteurs de ligne traversées. */
+function getRangePixelSize(sheet: ExcelJS.Worksheet, range: string): { width: number; height: number } {
   const { startCol, startRow, endCol, endRow } = parseRangeBounds(range)
-  // Bornes 0-based du rectangle complet (même convention que Image#set model pour une plage
-  // fournie sous forme de chaîne : tl = début de la première cellule, br = début de la cellule
-  // suivant la dernière).
-  const tl = { col: startCol - 1, row: startRow - 1 }
-  const br = { col: endCol, row: endRow }
-  const margin = (1 - fraction) / 2
-  const width = br.col - tl.col
-  const height = br.row - tl.row
-  return {
-    tl: { col: tl.col + margin * width, row: tl.row + margin * height },
-    br: { col: br.col - margin * width, row: br.row - margin * height },
+  let width = 0
+  for (let col = startCol; col <= endCol; col++) {
+    width += excelColumnWidthToPixels(sheet.getColumn(col).width ?? DEFAULT_COLUMN_WIDTH_CHARS)
+  }
+  let height = 0
+  for (let row = startRow; row <= endRow; row++) {
+    height += excelRowHeightToPixels(sheet.getRow(row).height ?? DEFAULT_ROW_HEIGHT_POINTS)
+  }
+  return { width, height }
+}
+
+/** Position fractionnaire (Anchor#col, voir exceljs/lib/doc/anchor.js) correspondant à un décalage en pixels depuis le début de la colonne `startCol1based`. */
+function pixelOffsetToColAnchor(sheet: ExcelJS.Worksheet, startCol1based: number, offsetPx: number): number {
+  let col = startCol1based
+  let remaining = offsetPx
+  for (;;) {
+    const colWidthPx = excelColumnWidthToPixels(sheet.getColumn(col).width ?? DEFAULT_COLUMN_WIDTH_CHARS)
+    if (colWidthPx <= 0 || remaining < colWidthPx) return col - 1 + (colWidthPx > 0 ? remaining / colWidthPx : 0)
+    remaining -= colWidthPx
+    col += 1
   }
 }
 
+/** Équivalent ligne de pixelOffsetToColAnchor. */
+function pixelOffsetToRowAnchor(sheet: ExcelJS.Worksheet, startRow1based: number, offsetPx: number): number {
+  let row = startRow1based
+  let remaining = offsetPx
+  for (;;) {
+    const rowHeightPx = excelRowHeightToPixels(sheet.getRow(row).height ?? DEFAULT_ROW_HEIGHT_POINTS)
+    if (rowHeightPx <= 0 || remaining < rowHeightPx) return row - 1 + (rowHeightPx > 0 ? remaining / rowHeightPx : 0)
+    remaining -= rowHeightPx
+    row += 1
+  }
+}
+
+/** En-tête PNG : largeur/hauteur en pixels toujours aux octets 16-23 (chunk IHDR, obligatoirement le premier du fichier). */
+function getPngDimensions(buffer: Buffer): { width: number; height: number } {
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) }
+}
+
+/** Parcourt les segments JPEG jusqu'au marqueur SOF (Start Of Frame) qui porte les dimensions — seul moyen fiable, la taille n'est pas à un offset fixe contrairement au PNG. */
+function getJpegDimensions(buffer: Buffer): { width: number; height: number } {
+  let offset = 2 // saute le marqueur SOI (0xFFD8)
+  while (offset + 9 <= buffer.length) {
+    if (buffer[offset] !== 0xff) throw new Error('Image JPEG de signature invalide (marqueur attendu).')
+    const marker = buffer[offset + 1]
+    // Marqueurs SOF0-SOF15, à l'exclusion de DHT (C4), JPG (C8) et DAC (CC) qui ne sont pas des SOF.
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) }
+    }
+    offset += 2 + buffer.readUInt16BE(offset + 2)
+  }
+  throw new Error('Image JPEG de signature invalide (dimensions introuvables).')
+}
+
+function getImageDimensions(buffer: Buffer, extension: 'png' | 'jpg'): { width: number; height: number } {
+  return extension === 'png' ? getPngDimensions(buffer) : getJpegDimensions(buffer)
+}
+
+/**
+ * Pose l'image de signature dans `range` en conservant ses proportions (ajustement "contain",
+ * décision du 20/09/2026 — un simple étirement tl/br déformait les signatures dont le ratio
+ * largeur/hauteur diffère de celui de la cellule) : l'image occupe au maximum
+ * `SIGNATURE_FILL_RATIO` de la largeur ou de la hauteur de la plage (celle des deux qui contraint
+ * le plus), centrée dans les deux axes. Nécessite un ancrage `{tl, ext}` (taille fixe en pixels,
+ * "oneCellAnchor" côté xlsx) plutôt que `{tl, br}` (étirement, "twoCellAnchor") — voir
+ * exceljs/lib/xlsx/xform/drawing/drawing-xform.js#getAnchorType.
+ */
 function addSignatureImage(
   workbook: ExcelJS.Workbook,
   sheet: ExcelJS.Worksheet,
@@ -226,10 +289,21 @@ function addSignatureImage(
     extension: signataire.signatureExtension === 'jpg' ? 'jpeg' : 'png',
   }
   const imageId = workbook.addImage(image)
-  // Les types exceljs exigent des instances de la classe `Anchor` pour tl/br, mais
-  // l'implémentation réelle (lib/doc/image.js#set model) accepte tout objet {col, row} — cast
-  // nécessaire, comportement voulu (voir shrinkRangeToFraction).
-  sheet.addImage(imageId, shrinkRangeToFraction(range, SIGNATURE_FILL_RATIO) as unknown as ExcelJS.ImageRange)
+
+  const { startCol, startRow } = parseRangeBounds(range)
+  const box = getRangePixelSize(sheet, range)
+  const { width: imgWidth, height: imgHeight } = getImageDimensions(signataire.signatureBuffer, signataire.signatureExtension)
+  const scale = Math.min((box.width * SIGNATURE_FILL_RATIO) / imgWidth, (box.height * SIGNATURE_FILL_RATIO) / imgHeight)
+  const renderWidth = imgWidth * scale
+  const renderHeight = imgHeight * scale
+
+  const tl = {
+    col: pixelOffsetToColAnchor(sheet, startCol, (box.width - renderWidth) / 2),
+    row: pixelOffsetToRowAnchor(sheet, startRow, (box.height - renderHeight) / 2),
+  }
+  // Les types exceljs exigent des instances de la classe `Anchor` pour tl, mais l'implémentation
+  // réelle (lib/doc/image.js#set model) accepte tout objet {col, row} — cast nécessaire.
+  sheet.addImage(imageId, { tl, ext: { width: renderWidth, height: renderHeight } } as unknown as ExcelJS.ImageRange)
 }
 
 // Bornes 0-based des 3 zones de signature (même convention que shrinkRangeToFraction) — sert à

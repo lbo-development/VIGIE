@@ -12,6 +12,17 @@ const SIGNATURE_PNG = Buffer.from(
   'base64',
 )
 
+/** PNG minimal (signature + en-tête IHDR uniquement, sans IDAT/CRC) — suffisant pour getPngDimensions, qui ne lit que les octets 16-23. */
+function buildPngWithSize(width: number, height: number): Buffer {
+  const buffer = Buffer.alloc(24)
+  buffer.write('\x89PNG\r\n\x1a\n', 0, 'binary')
+  buffer.writeUInt32BE(13, 8)
+  buffer.write('IHDR', 12, 'ascii')
+  buffer.writeUInt32BE(width, 16)
+  buffer.writeUInt32BE(height, 20)
+  return buffer
+}
+
 function buildData(overrides: Partial<FadPdfData> = {}): FadPdfData {
   return {
     direction: "Direction des Services de l'Exploitation et des réseaux",
@@ -221,6 +232,29 @@ describe('fillFadWorkbook', () => {
     const sheet = workbook.getWorksheet('Modèle FAD')!
 
     expect(sheet.getImages()).toHaveLength(baselineCount)
+  })
+
+  it.each([
+    ['paysage large', 400, 100],
+    ['portrait étroit', 60, 300],
+  ])('conserve les proportions de la signature (%s) sans la déformer', async (_label, width, height) => {
+    const workbook = await loadTemplate()
+    const signatureBuffer = buildPngWithSize(width, height)
+    fillFadWorkbook(
+      workbook,
+      buildData({
+        demandeur: { nomPrenom: 'Cédric LAMOISE', date: '15/07/2026', signatureBuffer, signatureExtension: 'png' },
+      }),
+    )
+    const sheet = workbook.getWorksheet('Modèle FAD')!
+    const image = sheet.getImages().find((img) => img.range.tl.nativeRow === 36) // B37:P37 → ligne 0-based 36
+    expect(image).toBeDefined()
+    const ext = (image!.range as unknown as { ext: { width: number; height: number } }).ext
+    expect(ext.width).toBeGreaterThan(0)
+    expect(ext.height).toBeGreaterThan(0)
+    // Le ratio largeur/hauteur de l'image posée doit correspondre à celui du fichier source
+    // (à la précision flottante près) — un étirement pour remplir la cellule le briserait.
+    expect(ext.width / ext.height).toBeCloseTo(width / height, 1)
   })
 
   it('lève une erreur explicite si la feuille "Modèle FAD" est absente du gabarit', async () => {
