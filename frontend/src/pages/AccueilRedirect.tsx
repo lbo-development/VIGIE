@@ -3,9 +3,10 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 
 /**
  * Racine `/` (onglet « Accueil ») — décision du 17/09/2026, étendue le
- * 18/09/2026 : redirige vers la page de suivi du rôle actif de l'utilisateur
- * (RC prioritaire sur CDS, lui-même prioritaire sur CB, s'il cumule
- * plusieurs de ces rôles — ordre hiérarchique N+1 > N+2 > CB, cohérent avec
+ * 18/09/2026 puis le 22/09/2026 : redirige vers la page de suivi du rôle
+ * actif de l'utilisateur (RC prioritaire sur CDS, lui-même prioritaire sur
+ * CB, lui-même prioritaire sur DS, s'il cumule plusieurs de ces rôles —
+ * ordre hiérarchique N+1 > N+2 > CB > N+3, cohérent avec
  * getAccueilSidebarItems côté config/navigation.ts), ou vers « Mes demandes
  * d'achat » (`/mes-demandes`, désormais son propre onglet du header, sorti
  * de la sidebar « Accueil ») s'il n'a aucun de ces rôles actifs. `null`
@@ -26,6 +27,9 @@ export function AccueilRedirect() {
 
   const hasCb = currentUser?.roles.some((r) => r.typeRole === 'CB') ?? false
   if (hasCb) return <Navigate to="/suivi-cb" replace />
+
+  const hasDs = currentUser?.roles.some((r) => r.typeRole === 'DS') ?? false
+  if (hasDs) return <Navigate to="/suivi-ds" replace />
 
   return <Navigate to="/mes-demandes" replace />
 }

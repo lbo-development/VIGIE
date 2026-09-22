@@ -9,7 +9,7 @@ vi.mock('../hooks/useCurrentUser', () => ({
   useCurrentUser: () => mockCurrentUser,
 }))
 
-function roles(types: Array<'RC' | 'CDS' | 'CB'>): MeResponse['roles'] {
+function roles(types: Array<'RC' | 'CDS' | 'CB' | 'DS'>): MeResponse['roles'] {
   return types.map((typeRole) => ({ typeRole, perimeterLabel: null, idService: null, idCellule: null }))
 }
 
@@ -22,6 +22,7 @@ function renderRedirect() {
         <Route path="/suivi-rc" element={<div>Suivi RC</div>} />
         <Route path="/suivi-cds" element={<div>Suivi CDS</div>} />
         <Route path="/suivi-cb" element={<div>Suivi CB</div>} />
+        <Route path="/suivi-ds" element={<div>Suivi DS</div>} />
       </Routes>
     </MemoryRouter>,
   )
@@ -95,6 +96,33 @@ describe('AccueilRedirect', () => {
   it('cumul RC+CB : RC prioritaire', () => {
     mockCurrentUser = {
       data: { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 3, roles: roles(['CB', 'RC']) },
+      loading: false,
+    }
+    renderRedirect()
+
+    expect(screen.getByText('Suivi RC')).toBeInTheDocument()
+  })
+
+  it('redirige vers /suivi-ds avec un rôle DS actif (décision du 22/09/2026)', () => {
+    mockCurrentUser = { data: { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 3, roles: roles(['DS']) }, loading: false }
+    renderRedirect()
+
+    expect(screen.getByText('Suivi DS')).toBeInTheDocument()
+  })
+
+  it('cumul CB+DS : CB prioritaire', () => {
+    mockCurrentUser = {
+      data: { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 3, roles: roles(['DS', 'CB']) },
+      loading: false,
+    }
+    renderRedirect()
+
+    expect(screen.getByText('Suivi CB')).toBeInTheDocument()
+  })
+
+  it('cumul RC+DS : RC prioritaire', () => {
+    mockCurrentUser = {
+      data: { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 3, roles: roles(['DS', 'RC']) },
       loading: false,
     }
     renderRedirect()
