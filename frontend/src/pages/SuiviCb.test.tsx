@@ -298,6 +298,17 @@ describe('SuiviCb — actions par ligne', () => {
     expect(row.getByRole('button', { name: 'Voir les éléments de la demande' })).toBeInTheDocument()
   })
 
+  it('bug corrigé le 22/09/2026 : depuis "Voir les éléments de la demande", la Gestion documentaire interroge le backend avec le rôle CB — sans ce paramètre, une CB pure (sans rôle RC) se voyait refuser l\'accès à sa propre FAD', () => {
+    const EN_COURS_AVEC_FOURNISSEUR = { ...EN_COURS, id_fournisseur_retenu: 42 }
+    mockLists({ EN_COURS_CB: [EN_COURS_AVEC_FOURNISSEUR] })
+    render(<SuiviCb />)
+    fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
+    fireEvent.click(within(screen.getByText('2026-09-07-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gestion documentaire' }))
+
+    expect(getConsultationMock).toHaveBeenCalledWith(2, 'CB')
+  })
+
   it('"Valider les éléments de la commande" ouvre ValiderCommandeCbModal', () => {
     render(<SuiviCb />)
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Valider les éléments de la commande' }))

@@ -370,7 +370,14 @@ export function SuiviCb() {
       </div>
 
       {modalDa && (
-        <DemandeAchatModal demandeAchat={modalDa} procedureEditable={false} readOnly onClose={() => setModalDa(null)} onSaved={() => setModalDa(null)} />
+        <DemandeAchatModal
+          demandeAchat={modalDa}
+          procedureEditable={false}
+          readOnly
+          roleHint="CB"
+          onClose={() => setModalDa(null)}
+          onSaved={() => setModalDa(null)}
+        />
       )}
 
       {validerCommandeDa && (

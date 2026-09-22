@@ -318,6 +318,17 @@ describe('SuiviCds — actions par ligne', () => {
     expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(2)
   })
 
+  it('bug corrigé le 22/09/2026 : depuis "Voir les éléments de la demande", la Gestion documentaire interroge le backend avec le rôle CDS — sans ce paramètre, un CDS pur (sans rôle RC) se voyait refuser l\'accès à sa propre FAD', () => {
+    const EN_COURS_AVEC_FOURNISSEUR = { ...EN_COURS, id_fournisseur_retenu: 42 }
+    mockLists({ EN_COURS_CDS: [EN_COURS_AVEC_FOURNISSEUR] })
+    render(<SuiviCds />)
+    fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
+    fireEvent.click(within(screen.getByText('2026-09-07-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gestion documentaire' }))
+
+    expect(getConsultationMock).toHaveBeenCalledWith(2, 'CDS')
+  })
+
   it('"Valider les éléments de la commande" ouvre ValiderCommandeCdsModal pour FAD_TRANSMISE_RC_CDS/FAD_VALIDEE_CDS', () => {
     render(<SuiviCds />)
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Valider les éléments de la commande' }))

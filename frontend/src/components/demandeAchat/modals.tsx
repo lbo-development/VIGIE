@@ -60,6 +60,17 @@ export interface DemandeAchatModalProps {
    * défaut (comportement inchangé pour l'onglet « A finaliser »).
    */
   readOnly?: boolean
+  /**
+   * Écrans de suivi CDS/CB (bug corrigé le 22/09/2026) : « Voir les éléments de la demande »
+   * (icône loupe, `readOnly`) passe par cette même modale générique pour toute FAD qui n'est pas
+   * au statut « à décider » — sans ce paramètre, la Gestion documentaire imbriquée
+   * (GestionDocumentaireModal) interroge le backend sans indice de rôle, qui retombe alors sur la
+   * résolution RC/Demandeur par défaut (resolveAccessContext, demandeAchat.service.ts) : un CDS ou
+   * une CB pur (sans rôle RC) se voyait refuser l'accès à sa propre FAD en 403 (« Un demandeur ne
+   * peut créer une DA que pour lui-même. », message trompeur car réutilisé hors contexte de
+   * création). RC n'a jamais besoin de ce paramètre, résolu par défaut — voir SuiviRc.tsx.
+   */
+  roleHint?: 'CDS' | 'CB'
   onClose: () => void
   onSaved: () => void
 }
@@ -75,7 +86,7 @@ export interface DemandeAchatModalProps {
  * Montant). « Fournisseurs consultés » reste désactivé : DEVIS_CONSULTE n'a
  * pas encore de backend.
  */
-export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = false, onClose, onSaved }: DemandeAchatModalProps) {
+export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = false, roleHint, onClose, onSaved }: DemandeAchatModalProps) {
   // OBJET_RC/DESCRIPTION_RC (pas *_DEMANDEUR) : synchronisés tant que la DA est éditable par le
   // demandeur, font foi ensuite (décision du 15/09/2026 — voir MLD §2.4). updateDemandeAchat
   // (OP1.1) recopie la valeur saisie ici dans les deux colonnes côté serveur.
@@ -430,6 +441,7 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
           idFournisseurRetenu={idFournisseurRetenu}
           montantDemande={Number(montant) || 0}
           readOnly={readOnly}
+          roleHint={roleHint}
           onClose={() => setGestionDocumentaireOpen(false)}
         />
       )}
