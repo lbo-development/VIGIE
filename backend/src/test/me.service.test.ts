@@ -56,7 +56,7 @@ describe('getCurrentUser', () => {
 
     const result = await getCurrentUser(MATRICULE)
 
-    expect(result.roles).toEqual([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 42, ...ROLE_ME_SANS_SUPPLEANCE }])
+    expect(result.roles).toEqual([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 42, idDirection: null, ...ROLE_ME_SANS_SUPPLEANCE }])
     expect(resolvePerimeterLabel).toHaveBeenCalledWith(expect.objectContaining({ id_cellule: 42, id_service: null, id_direction: null }))
   })
 
@@ -72,7 +72,7 @@ describe('getCurrentUser', () => {
 
     const result = await getCurrentUser(MATRICULE)
 
-    expect(result.roles).toEqual([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Sud', idService: null, idCellule: 99, ...ROLE_ME_SANS_SUPPLEANCE }])
+    expect(result.roles).toEqual([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Sud', idService: null, idCellule: 99, idDirection: null, ...ROLE_ME_SANS_SUPPLEANCE }])
   })
 
   it('plusieurs rôles cumulés sont tous exposés', async () => {
@@ -85,8 +85,8 @@ describe('getCurrentUser', () => {
     const result = await getCurrentUser(MATRICULE)
 
     expect(result.roles).toHaveLength(2)
-    expect(result.roles[0]).toEqual({ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 42, ...ROLE_ME_SANS_SUPPLEANCE })
-    expect(result.roles[1]).toEqual({ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Service Voyageurs', idService: 10, idCellule: null, ...ROLE_ME_SANS_SUPPLEANCE })
+    expect(result.roles[0]).toEqual({ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 42, idDirection: null, ...ROLE_ME_SANS_SUPPLEANCE })
+    expect(result.roles[1]).toEqual({ typeRole: 'ADMIN_SERVICE', perimeterLabel: 'Service Voyageurs', idService: 10, idCellule: null, idDirection: null, ...ROLE_ME_SANS_SUPPLEANCE })
   })
 
   it('acteur introuvable : nom/prenom null, sans planter', async () => {

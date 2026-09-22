@@ -153,6 +153,8 @@ const refetchMocks: Record<AccueilScope, ReturnType<typeof vi.fn>> = {
   EN_COURS_CDS: vi.fn(),
   A_TRAITER_CB: vi.fn(),
   EN_COURS_CB: vi.fn(),
+  A_TRAITER_DS: vi.fn(),
+  EN_COURS_DS: vi.fn(),
   FAD_COMMANDEES: vi.fn(),
   REJETEES_ANNULEES: vi.fn(),
 }
@@ -168,6 +170,8 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
     EN_COURS_CDS: [],
     A_TRAITER_CB: [],
     EN_COURS_CB: [],
+    A_TRAITER_DS: [],
+    EN_COURS_DS: [],
     FAD_COMMANDEES: [],
     REJETEES_ANNULEES: [],
     ...overrides,

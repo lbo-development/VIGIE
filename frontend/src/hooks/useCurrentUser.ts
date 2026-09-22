@@ -8,6 +8,11 @@ export interface MeRole {
   idService: number | null
   /** ID_CELLULE du rôle (RC) — ajouté le 15/09/2026 (écran de suivi RC) pour construire l'entrée de sidebar "FAD — <cellule>" sans dépendre du libellé texte. */
   idCellule: number | null
+  // ID_DIRECTION est toujours envoyé par /api/me pour un rôle DS (me.service.ts) ; optionnel ici
+  // uniquement pour ne pas imposer sa saisie dans chaque fixture de test qui fabrique un rôle
+  // RC/CDS/CB (même raison que les 4 champs de suppléance ci-dessous).
+  /** ID_DIRECTION du rôle (DS) — ajouté le 22/09/2026 (écran de suivi DS) pour construire l'entrée de sidebar "FAD (N+3) — <direction>" et résoudre le périmètre multi-services du DS. */
+  idDirection?: number | null
   // Les 4 champs de suppléance sont toujours envoyés par /api/me (me.service.ts) ; optionnels ici uniquement pour ne pas
   // imposer leur saisie dans chaque fixture de test qui fabrique un rôle sans suppléance.
   /** `true` = titulaire actuellement suppléé : consultation conservée, aucune écriture (décision du 20/09/2026). */

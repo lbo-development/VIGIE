@@ -25,13 +25,15 @@ const ACCUEIL_SCOPES = new Set([
   'EN_COURS_CDS',
   'A_TRAITER_CB',
   'EN_COURS_CB',
+  'A_TRAITER_DS',
+  'EN_COURS_DS',
   'FAD_COMMANDEES',
   'REJETEES_ANNULEES',
 ])
 
-/** Écrans de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — voir demandeAchat.service.ts#resolveAccessContext. */
-function parseRoleHint(raw: unknown): 'CDS' | 'CB' | undefined {
-  return raw === 'CDS' || raw === 'CB' ? raw : undefined
+/** Écrans de suivi CDS/CB/DS (décisions du 16/09/2026, 18/09/2026 puis 22/09/2026) — voir demandeAchat.service.ts#resolveAccessContext. */
+function parseRoleHint(raw: unknown): 'CDS' | 'CB' | 'DS' | undefined {
+  return raw === 'CDS' || raw === 'CB' || raw === 'DS' ? raw : undefined
 }
 
 export async function getDemandeAchat(req: Request, res: Response, next: NextFunction) {

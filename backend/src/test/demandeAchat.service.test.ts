@@ -93,8 +93,10 @@ vi.mock('../services/roleEffectif.service.js', () => ({
 }))
 const historiqueCreate = vi.fn()
 const serviceFindById = vi.fn()
+const serviceFindByDirection = vi.fn()
 vi.mock('../repositories/service.repository.js', () => ({
   findById: (...args: unknown[]) => serviceFindById(...args),
+  findByDirection: (...args: unknown[]) => serviceFindByDirection(...args),
 }))
 const seuilFindByService = vi.fn()
 vi.mock('../repositories/seuilValidationDs.repository.js', () => ({
@@ -209,11 +211,13 @@ const DEMANDEUR = '10001'
 const RC = '20001'
 const CDS = '22001'
 const CB = '25001'
+const DS = '28001'
 const ADMIN_SERVICE = '30001'
 const AUTRE_DEMANDEUR = '10002'
 const ID_SERVICE = 1
 const ID_SERVICE_AUTRE = 2
 const ID_CELLULE_RC = 5
+const ID_DIRECTION = 9
 
 const DA = {
   id_demande_achat: 1,
@@ -266,6 +270,7 @@ beforeEach(() => {
   findEffectiveRolesMock.mockReset()
   historiqueCreate.mockReset()
   serviceFindById.mockReset()
+  serviceFindByDirection.mockReset().mockResolvedValue([])
   seuilFindByService.mockReset().mockResolvedValue(null)
   findByMatricules.mockReset().mockResolvedValue([])
   roleFindById.mockReset()
@@ -633,6 +638,67 @@ describe('listDemandeAchat — écran de suivi CB (roleHint, décision du 18/09/
   })
 })
 
+describe('listDemandeAchat — écran de suivi DS (roleHint, décision du 22/09/2026)', () => {
+  it('DS avec role: "DS" voit tous les services de sa direction (périmètre ID_DIRECTION résolu en liste de services)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+    serviceFindByDirection.mockResolvedValue([
+      { id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true },
+      { id_service: ID_SERVICE_AUTRE, code_service: 'S2', libelle_service: 'S2', id_direction: ID_DIRECTION, actif: true },
+    ])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(DS, { role: 'DS' })
+
+    expect(serviceFindByDirection).toHaveBeenCalledWith(ID_DIRECTION)
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idServiceIn: [ID_SERVICE, ID_SERVICE_AUTRE] }))
+  })
+
+  it('bug équivalent CDS/CB : un suppléant DS pur (aucune role_attribution directe) voit la direction qu\'il supplée', async () => {
+    findEffectiveRolesMock.mockResolvedValue([
+      { idRole: 1, typeRole: 'DS', idCellule: null, idService: null, idDirection: ID_DIRECTION, idSuppleance: 99 },
+    ])
+    serviceFindByDirection.mockResolvedValue([{ id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(DS, { role: 'DS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idServiceIn: [ID_SERVICE] }))
+  })
+
+  it('sans role: "DS" explicite, un titulaire DS pur (pas RC) retombe en Demandeur — le hint est indispensable', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(DS, {})
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [DS] }))
+  })
+
+  it('correctif du cumul RC+DS : role: "DS" bascule sur la vue DS (direction) même pour un acteur qui a aussi un rôle RC actif', async () => {
+    findActiveByMatricule.mockResolvedValue([
+      { id_role: 1, type_role: 'RC', id_cellule: ID_CELLULE_RC, id_service: null, id_direction: null },
+      { id_role: 2, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION },
+    ])
+    serviceFindByDirection.mockResolvedValue([{ id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(RC, { role: 'DS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idServiceIn: [ID_SERVICE] }))
+    expect(findAllByCellule).not.toHaveBeenCalled()
+  })
+
+  it('ADMIN_SERVICE reste prioritaire sur role: "DS" (borné à son propre service, pas de résolution de direction)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
+    findAll.mockResolvedValue([DA])
+
+    await listDemandeAchat(ADMIN_SERVICE, { role: 'DS' })
+
+    expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idService: ID_SERVICE }))
+    expect(serviceFindByDirection).not.toHaveBeenCalled()
+  })
+})
+
 describe('listDemandeAchat — scope et filtre fournisseur (écran d\'accueil)', () => {
   it('traduit query.scope en liste de statuts fixe quand aucun statut précis n\'est choisi', async () => {
     findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
@@ -769,6 +835,41 @@ describe('couverture ACCUEIL_SCOPE_STATUTS (garde-fou anti-dérive)', () => {
       'FAD_TRANSMISE_RC_CDS',
       'FAD_A_COMPLETER_CDS',
       'FAD_VALIDEE_CDS',
+    ]
+    const codesAttendus = TOUS_LES_CODES_STATUT.filter((code) => !codesExclus.includes(code))
+
+    for (const code of codesExclus) expect(union).not.toContain(code)
+    expect(union.length).toBe(codesAttendus.length)
+    expect(new Set(union)).toEqual(new Set(codesAttendus))
+  })
+
+  // Écran de suivi DS (22/09/2026) : A_TRAITER_DS/EN_COURS_DS partagent FAD_COMMANDEES/
+  // REJETEES_ANNULEES avec les autres onglets — regroupement alternatif des mêmes codes. Exclus :
+  // les 4 codes DA_* (le DS n'intervient jamais sur une DA) + les 7 codes du seul ressort du
+  // CDS/de la CB avant que la FAD n'atteigne le DS (FAD_TRANSMISE_RC_CDS/FAD_MODIFIEE_TRANSMISE_RC_CB/
+  // FAD_VALIDEE_CDS/FAD_A_COMPLETER_CDS/FAD_TRANSMISE_CDS_CB/FAD_VALIDEE_CB/FAD_A_MODIFIER_CB — le
+  // DS ne voit jamais une FAD avant FAD_TRANSMISE_CB_DS, même principe que CB qui ne voit jamais une
+  // FAD avant FAD_TRANSMISE_CDS_CB). D'où 14 codes, pas 25.
+  it('les 4 onglets DS (A_TRAITER_DS/EN_COURS_DS/FAD_COMMANDEES/REJETEES_ANNULEES) couvrent exactement les 14 codes pertinents pour le DS, sans trou ni recouvrement', () => {
+    const scopes = [
+      ACCUEIL_SCOPE_STATUTS.A_TRAITER_DS,
+      ACCUEIL_SCOPE_STATUTS.EN_COURS_DS,
+      ACCUEIL_SCOPE_STATUTS.FAD_COMMANDEES,
+      ACCUEIL_SCOPE_STATUTS.REJETEES_ANNULEES,
+    ]
+    const union = scopes.flat()
+    const codesExclus = [
+      'DA_EN_PREPARATION',
+      'DA_TRANSMISE_DEM_RC',
+      'DA_VALIDEE_RC',
+      'DA_A_COMPLETER_RC',
+      'FAD_TRANSMISE_RC_CDS',
+      'FAD_MODIFIEE_TRANSMISE_RC_CB',
+      'FAD_VALIDEE_CDS',
+      'FAD_A_COMPLETER_CDS',
+      'FAD_TRANSMISE_CDS_CB',
+      'FAD_VALIDEE_CB',
+      'FAD_A_MODIFIER_CB',
     ]
     const codesAttendus = TOUS_LES_CODES_STATUT.filter((code) => !codesExclus.includes(code))
 
@@ -1042,6 +1143,74 @@ describe('getSynthese', () => {
       expect(result.enTransit.CDS).toEqual({ nombre: 1, montant: 200 })
       expect(result.enTransit.DS).toEqual({ nombre: 1, montant: 300 })
       expect(result.enTransit.CB).toEqual({ nombre: 0, montant: 0 })
+    })
+  })
+
+  // Écran de suivi DS (22/09/2026) : mêmes tuiles, scopées sur la direction du DS — appelé avec
+  // le hint explicite `roleHint: 'DS'` (voir resolveAccessContext). Périmètre = liste de services
+  // résolue via serviceRepository.findByDirection, contrairement à CDS/CB (idService unique).
+  describe('vue DS (écran de suivi DS)', () => {
+    beforeEach(() => {
+      findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+      serviceFindByDirection.mockResolvedValue([
+        { id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true },
+        { id_service: ID_SERVICE_AUTRE, code_service: 'S2', libelle_service: 'S2', id_direction: ID_DIRECTION, actif: true },
+      ])
+    })
+
+    it('interroge les DA/FAD de tous les services de la direction, pas seulement celles du DS lui-même', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(DS, 'DS')
+      expect(serviceFindByDirection).toHaveBeenCalledWith(ID_DIRECTION)
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idServiceIn: [ID_SERVICE, ID_SERVICE_AUTRE] }))
+      expect(findAllByCellule).not.toHaveBeenCalled()
+    })
+
+    it('"En transit" ne compte que RC/CDS/CB — jamais DS, même sur un statut EN_TRANSIT=DS', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_TRANSMISE_DEM_RC', montant_demande: 100 },
+        { code_statut: 'FAD_TRANSMISE_RC_CDS', montant_demande: 200 },
+        { code_statut: 'FAD_TRANSMISE_CB_DS', montant_demande: 300 },
+        { code_statut: 'FAD_A_COMMANDER', montant_demande: 400 },
+      ])
+
+      const result = await getSynthese(DS, 'DS')
+
+      expect(result.enTransit).toEqual({
+        RC: { nombre: 1, montant: 100 },
+        CDS: { nombre: 1, montant: 200 },
+        DS: { nombre: 0, montant: 0 },
+        CB: { nombre: 1, montant: 400 },
+      })
+    })
+
+    it('DA_EN_PREPARATION est exclue de "FAD de la direction" (mesDemandes)', async () => {
+      findAll.mockResolvedValue([
+        { code_statut: 'DA_EN_PREPARATION', montant_demande: 999 },
+        { code_statut: 'FAD_TRANSMISE_CB_DS', montant_demande: 50 },
+      ])
+
+      const result = await getSynthese(DS, 'DS')
+
+      expect(result.mesDemandes.enCours).toEqual({ nombre: 1, montant: 50 })
+    })
+
+    it('sans le hint, un titulaire DS pur retombe en Demandeur (interroge uniquement ses propres DA)', async () => {
+      findAll.mockResolvedValue([])
+      await getSynthese(DS)
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ matriculeDemandeurIn: [DS] }))
+    })
+
+    it("même correctif que CDS/CB (18/09/2026, cumul ADMIN_SERVICE) : un ADMIN_SERVICE avec le hint DS voit la vue de son propre service, pas le repli Demandeur — bornée, pas de résolution de direction possible depuis ADMIN_SERVICE", async () => {
+      findActiveByMatricule.mockResolvedValue([
+        { id_role: 1, type_role: 'ADMIN_SERVICE', id_cellule: null, id_service: ID_SERVICE, id_direction: null },
+      ])
+      findAll.mockResolvedValue([])
+
+      await getSynthese(ADMIN_SERVICE, 'DS')
+
+      expect(findAll).toHaveBeenCalledWith(expect.objectContaining({ idServiceIn: [ID_SERVICE] }))
+      expect(serviceFindByDirection).not.toHaveBeenCalled()
     })
   })
 })
@@ -2000,6 +2169,27 @@ describe('getHistoriqueStatuts', () => {
     findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'CB', id_cellule: null, id_service: ID_SERVICE, id_direction: null }])
 
     await expect(getHistoriqueStatuts(CB, 1)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('roleHint \'DS\' (décision du 22/09/2026) autorise un DS dont la direction couvre le service de la FAD, même si ce n\'est pas la sienne', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+    serviceFindByDirection.mockResolvedValue([{ id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true }])
+    historiqueFindAllByDemandeAchat.mockResolvedValue([])
+
+    await expect(getHistoriqueStatuts(DS, 1, 'DS')).resolves.toEqual([])
+  })
+
+  it('roleHint \'DS\' rejette un DS dont la direction ne couvre pas le service de la FAD (403)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+    serviceFindByDirection.mockResolvedValue([{ id_service: ID_SERVICE_AUTRE, code_service: 'S2', libelle_service: 'S2', id_direction: ID_DIRECTION, actif: true }])
+
+    await expect(getHistoriqueStatuts(DS, 1, 'DS')).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('sans le roleHint \'DS\', un DS pur retombe en Demandeur et se voit refuser l\'accès (403)', async () => {
+    findActiveByMatricule.mockResolvedValue([{ id_role: 1, type_role: 'DS', id_cellule: null, id_service: null, id_direction: ID_DIRECTION }])
+
+    await expect(getHistoriqueStatuts(DS, 1)).rejects.toMatchObject({ status: 403 })
   })
 
   it('renvoie une liste vide si aucun historique', async () => {

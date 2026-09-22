@@ -70,7 +70,7 @@ export interface DemandeAchatModalProps {
    * peut créer une DA que pour lui-même. », message trompeur car réutilisé hors contexte de
    * création). RC n'a jamais besoin de ce paramètre, résolu par défaut — voir SuiviRc.tsx.
    */
-  roleHint?: 'CDS' | 'CB'
+  roleHint?: 'CDS' | 'CB' | 'DS'
   onClose: () => void
   onSaved: () => void
 }
@@ -1274,7 +1274,7 @@ export interface GestionDocumentaireModalProps {
    * consultation/les pièces/le téléchargement du devis d'une FAD qui n'est
    * pas la sienne se solderaient par un 403, même en pure lecture.
    */
-  roleHint?: 'CDS' | 'CB'
+  roleHint?: 'CDS' | 'CB' | 'DS'
   onClose: () => void
 }
 
@@ -1563,7 +1563,7 @@ export interface AddPieceDaModalProps {
   fournisseurLabel: string
   currentNomFichier: string | null
   /** Écrans de suivi CDS/CB (décision du 18/09/2026), pertinent uniquement pour `kind === 'PIECE_COMPLEMENTAIRE'` — voir GestionDocumentaireModalProps#roleHint. */
-  roleHint?: 'CDS' | 'CB'
+  roleHint?: 'CDS' | 'CB' | 'DS'
   onClose: () => void
   /** Requis quand `kind === 'DEVIS'`. */
   onUploadedDevis?: (candidat: ConsultationCandidat) => void
@@ -1790,7 +1790,7 @@ export interface PiecesComplementairesModalProps {
   objetDa: string
   readOnly: boolean
   /** Écrans de suivi CDS/CB (décision du 18/09/2026) — voir GestionDocumentaireModalProps#roleHint. */
-  roleHint?: 'CDS' | 'CB'
+  roleHint?: 'CDS' | 'CB' | 'DS'
   onClose: () => void
   /** Prévient GestionDocumentaireModal du nouveau total, pour mettre à jour le badge de la ligne sans tout recharger. */
   onCountChange: (count: number) => void

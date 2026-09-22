@@ -167,6 +167,8 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
     EN_COURS_CDS: [],
     A_TRAITER_CB: [],
     EN_COURS_CB: [],
+    A_TRAITER_DS: [],
+    EN_COURS_DS: [],
     FAD_COMMANDEES: [],
     REJETEES_ANNULEES: [],
     ...overrides,

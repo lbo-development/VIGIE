@@ -55,6 +55,8 @@ export type AccueilScope =
   | 'EN_COURS_CDS'
   | 'A_TRAITER_CB'
   | 'EN_COURS_CB'
+  | 'A_TRAITER_DS'
+  | 'EN_COURS_DS'
   | 'FAD_COMMANDEES'
   | 'REJETEES_ANNULEES'
 
@@ -67,12 +69,13 @@ export interface DemandeAchatListParams {
   /** Filtre "Fournisseurs" des onglets de l'écran d'accueil — correspondance exacte. */
   idFournisseurRetenu?: number | null
   /**
-   * Écrans de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — indique explicitement au
-   * backend quel rôle scoper (voir demandeAchat.service.ts#resolveAccessContext) : un acteur peut
-   * cumuler RC/CDS/CB, la résolution par défaut ne suffit pas à distinguer les écrans
-   * (pages/SuiviRc.tsx ne le fournit jamais, pages/SuiviCds.tsx/SuiviCb.tsx le fournissent toujours).
+   * Écrans de suivi CDS/CB/DS (décisions du 16/09/2026, 18/09/2026 puis 22/09/2026) — indique
+   * explicitement au backend quel rôle scoper (voir demandeAchat.service.ts#resolveAccessContext) :
+   * un acteur peut cumuler RC/CDS/CB/DS, la résolution par défaut ne suffit pas à distinguer les
+   * écrans (pages/SuiviRc.tsx ne le fournit jamais, pages/SuiviCds.tsx/SuiviCb.tsx/SuiviDs.tsx le
+   * fournissent toujours).
    */
-  role?: 'CDS' | 'CB'
+  role?: 'CDS' | 'CB' | 'DS'
 }
 
 /** Filtres de la page DemandeAchat / des onglets de l'accueil — voir demandeAchat.service.ts#listDemandeAchat pour la portée exacte appliquée côté backend selon le rôle. */
@@ -154,7 +157,7 @@ export interface ConsultationCandidat {
 
 /** Écran FournisseurDA (bouton « Éléments de consultation »), à l'ouverture. */
 /** `role: 'CB'` (décision du 18/09/2026) — GestionDocumentaireModal en a besoin pour construire sa liste de fournisseurs sur une FAD qui n'est pas celle de la CB. */
-export async function getConsultationDemandeAchat(idDemandeAchat: number, role?: 'CDS' | 'CB'): Promise<ConsultationCandidat[]> {
+export async function getConsultationDemandeAchat(idDemandeAchat: number, role?: 'CDS' | 'CB' | 'DS'): Promise<ConsultationCandidat[]> {
   return api.get<ConsultationCandidat[]>(`/demandes-achat/${idDemandeAchat}/consultation${role ? `?role=${role}` : ''}`)
 }
 
@@ -207,7 +210,7 @@ export async function uploadDevisFile(idDemandeAchat: number, idDevis: number, f
 }
 
 /** Écran de gestion documentaire — télécharge le PDF déposé pour un devis. `role: 'CB'` (décision du 18/09/2026) : le devis reste verrouillé pour la CB, mais le téléchargement doit rester accessible sur une FAD qui n'est pas la sienne. */
-export async function downloadDevisFileBlob(idDemandeAchat: number, idDevis: number, role?: 'CDS' | 'CB'): Promise<Blob> {
+export async function downloadDevisFileBlob(idDemandeAchat: number, idDevis: number, role?: 'CDS' | 'CB' | 'DS'): Promise<Blob> {
   return api.getBlob(`/demandes-achat/${idDemandeAchat}/devis/${idDevis}/fichier${role ? `?role=${role}` : ''}`)
 }
 
@@ -230,7 +233,7 @@ export interface PieceJointe {
 }
 
 /** Écran de gestion documentaire — pièces complémentaires d'un fournisseur de la DA (voir demandeAchat.service.ts#listPiecesDemandeAchat). `role: 'CB'` (décision du 18/09/2026), voir addPieceDemandeAchat ci-dessous. */
-export async function getPiecesDemandeAchat(idDemandeAchat: number, idFournisseur: number, role?: 'CDS' | 'CB'): Promise<PieceJointe[]> {
+export async function getPiecesDemandeAchat(idDemandeAchat: number, idFournisseur: number, role?: 'CDS' | 'CB' | 'DS'): Promise<PieceJointe[]> {
   return api.get<PieceJointe[]>(`/demandes-achat/${idDemandeAchat}/pieces?idFournisseur=${idFournisseur}${role ? `&role=${role}` : ''}`)
 }
 
@@ -241,7 +244,7 @@ export async function getPiecesDemandeAchat(idDemandeAchat: number, idFournisseu
  * paramètre explicite — les pièces complémentaires restent modifiables tant qu'elle est « pour
  * action » (STATUTS_PIECES_MODIFIABLES côté backend), contrairement au devis.
  */
-export async function addPieceDemandeAchat(idDemandeAchat: number, idFournisseur: number, typePiece: string, file: File, role?: 'CDS' | 'CB'): Promise<PieceJointe> {
+export async function addPieceDemandeAchat(idDemandeAchat: number, idFournisseur: number, typePiece: string, file: File, role?: 'CDS' | 'CB' | 'DS'): Promise<PieceJointe> {
   const formData = new FormData()
   formData.append('fichier', file)
   formData.append('idFournisseur', String(idFournisseur))
@@ -249,11 +252,11 @@ export async function addPieceDemandeAchat(idDemandeAchat: number, idFournisseur
   return api.postForm<PieceJointe>(`/demandes-achat/${idDemandeAchat}/pieces${role ? `?role=${role}` : ''}`, formData)
 }
 
-export async function removePieceDemandeAchat(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB'): Promise<void> {
+export async function removePieceDemandeAchat(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB' | 'DS'): Promise<void> {
   return api.delete(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}${role ? `?role=${role}` : ''}`)
 }
 
-export async function downloadPieceDemandeAchatBlob(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB'): Promise<Blob> {
+export async function downloadPieceDemandeAchatBlob(idDemandeAchat: number, idPiece: number, role?: 'CDS' | 'CB' | 'DS'): Promise<Blob> {
   return api.getBlob(`/demandes-achat/${idDemandeAchat}/pieces/${idPiece}/fichier${role ? `?role=${role}` : ''}`)
 }
 
@@ -444,8 +447,8 @@ export interface HistoriqueStatutView {
   commentaireStatut: string | null
 }
 
-/** `role: 'CDS' | 'CB'` — même raison que DemandeAchatListParams.role : pages/SuiviCds.tsx/SuiviCb.tsx doivent le fournir pour rester consultables sur une FAD qui n'est pas la leur. */
-export async function getHistoriqueStatuts(idDemandeAchat: number, role?: 'CDS' | 'CB'): Promise<HistoriqueStatutView[]> {
+/** `role: 'CDS' | 'CB' | 'DS'` — même raison que DemandeAchatListParams.role : pages/SuiviCds.tsx/SuiviCb.tsx doivent le fournir pour rester consultables sur une FAD qui n'est pas la leur. */
+export async function getHistoriqueStatuts(idDemandeAchat: number, role?: 'CDS' | 'CB' | 'DS'): Promise<HistoriqueStatutView[]> {
   return api.get<HistoriqueStatutView[]>(`/demandes-achat/${idDemandeAchat}/historique${role ? `?role=${role}` : ''}`)
 }
 
@@ -466,11 +469,14 @@ export interface AccueilSynthese {
  * pages/SuiviRc.tsx — même hook, même endpoint, réutilisé tel quel (décision du 15/09/2026, second
  * chantier RC). Renommé depuis useAccueilDemandeurSynthese, qui ne décrivait plus que la moitié des
  * appelants. Vue CDS (DA/FAD du service, décision du 16/09/2026, pages/SuiviCds.tsx) : passer
- * `role: 'CDS' | 'CB'` — même raison que DemandeAchatListParams.role, un acteur peut cumuler
- * RC/CDS/CB. Vue CB (décision du 18/09/2026, pages/SuiviCb.tsx) : FAD du service, "En transit"
- * porte 3 compartiments (RC/CDS/DS), "Mes demandes" devient "FAD du service" comme pour CDS.
+ * `role: 'CDS'` — même raison que DemandeAchatListParams.role, un acteur peut cumuler RC/CDS/CB/DS.
+ * Vue CB (décision du 18/09/2026, pages/SuiviCb.tsx) : `role: 'CB'`, FAD du service, "En transit"
+ * porte 3 compartiments (RC/CDS/DS), "Mes demandes" devient "FAD du service" comme pour CDS. Vue DS
+ * (décision du 22/09/2026, pages/SuiviDs.tsx) : `role: 'DS'`, FAD de tous les services de la
+ * direction, "En transit" porte 3 compartiments (RC/CDS/CB), "Mes demandes" devient "FAD de la
+ * direction".
  */
-export function useAccueilSynthese(role?: 'CDS' | 'CB') {
+export function useAccueilSynthese(role?: 'CDS' | 'CB' | 'DS') {
   const [data, setData] = useState<AccueilSynthese | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

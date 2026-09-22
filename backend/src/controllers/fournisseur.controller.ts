@@ -5,9 +5,12 @@ export async function getFournisseurs(req: Request, res: Response, next: NextFun
   try {
     const raw = req.query.idService
     const idService = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : undefined
+    // Écran de suivi DS (décision du 22/09/2026) — voir fournisseur.service.ts#listFournisseurs.
+    const roleHint = req.query.role === 'DS' ? 'DS' : undefined
     const fournisseurs = await fournisseurService.listFournisseurs(
       req.matricule ?? null,
       idService !== undefined && Number.isFinite(idService) ? idService : undefined,
+      roleHint,
     )
     res.json(fournisseurs)
   } catch (err) {

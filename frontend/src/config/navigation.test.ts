@@ -186,6 +186,28 @@ describe('getAccueilSidebarItems', () => {
       { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
     ])
   })
+
+  it('ajoute "FAD (N+3) — <direction>" pointant vers /suivi-ds avec un rôle DS (titulaire ou suppléant)', () => {
+    const currentUser = meResponse([{ typeRole: 'DS', perimeterLabel: 'Direction Infrastructure', idService: null, idCellule: null, idDirection: 9 }])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-ds', label: 'FAD (N+3) — Direction Infrastructure', icon: 'iv-ds' }])
+  })
+
+  it('cumul RC+CDS+CB+DS : les quatre entrées apparaissent, dans l\'ordre RC/CDS/CB/DS', () => {
+    const currentUser = meResponse([
+      { typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 },
+      { typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null },
+      { typeRole: 'CB', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null },
+      { typeRole: 'DS', perimeterLabel: 'Direction Infrastructure', idService: null, idCellule: null, idDirection: 9 },
+    ])
+
+    expect(getAccueilSidebarItems(currentUser)).toEqual([
+      { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
+      { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
+      { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
+      { to: '/suivi-ds', label: 'FAD (N+3) — Direction Infrastructure', icon: 'iv-ds' },
+    ])
+  })
 })
 
 describe('isHomeSection', () => {
@@ -203,6 +225,10 @@ describe('isHomeSection', () => {
 
   it('reconnaît "/suivi-cb" et ses sous-pages', () => {
     expect(isHomeSection('/suivi-cb')).toBe(true)
+  })
+
+  it('reconnaît "/suivi-ds" et ses sous-pages', () => {
+    expect(isHomeSection('/suivi-ds')).toBe(true)
   })
 
   it('ignore une route hors de la section', () => {

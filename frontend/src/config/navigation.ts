@@ -72,16 +72,17 @@ export const NAV_ITEMS: NavItem[] = [
  * serveur, voir me.service.ts#getCurrentUser, donc couvre la suppléance sans
  * traitement supplémentaire ici) ; liste vide sans aucun rôle (l'utilisateur
  * est alors redirigé vers "Mes demandes" par AccueilRedirect.tsx, jamais
- * vers cette section). Un futur écran de suivi CB/DS rejoindrait cette même
- * liste plutôt que d'ajouter un mécanisme parallèle.
+ * vers cette section). CB ("FAD (CB) — <service>", 18/09/2026) et DS
+ * ("FAD (N+3) — <direction>", 22/09/2026) rejoignent cette même liste,
+ * plutôt que d'ajouter un mécanisme parallèle.
  *
  * Icône par rôle (décision du 17/09/2026, nomenclature #iv-xxx — voir
  * assets/icons-vigie.svg pour l'exception documentée au sprite GPMM) : une
  * icône dédiée par rôle pour distinguer les rôles au premier coup d'œil dans
  * la sidebar (utile en particulier pour un acteur qui cumule plusieurs
  * rôles). #iv-cb/#iv-ds existent déjà dans le sprite — #iv-cb utilisée
- * depuis le 18/09/2026 (écran de suivi CB), #iv-ds prête pour le futur écran
- * de suivi DS (pas encore construit).
+ * depuis le 18/09/2026 (écran de suivi CB), #iv-ds depuis le 22/09/2026
+ * (écran de suivi DS).
  */
 export function getAccueilSidebarItems(currentUser: MeResponse | null): NavItem[] {
   const items: NavItem[] = []
@@ -91,12 +92,20 @@ export function getAccueilSidebarItems(currentUser: MeResponse | null): NavItem[
   if (cdsRole) items.push({ to: '/suivi-cds', label: `FAD (N+2) — ${cdsRole.perimeterLabel ?? ''}`, icon: 'iv-cds' })
   const cbRole = currentUser?.roles.find((r) => r.typeRole === 'CB')
   if (cbRole) items.push({ to: '/suivi-cb', label: `FAD (CB) — ${cbRole.perimeterLabel ?? ''}`, icon: 'iv-cb' })
+  const dsRole = currentUser?.roles.find((r) => r.typeRole === 'DS')
+  if (dsRole) items.push({ to: '/suivi-ds', label: `FAD (N+3) — ${dsRole.perimeterLabel ?? ''}`, icon: 'iv-ds' })
   return items
 }
 
-/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC + suivi CDS + suivi CB — voir AppShell.tsx). */
+/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC + suivi CDS + suivi CB + suivi DS — voir AppShell.tsx). */
 export function isHomeSection(pathname: string): boolean {
-  return pathname === '/' || pathname.startsWith('/suivi-rc') || pathname.startsWith('/suivi-cds') || pathname.startsWith('/suivi-cb')
+  return (
+    pathname === '/' ||
+    pathname.startsWith('/suivi-rc') ||
+    pathname.startsWith('/suivi-cds') ||
+    pathname.startsWith('/suivi-cb') ||
+    pathname.startsWith('/suivi-ds')
+  )
 }
 
 /**

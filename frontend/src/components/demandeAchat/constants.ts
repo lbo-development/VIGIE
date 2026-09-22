@@ -92,6 +92,8 @@ export const ACCUEIL_SCOPE_STATUTS: Record<
   | 'EN_COURS_CDS'
   | 'A_TRAITER_CB'
   | 'EN_COURS_CB'
+  | 'A_TRAITER_DS'
+  | 'EN_COURS_DS'
   | 'FAD_COMMANDEES'
   | 'REJETEES_ANNULEES',
   string[]
@@ -159,6 +161,14 @@ export const ACCUEIL_SCOPE_STATUTS: Record<
   // jamais une FAD avant FAD_TRANSMISE_CDS_CB (pas de visibilité amont sur le circuit CDS).
   A_TRAITER_CB: ['FAD_TRANSMISE_CDS_CB', 'FAD_MODIFIEE_TRANSMISE_RC_CB', 'FAD_VALIDEE_CB', 'FAD_A_COMPLETER_CB', 'FAD_A_COMMANDER'],
   EN_COURS_CB: ['FAD_A_MODIFIER_CB', 'FAD_TRANSMISE_CB_DS', 'FAD_VALIDEE_DS', 'FAD_VALIDEE_DS_SEUIL', 'FAD_TRANSMISE_DS_CB'],
+  // Écran de suivi DS (22/09/2026) : A_TRAITER_DS/EN_COURS_DS regroupent différemment les mêmes
+  // codes (persona DS), en partageant FAD_COMMANDEES/REJETEES_ANNULEES avec les autres personas —
+  // voir demandeAchat.service.ts#ACCUEIL_SCOPE_STATUTS. Comme la CB, le DS ne voit jamais une FAD
+  // avant FAD_TRANSMISE_CB_DS. FAD_A_COMMANDER (dans EN_COURS_DS) porte à la fois les FAD validées
+  // par le DS et les FAD exemptées de seuil — le badge "Seuil DS" de DemandeAchatCard.tsx les
+  // distingue automatiquement.
+  A_TRAITER_DS: ['FAD_TRANSMISE_CB_DS', 'FAD_VALIDEE_DS'],
+  EN_COURS_DS: ['FAD_VALIDEE_DS_SEUIL', 'FAD_A_COMPLETER_CB', 'FAD_TRANSMISE_DS_CB', 'FAD_A_COMMANDER'],
   FAD_COMMANDEES: ['FAD_COMMANDEE'],
   REJETEES_ANNULEES: STATUTS_REJETEES_ANNULEES,
 }

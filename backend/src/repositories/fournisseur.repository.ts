@@ -30,13 +30,15 @@ export interface Fournisseur {
 const SELECT_COLUMNS =
   'id_fournisseur, id_service, etatfournisseur, raison_sociale_pgi, raison_sociale_service, siren, numpgi, adr1, adr2, cp, ville, cedex, type_creation'
 
-export async function findAll(idService?: number): Promise<Fournisseur[]> {
+/** `idServiceIn` (décision du 22/09/2026) — périmètre DS : une direction, potentiellement plusieurs services, voir fournisseur.service.ts#listFournisseurs. */
+export async function findAll(idService?: number, idServiceIn?: number[]): Promise<Fournisseur[]> {
   let query = supabase
     .schema('finances')
     .from('fournisseur')
     .select(SELECT_COLUMNS)
     .order('raison_sociale_service', { ascending: true })
   if (idService !== undefined) query = query.eq('id_service', idService)
+  if (idServiceIn) query = query.in('id_service', idServiceIn)
   const { data, error } = await query
   if (error) throw error
   return data ?? []

@@ -6,8 +6,8 @@ interface HistoriqueStatutsModalProps {
   idDemandeAchat: number
   numero: string
   onClose: () => void
-  /** À fournir depuis pages/SuiviCds.tsx/pages/SuiviCb.tsx — voir useDemandeAchat.ts#getHistoriqueStatuts. */
-  role?: 'CDS' | 'CB'
+  /** À fournir depuis pages/SuiviCds.tsx/pages/SuiviCb.tsx/pages/SuiviDs.tsx — voir useDemandeAchat.ts#getHistoriqueStatuts. */
+  role?: 'CDS' | 'CB' | 'DS'
 }
 
 /**

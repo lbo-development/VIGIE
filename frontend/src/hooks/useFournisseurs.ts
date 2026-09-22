@@ -48,9 +48,13 @@ export interface Fournisseur {
  * Liste des fournisseurs (avec leurs contacts imbriqués), filtrable par
  * service. Le périmètre réel (ADMIN_APP transverse, ADMIN_SERVICE/Demandeur
  * scopés à leur service) est appliqué côté backend, pas ici — voir
- * backend/src/services/fournisseur.service.ts.
+ * backend/src/services/fournisseur.service.ts. `role: 'DS'` (décision du
+ * 22/09/2026, écran de suivi DS) : le DS n'a pas de service unique
+ * (périmètre = une direction, potentiellement plusieurs services) — ignore
+ * `idService` (passer `null`) et résout côté serveur tous les services de sa
+ * direction (voir fournisseur.service.ts#listFournisseurs).
  */
-export function useFournisseurs(idService: number | null) {
+export function useFournisseurs(idService: number | null, role?: 'DS') {
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -58,13 +62,13 @@ export function useFournisseurs(idService: number | null) {
   const refetch = useCallback(() => {
     setLoading(true)
     setError(null)
-    const query = idService !== null ? `?idService=${idService}` : ''
+    const query = role === 'DS' ? '?role=DS' : idService !== null ? `?idService=${idService}` : ''
     return api
       .get<Fournisseur[]>(`/fournisseurs${query}`)
       .then((data) => setFournisseurs(data))
       .catch(() => setError('Impossible de charger les fournisseurs.'))
       .finally(() => setLoading(false))
-  }, [idService])
+  }, [idService, role])
 
   useEffect(() => {
     void refetch()

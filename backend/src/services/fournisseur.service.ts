@@ -4,6 +4,7 @@ import * as contactRepository from '../repositories/contact.repository.js'
 import * as serviceRepository from '../repositories/service.repository.js'
 import * as acteurRepository from '../repositories/acteur.repository.js'
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
+import * as roleEffectifService from './roleEffectif.service.js'
 import * as marcheRepository from '../repositories/marche.repository.js'
 import * as demandeAchatRepository from '../repositories/demandeAchat.repository.js'
 import * as devisConsulteRepository from '../repositories/devisConsulte.repository.js'
@@ -102,13 +103,7 @@ async function resolveReadScope(matricule: string | null): Promise<{ isAdminApp:
   return { isAdminApp: false, ownIdService }
 }
 
-export async function listFournisseurs(matricule: string | null, idService?: number): Promise<FournisseurWithContacts[]> {
-  const { isAdminApp, ownIdService } = await resolveReadScope(matricule)
-
-  const effectiveIdService = isAdminApp ? idService : (ownIdService ?? undefined)
-  if (!isAdminApp && effectiveIdService === undefined) return []
-
-  const fournisseurs = await fournisseurRepository.findAll(effectiveIdService)
+async function buildFournisseursResponse(fournisseurs: Fournisseur[]): Promise<FournisseurWithContacts[]> {
   const contacts = await contactRepository.findByFournisseurs(fournisseurs.map((f) => f.id_fournisseur))
 
   const byFournisseur = new Map<number, Contact[]>()
@@ -119,6 +114,33 @@ export async function listFournisseurs(matricule: string | null, idService?: num
   }
 
   return fournisseurs.map((f) => toApi(f, byFournisseur.get(f.id_fournisseur) ?? []))
+}
+
+/**
+ * `roleHint: 'DS'` (décision du 22/09/2026, écran de suivi DS) — le DS n'a pas de service unique
+ * (périmètre = une direction, potentiellement plusieurs services), contrairement à ADMIN_SERVICE/
+ * Demandeur ci-dessous (resolveReadScope). Résout la liste de services de sa direction via
+ * roleEffectifService.findEffectiveRoles + serviceRepository.findByDirection (même pattern que
+ * demandeAchat.service.ts#listDemandeAchat), ignore `idService` dans ce cas.
+ */
+export async function listFournisseurs(matricule: string | null, idService?: number, roleHint?: 'DS'): Promise<FournisseurWithContacts[]> {
+  if (roleHint === 'DS') {
+    if (!matricule) throw new AppError('Authentification requise', 401)
+    const roles = await roleEffectifService.findEffectiveRoles(matricule)
+    const isDs = (r: (typeof roles)[number]) => r.typeRole === 'DS' && r.idDirection !== null
+    const ds = roles.find((r) => isDs(r) && !r.lectureSeule) ?? roles.find(isDs)
+    const services = ds ? await serviceRepository.findByDirection(ds.idDirection as number) : []
+    const fournisseurs = await fournisseurRepository.findAll(undefined, services.map((s) => s.id_service))
+    return buildFournisseursResponse(fournisseurs)
+  }
+
+  const { isAdminApp, ownIdService } = await resolveReadScope(matricule)
+
+  const effectiveIdService = isAdminApp ? idService : (ownIdService ?? undefined)
+  if (!isAdminApp && effectiveIdService === undefined) return []
+
+  const fournisseurs = await fournisseurRepository.findAll(effectiveIdService)
+  return buildFournisseursResponse(fournisseurs)
 }
 
 /**

@@ -83,6 +83,8 @@ export async function findById(idDemandeAchat: number): Promise<DemandeAchat | n
 
 export interface ListFilters {
   idService?: number
+  /** Liste de services (écran de suivi DS, décision du 22/09/2026) — périmètre DS = une direction, potentiellement plusieurs services, contrairement à `idService` (RC/CDS/CB/ADMIN_SERVICE, un seul service). Voir demandeAchat.service.ts#listDemandeAchat. */
+  idServiceIn?: number[]
   matriculeDemandeurIn?: string[]
   statuts?: string[]
   search?: string
@@ -96,6 +98,7 @@ export async function findAll(filters: ListFilters): Promise<DemandeAchat[]> {
   let query = supabase.schema('finances').from('demande_achat').select(SELECT_COLUMNS).order('created_at', { ascending: false })
 
   if (filters.idService !== undefined) query = query.eq('id_service', filters.idService)
+  if (filters.idServiceIn) query = query.in('id_service', filters.idServiceIn)
   if (filters.matriculeDemandeurIn) query = query.in('matricule_demandeur', filters.matriculeDemandeurIn)
   if (filters.statuts && filters.statuts.length > 0) query = query.in('code_statut', filters.statuts)
   if (filters.idFournisseurRetenu !== undefined) query = query.eq('id_fournisseur_retenu', filters.idFournisseurRetenu)

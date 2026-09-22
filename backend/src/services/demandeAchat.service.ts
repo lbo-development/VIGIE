@@ -62,6 +62,8 @@ export type AccueilScope =
   | 'EN_COURS_CDS'
   | 'A_TRAITER_CB'
   | 'EN_COURS_CB'
+  | 'A_TRAITER_DS'
+  | 'EN_COURS_DS'
   | 'FAD_COMMANDEES'
   | 'REJETEES_ANNULEES'
 
@@ -169,6 +171,29 @@ const STATUTS_A_TRAITER_CB = ['FAD_TRANSMISE_CDS_CB', 'FAD_MODIFIEE_TRANSMISE_RC
 const STATUTS_EN_COURS_CB = ['FAD_A_MODIFIER_CB', 'FAD_TRANSMISE_CB_DS', 'FAD_VALIDEE_DS', 'FAD_VALIDEE_DS_SEUIL', 'FAD_TRANSMISE_DS_CB']
 
 /**
+ * Onglet "À traiter" de l'écran de suivi DS (décision du 22/09/2026) — les statuts où le DS est
+ * « pour action » : statuer sur une FAD fraîchement transmise par la CB au-dessus du seuil de
+ * validation (`FAD_TRANSMISE_CB_DS`), ou transmettre l'ordre de commande à la CB pour une FAD déjà
+ * validée mais pas encore transmise (`FAD_VALIDEE_DS`, même principe que `FAD_VALIDEE_CDS`/
+ * `FAD_VALIDEE_CB` ci-dessus). Comme le CDS, le DS ne modifie jamais aucun champ — pas d'écran
+ * « Traiter » équivalent à celui du RC/CB.
+ */
+const STATUTS_A_TRAITER_DS = ['FAD_TRANSMISE_CB_DS', 'FAD_VALIDEE_DS']
+
+/**
+ * Onglet "En cours" de l'écran de suivi DS — le reste du cycle non terminal où la FAD n'est plus
+ * « pour action » du DS : `FAD_A_COMPLETER_CB` (reprise que la CB traite, suivie ici même principe
+ * que CDS incluant `FAD_A_COMPLETER_CDS`), `FAD_TRANSMISE_DS_CB`/`FAD_A_COMMANDER` (suite du
+ * circuit après transmission). `FAD_A_COMMANDER` porte à la fois les FAD validées par le DS et les
+ * FAD exemptées de seuil (`VALIDEE_SUR_SEUIL_DS`, jamais vues par le DS en décision) — visibles ici
+ * en lecture pour la traçabilité (décision du 22/09/2026), le badge "Seuil DS" de
+ * DemandeAchatCard.tsx les distinguant automatiquement. `FAD_VALIDEE_DS_SEUIL` inclus par
+ * défensive bien que transitoire (jamais persisté, voir transmettreDsOuSeuil), même choix que
+ * RC/CDS/CB pour ce statut.
+ */
+const STATUTS_EN_COURS_DS = ['FAD_VALIDEE_DS_SEUIL', 'FAD_A_COMPLETER_CB', 'FAD_TRANSMISE_DS_CB', 'FAD_A_COMMANDER']
+
+/**
  * Statuts où RC et CB peuvent ajouter/retirer une pièce complémentaire
  * (décisions du 17/09/2026 puis 18/09/2026) — STATUTS_MODIFIABLES
  * (Demandeur), plus STATUTS_A_TRAITER_RC (tant que le RC n'a pas retransmis
@@ -217,19 +242,23 @@ export const ACCUEIL_SCOPE_STATUTS: Record<AccueilScope, string[]> = {
   EN_COURS_CDS: STATUTS_EN_COURS_CDS,
   A_TRAITER_CB: STATUTS_A_TRAITER_CB,
   EN_COURS_CB: STATUTS_EN_COURS_CB,
+  A_TRAITER_DS: STATUTS_A_TRAITER_DS,
+  EN_COURS_DS: STATUTS_EN_COURS_DS,
   FAD_COMMANDEES: STATUTS_FAD_COMMANDEES,
   REJETEES_ANNULEES: STATUTS_REJETEES_ANNULEES,
 }
 
-type Role = 'ADMIN_APP' | 'ADMIN_SERVICE' | 'RC' | 'CDS' | 'CB' | 'DEMANDEUR'
+type Role = 'ADMIN_APP' | 'ADMIN_SERVICE' | 'RC' | 'CDS' | 'CB' | 'DS' | 'DEMANDEUR'
 
 interface AccessContext {
   role: Role
-  /** Service dans lequel l'acteur agit (celui de sa cellule pour RC, le sien pour ADMIN_SERVICE, celui de son propre rattachement pour un Demandeur). Null pour ADMIN_APP (transverse). */
+  /** Service dans lequel l'acteur agit (celui de sa cellule pour RC, le sien pour ADMIN_SERVICE, celui de son propre rattachement pour un Demandeur). Null pour ADMIN_APP (transverse) et pour DS (périmètre = direction, potentiellement plusieurs services, voir ownIdDirection). */
   ownIdService: number | null
   /** Cellule d'appartenance du RC — sert de portée par défaut sur la liste (« accès à toutes les DA de sa cellule »), jamais utilisée pour la création. */
   ownIdCellule: number | null
-  /** Décision du 20/09/2026 : `true` = titulaire RC/CDS actuellement suppléé — consultation conservée, écritures refusées (voir assertCanActFor#write). */
+  /** Direction d'appartenance du DS (décision du 22/09/2026) — sert à résoudre la liste de services de son périmètre via serviceRepository.findByDirection, DEMANDE_ACHAT ne portant que ID_SERVICE. */
+  ownIdDirection?: number | null
+  /** Décision du 20/09/2026 : `true` = titulaire RC/CDS/DS actuellement suppléé — consultation conservée, écritures refusées (voir assertCanActFor#write). */
   lectureSeule?: boolean
   /** Fin (AAAA-MM-JJ, incluse) de la suppléance active, pour le message de refus. */
   suppleanceDateFin?: string | null
@@ -252,21 +281,24 @@ interface AccessContext {
  * retransmettreCb), qui utilisaient déjà findEffectiveRoles.
  *
  * `roleHint` (décision du 16/09/2026, écran de suivi CDS ; étendu à `'CB'`
- * le 18/09/2026, écran de suivi CB) : un acteur peut cumuler plusieurs rôles
- * opérationnels (RC + CDS + CB, Phase 1, cf. MOT « Points d'attention ») —
- * sans indication explicite de l'écran appelant, la priorité fixe ci-dessous
- * résoudrait toujours RC avant CDS/CB, même pour un appel émis par l'écran
- * de suivi CDS/CB. Pire : les scopes `FAD_COMMANDEES`/`REJETEES_ANNULEES`
- * sont partagés à l'identique entre les écrans, donc impossible de déduire
- * le rôle voulu à partir du seul `scope`. Quand `roleHint` est fourni et que
+ * le 18/09/2026, écran de suivi CB ; étendu à `'DS'` le 22/09/2026, écran de
+ * suivi DS) : un acteur peut cumuler plusieurs rôles opérationnels (RC + CDS
+ * + CB + DS, Phase 1, cf. MOT « Points d'attention ») — sans indication
+ * explicite de l'écran appelant, la priorité fixe ci-dessous résoudrait
+ * toujours RC avant CDS/CB/DS, même pour un appel émis par l'écran de suivi
+ * CDS/CB/DS. Pire : les scopes `FAD_COMMANDEES`/`REJETEES_ANNULEES` sont
+ * partagés à l'identique entre les écrans, donc impossible de déduire le
+ * rôle voulu à partir du seul `scope`. Quand `roleHint` est fourni et que
  * l'acteur détient effectivement le rôle correspondant actif, celui-ci est
  * vérifié **avant** RC — CDS/CB n'ont pas de cellule, leur périmètre est
  * ID_SERVICE directement (pas de jointure via celluleRepository, plus simple
- * que RC). Aucun appelant existant ne passe ce paramètre en dehors des
- * écrans CDS/CB : comportement RC/Demandeur strictement inchangé pour tous
- * les autres appels déjà en place.
+ * que RC) ; DS n'a ni cellule ni service direct, son périmètre est
+ * ID_DIRECTION (résolu en liste de services par listDemandeAchat/getSynthese
+ * via serviceRepository.findByDirection). Aucun appelant existant ne passe
+ * ce paramètre en dehors des écrans CDS/CB/DS : comportement RC/Demandeur
+ * strictement inchangé pour tous les autres appels déjà en place.
  */
-async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'): Promise<AccessContext> {
+async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB' | 'DS'): Promise<AccessContext> {
   if (await authRepository.hasActiveRole(matricule, 'ADMIN_APP')) {
     return { role: 'ADMIN_APP', ownIdService: null, ownIdCellule: null }
   }
@@ -288,6 +320,14 @@ async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'):
     const cb = roles.find((r) => r.typeRole === 'CB' && r.idService !== null)
     if (cb) {
       return { role: 'CB', ownIdService: cb.idService, ownIdCellule: null }
+    }
+  } else if (roleHint === 'DS') {
+    // DS est suppléable (contrairement à CB, exclu de la suppléance) : même priorité titulaire
+    // actif > suppléant/titulaire suppléé que CDS ci-dessus.
+    const isDs = (r: (typeof roles)[number]) => r.typeRole === 'DS' && r.idDirection !== null
+    const ds = roles.find((r) => isDs(r) && !r.lectureSeule) ?? roles.find(isDs)
+    if (ds) {
+      return { role: 'DS', ownIdService: null, ownIdCellule: null, ownIdDirection: ds.idDirection, lectureSeule: ds.lectureSeule, suppleanceDateFin: ds.suppleanceDateFin }
     }
   } else {
     const isRc = (r: (typeof roles)[number]) => r.typeRole === 'RC' && r.idCellule !== null
@@ -315,7 +355,7 @@ async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'):
 async function assertCanActFor(
   matricule: string,
   matriculeDemandeurCible: string,
-  roleHint?: 'CDS' | 'CB',
+  roleHint?: 'CDS' | 'CB' | 'DS',
   opts: { write?: boolean } = {},
 ): Promise<number> {
   const targetIdService = await acteurRepository.findIdServiceByMatricule(matriculeDemandeurCible)
@@ -324,6 +364,20 @@ async function assertCanActFor(
   const context = await resolveAccessContext(matricule, roleHint)
 
   if (context.role === 'ADMIN_APP') return targetIdService
+
+  // DS (décision du 22/09/2026) : périmètre = une direction, potentiellement plusieurs services —
+  // contrairement à ADMIN_SERVICE/RC/CDS/CB ci-dessous, l'égalité directe sur ownIdService ne
+  // fonctionne pas (toujours null pour DS, voir resolveAccessContext), il faut résoudre la liste
+  // des services de la direction et vérifier l'appartenance.
+  if (context.role === 'DS') {
+    if (opts.write && context.lectureSeule && matricule !== matriculeDemandeurCible) {
+      throw new AppError(roleEffectifService.lectureSeuleMessage(context.role as TypeRole, context.suppleanceDateFin ?? null), 403)
+    }
+    const services = context.ownIdDirection != null ? await serviceRepository.findByDirection(context.ownIdDirection) : []
+    if (services.some((s) => s.id_service === targetIdService)) return targetIdService
+    throw new AppError('Droits insuffisants pour ce service.', 403)
+  }
+
   // roleHint n'est jamais transmis par les appels d'écriture (RC/ADMIN_SERVICE) existants — un
   // acteur CDS/CB n'atterrit donc dans cette branche que depuis les appels en lecture
   // (getHistoriqueStatuts, listDemandeAchat) ou depuis les pièces complémentaires côté CB
@@ -398,7 +452,7 @@ export interface HistoriqueStatutView {
  * chronologique, aucune action possible dessus (historique_statut est
  * immuable en base, voir historiqueStatut.repository.ts).
  */
-export async function getHistoriqueStatuts(matricule: string | null, idDemandeAchat: number, roleHint?: 'CDS' | 'CB'): Promise<HistoriqueStatutView[]> {
+export async function getHistoriqueStatuts(matricule: string | null, idDemandeAchat: number, roleHint?: 'CDS' | 'CB' | 'DS'): Promise<HistoriqueStatutView[]> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
@@ -450,7 +504,7 @@ export interface ListQuery {
   /** Filtre "Fournisseurs" des onglets de l'écran d'accueil — correspondance exacte sur ID_FOURNISSEUR_RETENU. */
   idFournisseurRetenu?: number
   /** Écran de suivi CDS/CB (décisions du 16/09/2026 puis 18/09/2026) — voir resolveAccessContext#roleHint. */
-  role?: 'CDS' | 'CB'
+  role?: 'CDS' | 'CB' | 'DS'
 }
 
 /**
@@ -458,7 +512,10 @@ export interface ListQuery {
  * portée par rôle (voir resolveAccessContext) : Demandeur = uniquement
  * lui-même ; RC = sa cellule par défaut, ou le demandeur choisi (n'importe
  * lequel du service) si précisé ; CDS/CB = tout son service (écrans de suivi
- * CDS/CB, décisions du 16/09/2026 puis 18/09/2026) ; ADMIN_SERVICE = tout son
+ * CDS/CB, décisions du 16/09/2026 puis 18/09/2026) ; DS = tous les services
+ * de sa direction (écran de suivi DS, décision du 22/09/2026 — périmètre
+ * ID_DIRECTION résolu en liste de services via serviceRepository.findByDirection,
+ * DEMANDE_ACHAT ne portant que ID_SERVICE) ; ADMIN_SERVICE = tout son
  * service par défaut, ou une cellule/un demandeur choisi ; ADMIN_APP = sans
  * restriction (filtres appliqués tels quels s'ils sont fournis).
  */
@@ -539,6 +596,19 @@ export async function listDemandeAchat(matricule: string | null, query: ListQuer
     })
   }
 
+  if (context.role === 'DS') {
+    // Vue par défaut : tous les services de sa direction — DEMANDE_ACHAT ne porte que ID_SERVICE,
+    // jamais ID_DIRECTION directement, d'où la résolution en deux temps via serviceRepository.
+    const services = context.ownIdDirection != null ? await serviceRepository.findByDirection(context.ownIdDirection) : []
+    return demandeAchatRepository.findAll({
+      idServiceIn: services.map((s) => s.id_service),
+      statuts,
+      search: query.search,
+      idFournisseurIn,
+      idFournisseurRetenu,
+    })
+  }
+
   if (context.role === 'ADMIN_SERVICE') {
     return demandeAchatRepository.findAll({
       idService: context.ownIdService ?? undefined,
@@ -598,6 +668,13 @@ function nouvelleSyntheseBucket(): SyntheseBucket {
  *   (RC/CDS/DS) — le compartiment CB reste à zéro, même logique que RC/CDS
  *   ci-dessus. "Mes demandes" devient "FAD du service" côté frontend, comme
  *   pour CDS.
+ * - **DS** (titulaire ou suppléant, décision du 22/09/2026, écran de suivi
+ *   DS — paramètre `role: 'DS'` explicite) : FAD de tous les services de sa
+ *   direction (`ID_DIRECTION`, résolu en liste de services via
+ *   serviceRepository.findByDirection — contrairement à CDS/CB, pas de
+ *   filtre `idService` unique possible). "En transit" porte 3 compartiments
+ *   (RC/CDS/CB) — le compartiment DS reste à zéro, même logique que RC/CDS/CB
+ *   ci-dessus. "Mes demandes" devient "FAD de la direction" côté frontend.
  *
  * **DA_EN_PREPARATION exclue de "En cours" dans les quatre vues** (bug corrigé
  * le 15/09/2026, signalé par l'utilisateur pour la vue RC puis étendu à la
@@ -605,34 +682,42 @@ function nouvelleSyntheseBucket(): SyntheseBucket {
  * propriété du demandeur, pas encore engagé dans le circuit d'approbation —
  * il ne doit compter ni dans "Mes demandes : En cours" (Demandeur) ni dans
  * "Demandes de la cellule : En cours" (RC) ni dans "FAD du service : En
- * cours" (CDS/CB), même si le champ EN_TRANSIT de finances.statut ne le
- * concerne de toute façon jamais (DEM, pas RC/CDS/DS/CB).
+ * cours" (CDS/CB) ni dans "FAD de la direction : En cours" (DS), même si le
+ * champ EN_TRANSIT de finances.statut ne le concerne de toute façon jamais
+ * (DEM, pas RC/CDS/DS/CB).
  */
-export async function getSynthese(matricule: string | null, roleHint?: 'CDS' | 'CB'): Promise<AccueilSynthese> {
+export async function getSynthese(matricule: string | null, roleHint?: 'CDS' | 'CB' | 'DS'): Promise<AccueilSynthese> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const context = await resolveAccessContext(matricule, roleHint)
   const isRc = context.role === 'RC'
-  // Un acteur cumulant CDS/CB et ADMIN_SERVICE sur le même service (cas réel constaté le
-  // 18/09/2026, Audrey VATANIAN) résout toujours en ADMIN_SERVICE via resolveAccessContext
-  // (vérifié avant le roleHint) — sans ce repli, /suivi-cds et /suivi-cb tombaient sur la vue
-  // Demandeur (ses seules DA personnelles, quasi toujours vide) au lieu de la vue service
-  // demandée par l'écran. Portée identique à CDS/CB (même ID_SERVICE), seule la bascule diffère.
+  // Un acteur cumulant CDS/CB/DS et ADMIN_SERVICE sur le même service (cas réel constaté le
+  // 18/09/2026, Audrey VATANIAN, pour CDS/CB) résout toujours en ADMIN_SERVICE via
+  // resolveAccessContext (vérifié avant le roleHint) — sans ce repli, /suivi-cds, /suivi-cb et
+  // /suivi-ds tombaient sur la vue Demandeur (ses seules DA personnelles, quasi toujours vide) au
+  // lieu de la vue service/direction demandée par l'écran. Pour DS, le repli reste borné à son
+  // seul service ADMIN_SERVICE (pas de résolution de direction possible depuis ce rôle).
   const isCds = context.role === 'CDS' || (context.role === 'ADMIN_SERVICE' && roleHint === 'CDS')
   const isCb = context.role === 'CB' || (context.role === 'ADMIN_SERVICE' && roleHint === 'CB')
+  const isDs = context.role === 'DS' || (context.role === 'ADMIN_SERVICE' && roleHint === 'DS')
 
-  const [acteurs, statuts] = await Promise.all([
+  const [acteurs, idServiceInDs, statuts] = await Promise.all([
     isRc
       ? context.ownIdCellule !== null
         ? acteurRepository.findAllByCellule(context.ownIdCellule)
         : Promise.resolve([])
       : Promise.resolve(null),
+    context.role === 'DS' && context.ownIdDirection != null
+      ? serviceRepository.findByDirection(context.ownIdDirection).then((services) => services.map((s) => s.id_service))
+      : Promise.resolve(context.ownIdService != null ? [context.ownIdService] : []),
     statutRepository.findAll(),
   ])
   const rows = await demandeAchatRepository.findAll(
-    isCds || isCb
-      ? { idService: context.ownIdService ?? undefined }
-      : { matriculeDemandeurIn: isRc ? acteurs!.map((a) => a.matricule) : [matricule] },
+    isDs
+      ? { idServiceIn: idServiceInDs }
+      : isCds || isCb
+        ? { idService: context.ownIdService ?? undefined }
+        : { matriculeDemandeurIn: isRc ? acteurs!.map((a) => a.matricule) : [matricule] },
   )
   const enTransitByCode = new Map(statuts.map((s) => [s.code_statut, s.en_transit]))
 
@@ -646,8 +731,9 @@ export async function getSynthese(matricule: string | null, roleHint?: 'CDS' | '
     const roleCompteRc = role === 'CDS' || role === 'DS' || role === 'CB'
     const roleCompteCds = role === 'RC' || role === 'DS' || role === 'CB'
     const roleCompteCb = role === 'RC' || role === 'CDS' || role === 'DS'
+    const roleCompteDs = role === 'RC' || role === 'CDS' || role === 'CB'
     const roleCompteDemandeur = role === 'RC' || role === 'CDS' || role === 'DS' || role === 'CB'
-    const compte = isRc ? roleCompteRc : isCds ? roleCompteCds : isCb ? roleCompteCb : roleCompteDemandeur
+    const compte = isRc ? roleCompteRc : isCds ? roleCompteCds : isCb ? roleCompteCb : isDs ? roleCompteDs : roleCompteDemandeur
     if (compte) {
       enTransit[role as 'RC' | 'CDS' | 'DS' | 'CB'].nombre += 1
       enTransit[role as 'RC' | 'CDS' | 'DS' | 'CB'].montant += row.montant_demande
@@ -1692,7 +1778,7 @@ async function purgePieceJointe(idDemandeAchat: number, idFournisseur?: number):
  * à l'ouverture) — même règle d'accès que getDemandeAchat.
  */
 /** `roleHint` (décision du 18/09/2026, écran de suivi CB) — GestionDocumentaireModal l'appelle pour construire sa liste de fournisseurs, y compris pour une CB sur une FAD qui n'est pas la sienne. */
-export async function listConsultationDemandeAchat(matricule: string | null, idDemandeAchat: number, roleHint?: 'CDS' | 'CB'): Promise<ConsultationCandidat[]> {
+export async function listConsultationDemandeAchat(matricule: string | null, idDemandeAchat: number, roleHint?: 'CDS' | 'CB' | 'DS'): Promise<ConsultationCandidat[]> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
@@ -1924,7 +2010,7 @@ function isPdfBuffer(buffer: Buffer): boolean {
   return buffer.subarray(0, 4).equals(PDF_MAGIC_BYTES)
 }
 
-async function assertDevisAccessible(matricule: string | null, idDemandeAchat: number, idDevis: number, roleHint?: 'CDS' | 'CB') {
+async function assertDevisAccessible(matricule: string | null, idDemandeAchat: number, idDevis: number, roleHint?: 'CDS' | 'CB' | 'DS') {
   if (!matricule) throw new AppError('Authentification requise', 401)
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
@@ -1984,7 +2070,7 @@ export async function downloadDevisFile(
   matricule: string | null,
   idDemandeAchat: number,
   idDevis: number,
-  roleHint?: 'CDS' | 'CB',
+  roleHint?: 'CDS' | 'CB' | 'DS',
 ): Promise<{ buffer: Buffer; nomFichier: string }> {
   const { row } = await assertDevisAccessible(matricule, idDemandeAchat, idDevis, roleHint)
   if (!row.storage_path || !row.nom_fichier_original) throw new AppError('Aucun fichier déposé pour ce devis.', 404)
@@ -2067,7 +2153,7 @@ export async function listPiecesDemandeAchat(
   matricule: string | null,
   idDemandeAchat: number,
   idFournisseur: number,
-  roleHint?: 'CDS' | 'CB',
+  roleHint?: 'CDS' | 'CB' | 'DS',
 ): Promise<PieceJointeView[]> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
@@ -2098,7 +2184,7 @@ export async function addPieceDemandeAchat(
   idDemandeAchat: number,
   input: unknown,
   file: { buffer: Buffer; originalname: string; size: number } | undefined,
-  roleHint?: 'CDS' | 'CB',
+  roleHint?: 'CDS' | 'CB' | 'DS',
 ): Promise<PieceJointeView> {
   if (!matricule) throw new AppError('Authentification requise', 401)
   if (!file) throw new AppError('Fichier requis.', 400)
@@ -2140,7 +2226,7 @@ export async function addPieceDemandeAchat(
 }
 
 /** Suppression d'une pièce complémentaire — jamais une pièce ORIGINE=SYSTEME (fiche récapitulative, Phase 2). */
-export async function removePieceDemandeAchat(matricule: string | null, idDemandeAchat: number, idPiece: number, roleHint?: 'CDS' | 'CB'): Promise<void> {
+export async function removePieceDemandeAchat(matricule: string | null, idDemandeAchat: number, idPiece: number, roleHint?: 'CDS' | 'CB' | 'DS'): Promise<void> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
@@ -2164,7 +2250,7 @@ export async function downloadPieceDemandeAchat(
   matricule: string | null,
   idDemandeAchat: number,
   idPiece: number,
-  roleHint?: 'CDS' | 'CB',
+  roleHint?: 'CDS' | 'CB' | 'DS',
 ): Promise<{ buffer: Buffer; nomFichier: string }> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 

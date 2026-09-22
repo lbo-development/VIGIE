@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
-import { SuiviCds } from './SuiviCds'
+import { SuiviDs } from './SuiviDs'
 import type { DemandeAchat as DemandeAchatRow, AccueilScope, AccueilSynthese } from '../hooks/useDemandeAchat'
 import type { MeResponse } from '../hooks/useCurrentUser'
 
@@ -33,15 +33,15 @@ const FAD_A_TRAITER: DemandeAchatRow = {
   nummarche: null,
   id_marche_tiers: null,
   id_fournisseur_retenu: null,
-  code_statut: 'FAD_TRANSMISE_RC_CDS',
+  code_statut: 'FAD_TRANSMISE_CB_DS',
   created_at: '2026-09-08T10:00:00Z',
   updated_at: '2026-09-08T10:00:00Z',
 }
 
-const FAD_VALIDEE: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 5, numero: '2026-09-09-001', code_statut: 'FAD_VALIDEE_CDS' }
-const EN_COURS: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 2, numero: '2026-09-07-001', code_statut: 'FAD_A_COMPLETER_CDS' }
+const FAD_VALIDEE: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 5, numero: '2026-09-09-001', code_statut: 'FAD_VALIDEE_DS' }
+const EN_COURS: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 2, numero: '2026-09-07-001', code_statut: 'FAD_A_COMPLETER_CB' }
 const FAD_COMMANDEE: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 3, numero: '2026-08-01-001', code_statut: 'FAD_COMMANDEE' }
-const FAD_REJETEE: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 4, numero: '2026-08-02-001', code_statut: 'FAD_REJETEE_CDS' }
+const FAD_REJETEE: DemandeAchatRow = { ...FAD_A_TRAITER, id_demande_achat: 4, numero: '2026-08-02-001', code_statut: 'FAD_REJETEE_DS' }
 
 const SYNTHESE_VIDE: AccueilSynthese = {
   enTransit: { RC: { nombre: 0, montant: 0 }, CDS: { nombre: 0, montant: 0 }, DS: { nombre: 0, montant: 0 }, CB: { nombre: 0, montant: 0 } },
@@ -51,8 +51,8 @@ const SYNTHESE_VIDE: AccueilSynthese = {
 let currentUserData: MeResponse | null = null
 const listMock = vi.fn()
 const syntheseMock = vi.fn()
-const decisionCdsMock = vi.fn()
-const transmettreCbMock = vi.fn()
+const decisionDsMock = vi.fn()
+const transmettreOrdreCbMock = vi.fn()
 const getHistoriqueMock = vi.fn()
 const updateMock = vi.fn()
 const selectMarcheMock = vi.fn()
@@ -71,7 +71,7 @@ const downloadPieceBlobMock = vi.fn()
 const deleteMock = vi.fn()
 
 vi.mock('../hooks/useAuth', () => ({
-  useAuth: () => ({ session: { user: { email: 'paul.durand@gpmm.fr' } }, loading: false, signOut: vi.fn() }),
+  useAuth: () => ({ session: { user: { email: 'sylvie.martin@gpmm.fr' } }, loading: false, signOut: vi.fn() }),
 }))
 vi.mock('../hooks/useCurrentUser', () => ({
   useCurrentUser: () => ({ data: currentUserData, loading: false }),
@@ -83,14 +83,12 @@ vi.mock('../hooks/useSuppleance', () => ({
   createSuppleance: vi.fn(),
   retireSuppleance: vi.fn(),
 }))
+const useFournisseursMock = vi.fn()
 vi.mock('../hooks/useFournisseurs', () => ({
-  useFournisseurs: () => ({
-    fournisseurs: [{ id_fournisseur: 42, id_service: 10, raison_sociale_service: 'ACME', etatfournisseur: 'Actif' }],
-    loading: false,
-  }),
+  useFournisseurs: (...args: unknown[]) => useFournisseursMock(...args),
 }))
 vi.mock('../hooks/useServices', () => ({
-  useServices: () => ({ services: [{ id_service: 10, code_service: 'S1', libelle_service: 'Service Maintenance', id_direction: 1, actif: true }], loading: false }),
+  useServices: () => ({ services: [{ id_service: 10, code_service: 'S1', libelle_service: 'Service Maintenance', id_direction: 9, actif: true }], loading: false }),
 }))
 vi.mock('../hooks/useMarches', () => ({
   useMarches: () => ({ marches: [], loading: false }),
@@ -105,8 +103,8 @@ vi.mock('../hooks/useLibelleReferentiel', () => ({
 vi.mock('../hooks/useDemandeAchat', () => ({
   useDemandeAchatList: (...args: unknown[]) => listMock(...args),
   useAccueilSynthese: (...args: unknown[]) => syntheseMock(...args),
-  decisionCds: (...args: unknown[]) => decisionCdsMock(...args),
-  transmettreCb: (...args: unknown[]) => transmettreCbMock(...args),
+  decisionDs: (...args: unknown[]) => decisionDsMock(...args),
+  transmettreOrdreCb: (...args: unknown[]) => transmettreOrdreCbMock(...args),
   getHistoriqueStatuts: (...args: unknown[]) => getHistoriqueMock(...args),
   updateDemandeAchat: (...args: unknown[]) => updateMock(...args),
   selectMarcheDemandeAchat: (...args: unknown[]) => selectMarcheMock(...args),
@@ -125,7 +123,7 @@ vi.mock('../hooks/useDemandeAchat', () => ({
   deleteDemandeAchat: (...args: unknown[]) => deleteMock(...args),
 }))
 
-/** Route listMock par `params.scope` — même principe que pages/SuiviRc.test.tsx. */
+/** Route listMock par `params.scope` — même principe que pages/SuiviCds.test.tsx. */
 function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) {
   const byScope: Record<AccueilScope, DemandeAchatRow[]> = {
     A_FINALISER: [],
@@ -154,8 +152,8 @@ beforeEach(() => {
   mesSuppleancesData = null
   listMock.mockReset()
   syntheseMock.mockReset().mockReturnValue({ data: SYNTHESE_VIDE, loading: false, error: null, refetch: vi.fn() })
-  decisionCdsMock.mockReset()
-  transmettreCbMock.mockReset()
+  decisionDsMock.mockReset()
+  transmettreOrdreCbMock.mockReset()
   getHistoriqueMock.mockReset().mockResolvedValue([])
   updateMock.mockReset()
   selectMarcheMock.mockReset()
@@ -172,55 +170,69 @@ beforeEach(() => {
   removePieceMock.mockReset()
   downloadPieceBlobMock.mockReset()
   deleteMock.mockReset()
+  useFournisseursMock.mockReset().mockReturnValue({
+    fournisseurs: [{ id_fournisseur: 42, id_service: 10, raison_sociale_service: 'ACME', etatfournisseur: 'Actif' }],
+    loading: false,
+  })
 
-  mockLists({ A_TRAITER_CDS: [FAD_A_TRAITER] })
+  mockLists({ A_TRAITER_DS: [FAD_A_TRAITER] })
   currentUserData = {
-    matricule: '22001',
-    nom: 'DURAND',
-    prenom: 'Paul',
-    idService: 10,
+    matricule: '28001',
+    nom: 'MARTIN',
+    prenom: 'Sylvie',
+    idService: null,
     idCellule: null,
-    roles: [{ typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null }],
+    roles: [{ typeRole: 'DS', perimeterLabel: 'Direction Infrastructure', idService: null, idCellule: null, idDirection: 9 }],
   }
 })
 
-describe('SuiviCds — en-tête', () => {
-  it('affiche le nom du service du rôle CDS dans le titre', () => {
-    render(<SuiviCds />)
-    expect(screen.getByRole('heading', { name: 'Suivi CDS — Service Maintenance' })).toBeInTheDocument()
+describe('SuiviDs — en-tête', () => {
+  it('affiche le nom de la direction du rôle DS dans le titre', () => {
+    render(<SuiviDs />)
+    expect(screen.getByRole('heading', { name: 'Suivi DS — Direction Infrastructure' })).toBeInTheDocument()
   })
 })
 
-describe('SuiviCds — suppléance (décision du 20/09/2026)', () => {
+describe('SuiviDs — suppléance (décision du 20/09/2026)', () => {
   it("n'affiche le bouton « Suppléance » que pour un titulaire du rôle", () => {
-    render(<SuiviCds />)
+    render(<SuiviDs />)
     expect(screen.queryByRole('button', { name: 'Suppléance' })).not.toBeInTheDocument()
 
-    mesSuppleancesData = { roles: [{ idRole: 5, typeRole: 'CDS', perimeterLabel: 'Service Maintenance' }], suppleances: [] }
+    mesSuppleancesData = { roles: [{ idRole: 8, typeRole: 'DS', perimeterLabel: 'Direction Infrastructure' }], suppleances: [] }
     cleanup()
-    render(<SuiviCds />)
+    render(<SuiviDs />)
     expect(screen.getByRole('button', { name: 'Suppléance' })).toBeInTheDocument()
   })
 
   it("un suppléant voit le bandeau « Vous suppléez … » sous l'en-tête", () => {
     currentUserData = {
-      matricule: '22001',
-      nom: 'DURAND',
-      prenom: 'Paul',
-      idService: 10,
+      matricule: '28001',
+      nom: 'MARTIN',
+      prenom: 'Sylvie',
+      idService: null,
       idCellule: null,
-      roles: [{ typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null, enSuppleanceDe: 'Jean DUPONT', suppleanceDateFin: '2026-09-30' }],
+      roles: [
+        {
+          typeRole: 'DS',
+          perimeterLabel: 'Direction Infrastructure',
+          idService: null,
+          idCellule: null,
+          idDirection: 9,
+          enSuppleanceDe: 'Jean DUPONT',
+          suppleanceDateFin: '2026-09-30',
+        },
+      ],
     }
-    render(<SuiviCds />)
+    render(<SuiviDs />)
     expect(screen.getByText(/Vous suppléez Jean DUPONT/)).toBeInTheDocument()
   })
 })
 
-describe('SuiviCds — tuiles de synthèse', () => {
-  it('affiche "En transit" avec 3 compartiments seulement (RC/DS/CB, pas CDS) et "FAD du service" (pas "Demandes de la cellule")', () => {
+describe('SuiviDs — tuiles de synthèse', () => {
+  it('affiche "En transit" avec 3 compartiments seulement (RC/CDS/CB, pas DS) et "FAD de la direction" (pas "FAD du service")', () => {
     syntheseMock.mockReturnValue({
       data: {
-        enTransit: { RC: { nombre: 3, montant: 25131.7 }, CDS: { nombre: 99, montant: 999999 }, DS: { nombre: 11, montant: 24340.8 }, CB: { nombre: 10, montant: 70100.5 } },
+        enTransit: { RC: { nombre: 3, montant: 25131.7 }, CDS: { nombre: 7, montant: 12000 }, DS: { nombre: 99, montant: 999999 }, CB: { nombre: 10, montant: 70100.5 } },
         mesDemandes: { enCours: { nombre: 38, montant: 150785.4 }, commande: { nombre: 23, montant: 50163.8 } },
       },
       loading: false,
@@ -228,29 +240,41 @@ describe('SuiviCds — tuiles de synthèse', () => {
       refetch: vi.fn(),
     })
 
-    render(<SuiviCds />)
+    render(<SuiviDs />)
 
     expect(screen.getByRole('heading', { name: 'En transit' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'FAD du service' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Demandes de la cellule' })).not.toBeInTheDocument()
-    // Le compartiment CDS (99) n'est jamais affiché — seuls RC/DS/CB le sont.
+    expect(screen.getByRole('heading', { name: 'FAD de la direction' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'FAD du service' })).not.toBeInTheDocument()
+    // Le compartiment DS (99) n'est jamais affiché — seuls RC/CDS/CB le sont.
     expect(screen.queryByText('99')).not.toBeInTheDocument()
     expect(screen.getByText('3')).toBeInTheDocument()
-    expect(screen.getByText('11')).toBeInTheDocument()
+    expect(screen.getByText('7')).toBeInTheDocument()
     expect(screen.getByText('38')).toBeInTheDocument()
     expect(screen.getByText('23')).toBeInTheDocument()
   })
 
-  it('demande la synthèse avec le rôle CDS explicite', () => {
-    render(<SuiviCds />)
-    expect(syntheseMock).toHaveBeenCalledWith('CDS')
+  it('demande la synthèse avec le rôle DS explicite', () => {
+    render(<SuiviDs />)
+    expect(syntheseMock).toHaveBeenCalledWith('DS')
   })
 })
 
-describe('SuiviCds — onglets', () => {
+describe('SuiviDs — pas de filtre Fournisseurs (décision du 22/09/2026)', () => {
+  it("n'affiche pas de filtre \"Fournisseurs\" (pas d'équivalent multi-service)", () => {
+    render(<SuiviDs />)
+    expect(screen.queryByLabelText('Filtre fournisseur')).not.toBeInTheDocument()
+  })
+
+  it('interroge quand même useFournisseurs (rôle DS, sans idService) pour résoudre le nom du fournisseur retenu sur chaque carte', () => {
+    render(<SuiviDs />)
+    expect(useFournisseursMock).toHaveBeenCalledWith(null, 'DS')
+  })
+})
+
+describe('SuiviDs — onglets', () => {
   it('affiche les 4 onglets avec leur badge de comptage, "À traiter" actif par défaut', () => {
-    mockLists({ A_TRAITER_CDS: [FAD_A_TRAITER], EN_COURS_CDS: [EN_COURS], FAD_COMMANDEES: [FAD_COMMANDEE], REJETEES_ANNULEES: [FAD_REJETEE] })
-    render(<SuiviCds />)
+    mockLists({ A_TRAITER_DS: [FAD_A_TRAITER], EN_COURS_DS: [EN_COURS], FAD_COMMANDEES: [FAD_COMMANDEE], REJETEES_ANNULEES: [FAD_REJETEE] })
+    render(<SuiviDs />)
 
     expect(within(screen.getByRole('tab', { name: /À traiter/ })).getByText('1')).toBeInTheDocument()
     expect(within(screen.getByRole('tab', { name: /En cours/ })).getByText('1')).toBeInTheDocument()
@@ -259,14 +283,14 @@ describe('SuiviCds — onglets', () => {
     expect(screen.getByRole('tab', { name: /À traiter/ })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('ne propose jamais de bouton "Nouvelle demande" (le CDS ne crée pas de DA)', () => {
-    render(<SuiviCds />)
+  it('ne propose jamais de bouton "Nouvelle demande" (le DS ne crée pas de DA)', () => {
+    render(<SuiviDs />)
     expect(screen.queryByRole('button', { name: 'Nouvelle demande' })).not.toBeInTheDocument()
   })
 
-  it('changer d\'onglet affiche la liste scopée correspondante', () => {
-    mockLists({ A_TRAITER_CDS: [FAD_A_TRAITER], EN_COURS_CDS: [EN_COURS] })
-    render(<SuiviCds />)
+  it("changer d'onglet affiche la liste scopée correspondante", () => {
+    mockLists({ A_TRAITER_DS: [FAD_A_TRAITER], EN_COURS_DS: [EN_COURS] })
+    render(<SuiviDs />)
 
     fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
 
@@ -275,15 +299,15 @@ describe('SuiviCds — onglets', () => {
     expect(screen.queryByText('2026-09-08-001')).not.toBeInTheDocument()
   })
 
-  it('demande chaque liste avec le rôle CDS explicite (indispensable pour un acteur cumulant RC+CDS)', () => {
-    render(<SuiviCds />)
-    expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ scope: 'A_TRAITER_CDS', role: 'CDS' }))
+  it('demande chaque liste avec le rôle DS explicite (indispensable pour un acteur cumulant CB+DS)', () => {
+    render(<SuiviDs />)
+    expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ scope: 'A_TRAITER_DS', role: 'DS' }))
   })
 })
 
-describe('SuiviCds — actions par ligne', () => {
-  it('sur "À traiter", pour FAD_TRANSMISE_RC_CDS, propose "Valider les éléments de la commande"/Historique — jamais de bouton Traiter (le CDS ne modifie rien)', () => {
-    render(<SuiviCds />)
+describe('SuiviDs — actions par ligne', () => {
+  it('sur "À traiter", pour FAD_TRANSMISE_CB_DS, propose "Valider les éléments de la commande"/Historique — jamais de bouton Traiter (le DS ne modifie rien)', () => {
+    render(<SuiviDs />)
     const row = within(screen.getByText('2026-09-08-001').closest('article')!)
 
     expect(row.queryByRole('button', { name: 'Traiter la demande' })).not.toBeInTheDocument()
@@ -291,9 +315,9 @@ describe('SuiviCds — actions par ligne', () => {
     expect(row.getByRole('button', { name: 'Historique des statuts' })).toBeInTheDocument()
   })
 
-  it('sur "À traiter", pour FAD_VALIDEE_CDS, propose aussi "Valider les éléments de la commande" (pour transmettre à la CB)', () => {
-    mockLists({ A_TRAITER_CDS: [FAD_VALIDEE] })
-    render(<SuiviCds />)
+  it('sur "À traiter", pour FAD_VALIDEE_DS, propose aussi "Valider les éléments de la commande" (pour transmettre à la CB)', () => {
+    mockLists({ A_TRAITER_DS: [FAD_VALIDEE] })
+    render(<SuiviDs />)
     const row = within(screen.getByText('2026-09-09-001').closest('article')!)
 
     expect(row.getByRole('button', { name: 'Valider les éléments de la commande' })).toBeInTheDocument()
@@ -301,8 +325,8 @@ describe('SuiviCds — actions par ligne', () => {
   })
 
   it('sur les autres onglets, "Voir les éléments de la demande" (pas renommé)', () => {
-    mockLists({ EN_COURS_CDS: [EN_COURS] })
-    render(<SuiviCds />)
+    mockLists({ EN_COURS_DS: [EN_COURS] })
+    render(<SuiviDs />)
     fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
     const row = within(screen.getByText('2026-09-07-001').closest('article')!)
 
@@ -311,8 +335,8 @@ describe('SuiviCds — actions par ligne', () => {
   })
 
   it('"Voir les éléments de la demande" ouvre la FAD en lecture seule (pied de modale réduit à "Fermer")', () => {
-    mockLists({ EN_COURS_CDS: [EN_COURS] })
-    render(<SuiviCds />)
+    mockLists({ EN_COURS_DS: [EN_COURS] })
+    render(<SuiviDs />)
     fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
     fireEvent.click(within(screen.getByText('2026-09-07-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
 
@@ -320,19 +344,19 @@ describe('SuiviCds — actions par ligne', () => {
     expect(screen.getAllByRole('button', { name: 'Fermer' })).toHaveLength(2)
   })
 
-  it('bug corrigé le 22/09/2026 : depuis "Voir les éléments de la demande", la Gestion documentaire interroge le backend avec le rôle CDS — sans ce paramètre, un CDS pur (sans rôle RC) se voyait refuser l\'accès à sa propre FAD', () => {
+  it('depuis "Voir les éléments de la demande", la Gestion documentaire interroge le backend avec le rôle DS — même correctif que CDS/CB, sans ce paramètre un DS pur se verrait refuser l\'accès à sa propre FAD', () => {
     const EN_COURS_AVEC_FOURNISSEUR = { ...EN_COURS, id_fournisseur_retenu: 42 }
-    mockLists({ EN_COURS_CDS: [EN_COURS_AVEC_FOURNISSEUR] })
-    render(<SuiviCds />)
+    mockLists({ EN_COURS_DS: [EN_COURS_AVEC_FOURNISSEUR] })
+    render(<SuiviDs />)
     fireEvent.click(screen.getByRole('tab', { name: /En cours/ }))
     fireEvent.click(within(screen.getByText('2026-09-07-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
     fireEvent.click(screen.getByRole('button', { name: 'Gestion documentaire' }))
 
-    expect(getConsultationMock).toHaveBeenCalledWith(2, 'CDS')
+    expect(getConsultationMock).toHaveBeenCalledWith(2, 'DS')
   })
 
-  it('"Valider les éléments de la commande" ouvre ValiderCommandeCdsModal pour FAD_TRANSMISE_RC_CDS/FAD_VALIDEE_CDS', () => {
-    render(<SuiviCds />)
+  it('"Valider les éléments de la commande" ouvre ValiderCommandeDsModal pour FAD_TRANSMISE_CB_DS/FAD_VALIDEE_DS', () => {
+    render(<SuiviDs />)
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Valider les éléments de la commande' }))
 
     expect(screen.getByText(/Valider les éléments de la commande/)).toBeInTheDocument()
@@ -340,7 +364,7 @@ describe('SuiviCds — actions par ligne', () => {
   })
 
   it('"Historique" ouvre la modale d\'historique des statuts', () => {
-    render(<SuiviCds />)
+    render(<SuiviDs />)
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
 
     expect(screen.getByRole('dialog', { name: /Historique des statuts/ })).toBeInTheDocument()

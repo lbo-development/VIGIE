@@ -9,6 +9,8 @@ export interface MeRole {
   idService: number | null
   /** ID_CELLULE du rôle (RC) — ajouté le 15/09/2026 (écran de suivi RC) pour construire l'entrée de sidebar "FAD — <cellule>" et interroger la bonne cellule sans dépendre du libellé texte. */
   idCellule: number | null
+  /** ID_DIRECTION du rôle (DS) — ajouté le 22/09/2026 (écran de suivi DS) pour construire l'entrée de sidebar "FAD (N+3) — <direction>" et résoudre le périmètre multi-services du DS sans dépendre du libellé texte. */
+  idDirection: number | null
   /** Décision du 20/09/2026 : `true` = titulaire actuellement suppléé, rôle en lecture seule (écritures refusées par roleEffectif.service.ts). */
   lectureSeule: boolean
   /** Date de fin (AAAA-MM-JJ, incluse) de la suppléance active qui concerne ce rôle, côté titulaire suppléé comme côté suppléant — `null` sinon. */
@@ -75,6 +77,7 @@ export async function getCurrentUser(matricule: string | null): Promise<MeRespon
         perimeterLabel,
         idService: role.idService,
         idCellule: role.idCellule,
+        idDirection: role.idDirection,
         lectureSeule: role.lectureSeule,
         suppleanceDateFin: role.suppleanceDateFin,
         suppleantNomPrenom: nomPrenom(role.matriculeSuppleant),

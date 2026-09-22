@@ -10,10 +10,12 @@ const findByFournisseurs = vi.fn()
 const removeByFournisseur = vi.fn()
 
 const serviceFindById = vi.fn()
+const serviceFindByDirection = vi.fn()
 
 const findIdServiceByMatricule = vi.fn()
 
 const findActiveByMatricule = vi.fn()
+const findEffectiveRolesMock = vi.fn()
 
 const hasActiveRole = vi.fn()
 const hasActiveRoleForService = vi.fn()
@@ -35,12 +37,16 @@ vi.mock('../repositories/contact.repository.js', () => ({
 }))
 vi.mock('../repositories/service.repository.js', () => ({
   findById: (...args: unknown[]) => serviceFindById(...args),
+  findByDirection: (...args: unknown[]) => serviceFindByDirection(...args),
 }))
 vi.mock('../repositories/acteur.repository.js', () => ({
   findIdServiceByMatricule: (...args: unknown[]) => findIdServiceByMatricule(...args),
 }))
 vi.mock('../repositories/roleAttribution.repository.js', () => ({
   findActiveByMatricule: (...args: unknown[]) => findActiveByMatricule(...args),
+}))
+vi.mock('../services/roleEffectif.service.js', () => ({
+  findEffectiveRoles: (...args: unknown[]) => findEffectiveRolesMock(...args),
 }))
 vi.mock('../repositories/auth.repository.js', () => ({
   hasActiveRole: (...args: unknown[]) => hasActiveRole(...args),
@@ -88,8 +94,10 @@ beforeEach(() => {
   findByFournisseurs.mockReset()
   removeByFournisseur.mockReset()
   serviceFindById.mockReset()
+  serviceFindByDirection.mockReset()
   findIdServiceByMatricule.mockReset()
   findActiveByMatricule.mockReset()
+  findEffectiveRolesMock.mockReset()
   hasActiveRole.mockReset()
   hasActiveRoleForService.mockReset()
   marcheExistsForFournisseur.mockReset()
@@ -186,6 +194,46 @@ describe('listFournisseurs', () => {
 
     expect(result[0].contacts).toHaveLength(1)
     expect(result[0].contacts[0].nom).toBe('Dupont')
+  })
+
+  // Écran de suivi DS (décision du 22/09/2026) — résolution du nom du fournisseur retenu sur
+  // chaque carte FAD, le DS n'ayant pas de service unique (périmètre = une direction).
+  describe("roleHint 'DS' (décision du 22/09/2026)", () => {
+    const ID_DIRECTION = 9
+    const ID_SERVICE_AUTRE = 2
+
+    it('un DS avec le hint "DS" voit les fournisseurs de tous les services de sa direction', async () => {
+      findEffectiveRolesMock.mockResolvedValue([
+        { idRole: 1, typeRole: 'DS', idCellule: null, idService: null, idDirection: ID_DIRECTION, idSuppleance: null, lectureSeule: false },
+      ])
+      serviceFindByDirection.mockResolvedValue([
+        { id_service: ID_SERVICE, code_service: 'S1', libelle_service: 'S1', id_direction: ID_DIRECTION, actif: true },
+        { id_service: ID_SERVICE_AUTRE, code_service: 'S2', libelle_service: 'S2', id_direction: ID_DIRECTION, actif: true },
+      ])
+      findAll.mockResolvedValue([FOURNISSEUR])
+      findByFournisseurs.mockResolvedValue([])
+
+      await listFournisseurs(MATRICULE, undefined, 'DS')
+
+      expect(serviceFindByDirection).toHaveBeenCalledWith(ID_DIRECTION)
+      expect(findAll).toHaveBeenCalledWith(undefined, [ID_SERVICE, ID_SERVICE_AUTRE])
+    })
+
+    it('sans rôle DS effectif, le hint "DS" renvoie une liste vide plutôt que de planter', async () => {
+      findEffectiveRolesMock.mockResolvedValue([])
+      findAll.mockResolvedValue([])
+      findByFournisseurs.mockResolvedValue([])
+
+      const result = await listFournisseurs(MATRICULE, undefined, 'DS')
+
+      expect(result).toEqual([])
+      expect(serviceFindByDirection).not.toHaveBeenCalled()
+      expect(findAll).toHaveBeenCalledWith(undefined, [])
+    })
+
+    it('rejette sans authentification (401), même avec le hint "DS"', async () => {
+      await expect(listFournisseurs(null, undefined, 'DS')).rejects.toMatchObject({ status: 401 })
+    })
   })
 })
 
