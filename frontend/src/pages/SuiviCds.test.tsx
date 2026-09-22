@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { SuiviCds } from './SuiviCds'
 import type { DemandeAchat as DemandeAchatRow, AccueilScope, AccueilSynthese } from '../hooks/useDemandeAchat'
 import type { MeResponse } from '../hooks/useCurrentUser'
@@ -76,6 +76,13 @@ vi.mock('../hooks/useAuth', () => ({
 vi.mock('../hooks/useCurrentUser', () => ({
   useCurrentUser: () => ({ data: currentUserData, loading: false }),
 }))
+let mesSuppleancesData: { roles: unknown[]; suppleances: unknown[] } | null = null
+vi.mock('../hooks/useSuppleance', () => ({
+  useMesSuppleances: () => ({ data: mesSuppleancesData, loading: false, error: null, refetch: vi.fn() }),
+  useSuppleantCandidats: () => ({ candidats: [], loading: false, error: null }),
+  createSuppleance: vi.fn(),
+  retireSuppleance: vi.fn(),
+}))
 vi.mock('../hooks/useFournisseurs', () => ({
   useFournisseurs: () => ({
     fournisseurs: [{ id_fournisseur: 42, id_service: 10, raison_sociale_service: 'ACME', etatfournisseur: 'Actif' }],
@@ -142,6 +149,7 @@ function mockLists(overrides: Partial<Record<AccueilScope, DemandeAchatRow[]>>) 
 }
 
 beforeEach(() => {
+  mesSuppleancesData = null
   listMock.mockReset()
   syntheseMock.mockReset().mockReturnValue({ data: SYNTHESE_VIDE, loading: false, error: null, refetch: vi.fn() })
   decisionCdsMock.mockReset()
@@ -178,6 +186,31 @@ describe('SuiviCds — en-tête', () => {
   it('affiche le nom du service du rôle CDS dans le titre', () => {
     render(<SuiviCds />)
     expect(screen.getByRole('heading', { name: 'Suivi CDS — Service Maintenance' })).toBeInTheDocument()
+  })
+})
+
+describe('SuiviCds — suppléance (décision du 20/09/2026)', () => {
+  it("n'affiche le bouton « Suppléance » que pour un titulaire du rôle", () => {
+    render(<SuiviCds />)
+    expect(screen.queryByRole('button', { name: 'Suppléance' })).not.toBeInTheDocument()
+
+    mesSuppleancesData = { roles: [{ idRole: 5, typeRole: 'CDS', perimeterLabel: 'Service Maintenance' }], suppleances: [] }
+    cleanup()
+    render(<SuiviCds />)
+    expect(screen.getByRole('button', { name: 'Suppléance' })).toBeInTheDocument()
+  })
+
+  it("un suppléant voit le bandeau « Vous suppléez … » sous l'en-tête", () => {
+    currentUserData = {
+      matricule: '22001',
+      nom: 'DURAND',
+      prenom: 'Paul',
+      idService: 10,
+      idCellule: null,
+      roles: [{ typeRole: 'CDS', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null, enSuppleanceDe: 'Jean DUPONT', suppleanceDateFin: '2026-09-30' }],
+    }
+    render(<SuiviCds />)
+    expect(screen.getByText(/Vous suppléez Jean DUPONT/)).toBeInTheDocument()
   })
 })
 

@@ -6,8 +6,10 @@ vi.mock('../repositories/roleAttribution.repository.js', () => ({
 }))
 
 const findActiveForSuppleant = vi.fn()
+const findActiveByRoles = vi.fn()
 vi.mock('../repositories/suppleance.repository.js', () => ({
   findActiveForSuppleant: (...args: unknown[]) => findActiveForSuppleant(...args),
+  findActiveByRoles: (...args: unknown[]) => findActiveByRoles(...args),
 }))
 
 const { findEffectiveRoles, assertHasEffectiveRole } = await import('../services/roleEffectif.service.js')
@@ -18,12 +20,17 @@ const AUTRE = '10003'
 
 const ROLE_RC_TITULAIRE = { id_role: 1, matricule: TITULAIRE, type_role: 'RC', id_cellule: 7, id_service: null, id_direction: null, date_debut: '2026-01-01', date_fin: null, actif: true }
 const ROLE_DS_TITULAIRE = { id_role: 2, matricule: TITULAIRE, type_role: 'DS', id_cellule: null, id_service: null, id_direction: 3, date_debut: '2026-01-01', date_fin: null, actif: true }
+const ROLE_CB_TITULAIRE = { id_role: 3, matricule: TITULAIRE, type_role: 'CB', id_cellule: null, id_service: 12, id_direction: null, date_debut: '2026-01-01', date_fin: null, actif: true }
 
-const SUPPLEANCE_CDS = { id_suppleance: 99, id_role: 5, type_role: 'CDS', id_cellule: null, id_service: 12, id_direction: null }
+const SUPPLEANCE_CDS = { id_suppleance: 99, id_role: 5, type_role: 'CDS', id_cellule: null, id_service: 12, id_direction: null, date_fin: '2026-09-30', matricule_titulaire: AUTRE }
+const SUPPLEANCE_ACTIVE_SUR_RC = { id_suppleance: 50, id_role: 1, matricule_suppleant: SUPPLEANT, date_fin: '2026-09-25' }
+
+const SANS_SUPPLEANCE = { lectureSeule: false, matriculeSuppleant: null, matriculeTitulaire: null, suppleanceDateFin: null }
 
 beforeEach(() => {
   findActiveByMatricule.mockReset().mockResolvedValue([])
   findActiveForSuppleant.mockReset().mockResolvedValue([])
+  findActiveByRoles.mockReset().mockResolvedValue([])
 })
 
 describe('findEffectiveRoles', () => {
@@ -34,14 +41,43 @@ describe('findEffectiveRoles', () => {
     const roles = await findEffectiveRoles(TITULAIRE)
 
     expect(roles).toEqual([
-      { idRole: 1, typeRole: 'RC', idCellule: 7, idService: null, idDirection: null, idSuppleance: null },
-      { idRole: 2, typeRole: 'DS', idCellule: null, idService: null, idDirection: 3, idSuppleance: null },
-      { idRole: 5, typeRole: 'CDS', idCellule: null, idService: 12, idDirection: null, idSuppleance: 99 },
+      { idRole: 1, typeRole: 'RC', idCellule: 7, idService: null, idDirection: null, idSuppleance: null, ...SANS_SUPPLEANCE },
+      { idRole: 2, typeRole: 'DS', idCellule: null, idService: null, idDirection: 3, idSuppleance: null, ...SANS_SUPPLEANCE },
+      {
+        idRole: 5,
+        typeRole: 'CDS',
+        idCellule: null,
+        idService: 12,
+        idDirection: null,
+        idSuppleance: 99,
+        lectureSeule: false,
+        matriculeSuppleant: null,
+        matriculeTitulaire: AUTRE,
+        suppleanceDateFin: '2026-09-30',
+      },
     ])
   })
 
   it('renvoie une liste vide sans rôle ni suppléance', async () => {
     expect(await findEffectiveRoles(AUTRE)).toEqual([])
+  })
+
+  it('un titulaire dont le rôle est couvert par une suppléance active passe en lecture seule (20/09/2026)', async () => {
+    findActiveByMatricule.mockResolvedValue([ROLE_RC_TITULAIRE, ROLE_DS_TITULAIRE])
+    findActiveByRoles.mockResolvedValue([SUPPLEANCE_ACTIVE_SUR_RC])
+
+    const [rc, ds] = await findEffectiveRoles(TITULAIRE)
+
+    expect(rc).toMatchObject({ idRole: 1, lectureSeule: true, matriculeSuppleant: SUPPLEANT, suppleanceDateFin: '2026-09-25' })
+    expect(ds).toMatchObject({ idRole: 2, lectureSeule: false, matriculeSuppleant: null })
+  })
+
+  it("ne cherche de suppléance que sur les rôles RC/CDS/DS — la CB n'est jamais suppléable", async () => {
+    findActiveByMatricule.mockResolvedValue([ROLE_RC_TITULAIRE, ROLE_CB_TITULAIRE])
+
+    await findEffectiveRoles(TITULAIRE)
+
+    expect(findActiveByRoles).toHaveBeenCalledWith([1])
   })
 })
 
@@ -75,5 +111,36 @@ describe('assertHasEffectiveRole', () => {
     findActiveByMatricule.mockResolvedValue([ROLE_DS_TITULAIRE])
     const role = await assertHasEffectiveRole(TITULAIRE, 'DS', 3)
     expect(role.idDirection).toBe(3)
+  })
+
+  it('refuse (403) une écriture à un titulaire suppléé, avec un message dédié (20/09/2026)', async () => {
+    findActiveByMatricule.mockResolvedValue([ROLE_RC_TITULAIRE])
+    findActiveByRoles.mockResolvedValue([SUPPLEANCE_ACTIVE_SUR_RC])
+
+    await expect(assertHasEffectiveRole(TITULAIRE, 'RC', 7)).rejects.toMatchObject({
+      status: 403,
+      message: expect.stringContaining('lecture seule'),
+    })
+    await expect(assertHasEffectiveRole(TITULAIRE, 'RC', 7)).rejects.toMatchObject({
+      message: expect.stringContaining('25/09/2026'),
+    })
+  })
+
+  it('un titulaire suppléé sur un rôle garde la main sur ses autres rôles', async () => {
+    findActiveByMatricule.mockResolvedValue([ROLE_RC_TITULAIRE, ROLE_DS_TITULAIRE])
+    findActiveByRoles.mockResolvedValue([SUPPLEANCE_ACTIVE_SUR_RC])
+
+    const role = await assertHasEffectiveRole(TITULAIRE, 'DS', 3)
+    expect(role.idRole).toBe(2)
+  })
+
+  it("un titulaire suppléé qui supplée aussi le même périmètre agit en suppléant", async () => {
+    // Cas limite : titulaire RC de la cellule 7 (suppléé), mais aussi suppléant d'un autre RC de la même cellule.
+    findActiveByMatricule.mockResolvedValue([ROLE_RC_TITULAIRE])
+    findActiveByRoles.mockResolvedValue([SUPPLEANCE_ACTIVE_SUR_RC])
+    findActiveForSuppleant.mockResolvedValue([{ ...SUPPLEANCE_CDS, type_role: 'RC', id_cellule: 7, id_service: null }])
+
+    const role = await assertHasEffectiveRole(TITULAIRE, 'RC', 7)
+    expect(role.idSuppleance).toBe(99)
   })
 })

@@ -222,8 +222,10 @@ exploitable directement par `supabase-js`) est de même porté par une fonction 
    (`acteur.id_cellule → cellule.id_service`, indépendant des rôles applicatifs) — fichier
    partagé avec `site.service.ts`/`sousSite.service.ts`, pas dupliqué par ressource.
    `repositories/auth.repository.ts` — résolution matricule ↔ compte Auth, vérification de
-   rôle actif (`role_attribution`, sans la suppléance : d'après le MCD elle ne couvre que
-   RC/CDS/DS, pas ADMIN_APP).
+   rôle actif (`role_attribution`, y compris la suppléance depuis le 14/09/2026 : elle ne
+   couvre que RC/CDS/DS, jamais CB ni ADMIN_*). Suppléance : auto-déclarée et retirable par
+   le titulaire (`suppleance.*`, refonte du 20/09/2026, voir `ForClaude/SECURITY.md` §2.10) ;
+   le titulaire suppléé est en lecture seule pendant la période.
 3. `services/parametres.service.ts` — registre `cle → schéma Zod` (`PARAMETRE_SCHEMAS`,
    validation uniquement — libellé/description/valeur par défaut viennent de
    `parametre_definition`), une seule entrée à ce stade : `auth.inactivite_delai_minutes`

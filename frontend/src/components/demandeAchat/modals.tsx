@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { DatePicker } from '../DatePicker'
 import { useServices } from '../../hooks/useServices'
 import { useFournisseurs } from '../../hooks/useFournisseurs'
 import { useMarches } from '../../hooks/useMarches'
@@ -1137,12 +1138,10 @@ export function FournisseurDaModal({
                               />
                             </td>
                             <td style={{ width: 140 }}>
-                              <input
-                                type="date"
-                                className="gp-input gp-input--compact"
-                                value={c.delaiLivraison}
-                                onChange={(e) => changerDelai(c.idDevis, e.target.value)}
-                                aria-label={`Délai annoncé — ${fournisseurLabel(c.idFournisseur)}`}
+                              <DatePicker
+                                value={c.delaiLivraison || null}
+                                onChange={(value) => changerDelai(c.idDevis, value ?? '')}
+                                ariaLabel={`Délai annoncé — ${fournisseurLabel(c.idFournisseur)}`}
                               />
                             </td>
                             <td style={{ width: 40 }}>

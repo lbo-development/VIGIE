@@ -3,6 +3,8 @@ import { useAuth } from '../hooks/useAuth'
 import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useFournisseurs } from '../hooks/useFournisseurs'
 import { useDemandeAchatList, useAccueilSynthese, type DemandeAchat as DemandeAchatRow, type AccueilScope } from '../hooks/useDemandeAchat'
+import { SuppleanceButton } from '../components/suppleance/SuppleanceButton'
+import { SuppleanceBanner } from '../components/suppleance/SuppleanceBanner'
 import { Combobox } from '../components/Combobox'
 import { MetricCard } from '../components/MetricCard'
 import { DemandeAchatModal } from '../components/demandeAchat/modals'
@@ -123,7 +125,12 @@ export function SuiviCds() {
           <h1>Suivi CDS{cdsRole?.perimeterLabel ? ` — ${cdsRole.perimeterLabel}` : ''}</h1>
           <p>Bienvenue, {displayName}. Fiches d'achat de votre service.</p>
         </div>
+        <div className="page-actions">
+          <SuppleanceButton />
+        </div>
       </div>
+
+      <SuppleanceBanner roles={currentUser?.roles ?? []} />
 
       {/* accueil-tiles-grid : même mise en page que pages/SuiviRc.tsx (styles/tableauDeBord.css). */}
       <div className="demo-grid accueil-tiles-grid">

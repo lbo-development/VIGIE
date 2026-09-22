@@ -607,3 +607,32 @@ table.gp-table{border-collapse:separate;border-spacing:0;width:100%;min-width:68
 /* pied */
 .gp-dp__foot{display:flex;justify-content:space-between;align-items:center;
   padding:8px 12px;border-top:1px solid var(--gp-border);background:var(--gp-surface);}
+
+/* ========================= ONGLET ACTIF "PLEIN" ========================= */
+/* Modificateur de .gp-tab — motif nouveau, absent de gpmm-style-guide.html
+   (voir ForClaude/INSTRUCTIONS_UX.md) : demande du 20/09/2026, l'onglet actif
+   reprend le rendu plein de .gp-btn--primary (fond --gp-primary, texte
+   --gp-on-primary, coins arrondis en haut seulement — l'onglet reste posé sur
+   le panneau/tableau du dessous, un arrondi bas casserait ce contact visuel)
+   plutôt que le simple soulignement du gabarit d'origine. `:not(.header-tabs)`
+   exclut la barre de navigation du shell applicatif (`Header.tsx` cumule les
+   classes `header-tabs gp-tabs` sur le même élément — sans cette exclusion, le
+   sélecteur générique `.gp-tabs .gp-tab` s'y appliquait aussi par erreur,
+   corrigé le 20/09/2026) : le shell ne se modifie pas, seuls les onglets de
+   contenu de page (SuiviRc/SuiviCb/SuiviCds/Home) sont concernés. */
+.gp-tabs:not(.header-tabs) .gp-tab[aria-selected="true"]{
+  background:var(--gp-primary);color:var(--gp-on-primary);border-bottom-color:transparent;
+  border-radius:var(--gp-radius) var(--gp-radius) 0 0;margin-bottom:0;}
+.gp-tabs:not(.header-tabs) .gp-tab[aria-selected="true"]:hover{background:var(--gp-primary-hover);}
+
+/* ========================= PASTILLE DE COMPTEUR D'ONGLET ========================= */
+/* Modificateur de .gp-badge — motif nouveau, absent de gpmm-style-guide.html
+   (voir ForClaude/INSTRUCTIONS_UX.md) : demande du 20/09/2026, +2px de police
+   pour la pastille numérique des onglets de suivi (ex. SuiviRc/SuiviCb/
+   SuiviCds/Home — `<span className="gp-badge">{tabCounts[...]}</span>` posé
+   dans un `.gp-tab`). Scopé à `.gp-tab .gp-badge` : ne touche pas les autres
+   usages de `.gp-badge` dans l'appli (statuts de DA, "Actif"/"Inactif",
+   "Retenu"...). `.gp-badge` n'a ni largeur ni hauteur fixe (span, dimensionné
+   par son contenu + padding) : 3 chiffres ("999") s'affichent sans découpe,
+   la pastille s'élargit simplement. */
+.gp-tab .gp-badge{font-size:13px;}

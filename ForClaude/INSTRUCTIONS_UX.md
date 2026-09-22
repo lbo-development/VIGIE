@@ -71,12 +71,17 @@ recréer un autre ou de revenir à un champ texte simplifié :
 
 - `components/Combobox.tsx` — réimplémentation de `.gp-combobox`.
 - `components/DatePicker.tsx` — réimplémentation de `.gp-dp` (calendrier), utilisé par
-  tous les champs date de l'application (ex. `CreateMarcheModal` dans `Marches.tsx`).
-  Deux simplifications assumées par rapport au gabarit, documentées dans le composant
-  lui-même : la saisie directe se fait dans le champ texte principal (pas le triptyque
-  `.gp-dp__direct` à 3 segments auto-avançants du gabarit), et le sélecteur rapide
-  mois/année (`.gp-dp__nav-sel`) est un simple libellé, sans menu déroulant — navigation
-  uniquement via les flèches précédent/suivant.
+  **tous** les champs date de l'application, sans exception, y compris dans une cellule
+  de tableau étroite ou une modale au contenu dense (ex. `CreateMarcheModal` dans
+  `Marches.tsx`, colonne « Délai annoncé » de `FournisseurDaModal` dans `modals.tsx`) —
+  jamais de repli vers `<input type="date">` natif par facilité dans ce genre de cas
+  (régression constatée et corrigée le 20/09/2026 sur cette même colonne : `.gp-dp`
+  tient très bien dans une cellule étroite, `max-width:280px` côté CSS, pas de
+  min-width). Deux simplifications assumées par rapport au gabarit, documentées dans le
+  composant lui-même : la saisie directe se fait dans le champ texte principal (pas le
+  triptyque `.gp-dp__direct` à 3 segments auto-avançants du gabarit), et le sélecteur
+  rapide mois/année (`.gp-dp__nav-sel`) est un simple libellé, sans menu déroulant —
+  navigation uniquement via les flèches précédent/suivant.
 - `components/SpinButton.tsx` — réimplémentation de `.gp-spin` (variante desktop,
   chevrons haut/bas — pas `.gp-spin--touch`, non nécessaire à ce jour), utilisé par tout
   champ numérique court de l'application (ex. Montant maximum/Alerte sur date/Alerte sur

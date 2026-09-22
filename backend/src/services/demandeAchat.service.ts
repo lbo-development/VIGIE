@@ -24,6 +24,7 @@ import * as libelleReferentielService from './libelleReferentiel.service.js'
 import * as roleEffectifService from './roleEffectif.service.js'
 import * as signatureActeurService from './signatureActeur.service.js'
 import { genererFadPdfBuffer } from '../pdf/fadPdfGenerator.js'
+import type { TypeRole } from '../repositories/roleAttribution.repository.js'
 import type { FadPdfSignataire } from '../pdf/fadPdfGenerator.js'
 import { AppError } from '../middlewares/errorHandler.js'
 import type { DemandeAchat, DemandeAchatUpdate } from '../repositories/demandeAchat.repository.js'
@@ -228,6 +229,10 @@ interface AccessContext {
   ownIdService: number | null
   /** Cellule d'appartenance du RC — sert de portée par défaut sur la liste (« accès à toutes les DA de sa cellule »), jamais utilisée pour la création. */
   ownIdCellule: number | null
+  /** Décision du 20/09/2026 : `true` = titulaire RC/CDS actuellement suppléé — consultation conservée, écritures refusées (voir assertCanActFor#write). */
+  lectureSeule?: boolean
+  /** Fin (AAAA-MM-JJ, incluse) de la suppléance active, pour le message de refus. */
+  suppleanceDateFin?: string | null
 }
 
 /**
@@ -274,9 +279,10 @@ async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'):
   }
 
   if (roleHint === 'CDS') {
-    const cds = roles.find((r) => r.typeRole === 'CDS' && r.idService !== null)
+    const isCds = (r: (typeof roles)[number]) => r.typeRole === 'CDS' && r.idService !== null
+    const cds = roles.find((r) => isCds(r) && !r.lectureSeule) ?? roles.find(isCds)
     if (cds) {
-      return { role: 'CDS', ownIdService: cds.idService, ownIdCellule: null }
+      return { role: 'CDS', ownIdService: cds.idService, ownIdCellule: null, lectureSeule: cds.lectureSeule, suppleanceDateFin: cds.suppleanceDateFin }
     }
   } else if (roleHint === 'CB') {
     const cb = roles.find((r) => r.typeRole === 'CB' && r.idService !== null)
@@ -284,10 +290,11 @@ async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'):
       return { role: 'CB', ownIdService: cb.idService, ownIdCellule: null }
     }
   } else {
-    const rc = roles.find((r) => r.typeRole === 'RC' && r.idCellule !== null)
+    const isRc = (r: (typeof roles)[number]) => r.typeRole === 'RC' && r.idCellule !== null
+    const rc = roles.find((r) => isRc(r) && !r.lectureSeule) ?? roles.find(isRc)
     if (rc) {
       const cellule = await celluleRepository.findById(rc.idCellule as number)
-      return { role: 'RC', ownIdService: cellule?.id_service ?? null, ownIdCellule: rc.idCellule }
+      return { role: 'RC', ownIdService: cellule?.id_service ?? null, ownIdCellule: rc.idCellule, lectureSeule: rc.lectureSeule, suppleanceDateFin: rc.suppleanceDateFin }
     }
   }
 
@@ -305,7 +312,12 @@ async function resolveAccessContext(matricule: string, roleHint?: 'CDS' | 'CB'):
  * figer sur la DA (décision du 07/09/2026 : figé à la création, jamais
  * recalculé si le service du demandeur est réorganisé ensuite).
  */
-async function assertCanActFor(matricule: string, matriculeDemandeurCible: string, roleHint?: 'CDS' | 'CB'): Promise<number> {
+async function assertCanActFor(
+  matricule: string,
+  matriculeDemandeurCible: string,
+  roleHint?: 'CDS' | 'CB',
+  opts: { write?: boolean } = {},
+): Promise<number> {
   const targetIdService = await acteurRepository.findIdServiceByMatricule(matriculeDemandeurCible)
   if (targetIdService === null) throw new AppError('Demandeur introuvable ou non rattaché à un service.', 404)
 
@@ -317,6 +329,11 @@ async function assertCanActFor(matricule: string, matriculeDemandeurCible: strin
   // (getHistoriqueStatuts, listDemandeAchat) ou depuis les pièces complémentaires côté CB
   // (décision du 18/09/2026, même trou 403 que celui corrigé le 17/09/2026 pour CDS/RC).
   if (context.role === 'ADMIN_SERVICE' || context.role === 'RC' || context.role === 'CDS' || context.role === 'CB') {
+    // Titulaire suppléé (décision du 20/09/2026) : lecture seule sur les DA/FAD de son périmètre —
+    // aucune modification, transmission ni suppression, sauf sur ses propres DA en tant que demandeur.
+    if (opts.write && context.lectureSeule && matricule !== matriculeDemandeurCible) {
+      throw new AppError(roleEffectifService.lectureSeuleMessage(context.role as TypeRole, context.suppleanceDateFin ?? null), 403)
+    }
     if (context.ownIdService === targetIdService) return targetIdService
     throw new AppError('Droits insuffisants pour ce service.', 403)
   }
@@ -342,7 +359,7 @@ export async function createDemandeAchat(matricule: string | null, input: unknow
   if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
 
   const cible = result.data.matriculeDemandeurCible ?? matricule
-  const idService = await assertCanActFor(matricule, cible)
+  const idService = await assertCanActFor(matricule, cible, undefined, { write: true })
 
   return demandeAchatRepository.createBrouillon(idService, cible)
 }
@@ -678,7 +695,7 @@ export async function updateDemandeAchat(matricule: string | null, idDemandeAcha
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -759,7 +776,7 @@ export async function transmettreRc(matricule: string | null, idDemandeAchat: nu
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!['DA_EN_PREPARATION', 'DA_A_COMPLETER_RC'].includes(existing.code_statut)) {
     throw new AppError('Cette demande ne peut pas être transmise au RC à ce stade.', 409)
   }
@@ -1524,7 +1541,7 @@ export async function selectMarcheDemandeAchat(matricule: string | null, idDeman
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -1707,7 +1724,7 @@ export async function addConsultationCandidat(matricule: string | null, idDemand
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -1751,7 +1768,7 @@ export async function removeConsultationCandidat(matricule: string | null, idDem
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -1821,7 +1838,7 @@ export async function saveConsultationDemandeAchat(matricule: string | null, idD
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -1875,7 +1892,7 @@ export async function getOrCreateMarcheDevis(matricule: string | null, idDemande
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (!STATUTS_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -2092,7 +2109,7 @@ export async function addPieceDemandeAchat(
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
-  await assertCanActFor(matricule, existing.matricule_demandeur, roleHint)
+  await assertCanActFor(matricule, existing.matricule_demandeur, roleHint, { write: true })
   if (!STATUTS_PIECES_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -2128,7 +2145,7 @@ export async function removePieceDemandeAchat(matricule: string | null, idDemand
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
-  await assertCanActFor(matricule, existing.matricule_demandeur, roleHint)
+  await assertCanActFor(matricule, existing.matricule_demandeur, roleHint, { write: true })
   if (!STATUTS_PIECES_MODIFIABLES.includes(existing.code_statut)) {
     throw new AppError('Cette demande d\'achat ne peut plus être modifiée à ce stade.', 409)
   }
@@ -2177,7 +2194,7 @@ export async function deleteDemandeAchat(matricule: string | null, idDemandeAcha
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
 
-  await assertCanActFor(matricule, existing.matricule_demandeur)
+  await assertCanActFor(matricule, existing.matricule_demandeur, undefined, { write: true })
   if (existing.code_statut !== STATUT_SUPPRESSIBLE) {
     throw new AppError('Seule une demande d\'achat en préparation peut être supprimée.', 409)
   }

@@ -62,3 +62,14 @@ export async function update(idService: number, input: Partial<Omit<Service, 'id
   if (error) throw error
   return data
 }
+
+/** Services (actifs ou non) d'une direction — sert à résoudre le périmètre d'un DS (suppléance). */
+export async function findByDirection(idDirection: number): Promise<Service[]> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('service')
+    .select('id_service, code_service, libelle_service, id_direction, actif')
+    .eq('id_direction', idDirection)
+  if (error) throw error
+  return data ?? []
+}

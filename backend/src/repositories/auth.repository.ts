@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabaseClient.js'
+import { todayParis } from '../utils/dates.js'
 
 /**
  * Résolution identité (Supabase Auth) <-> métier (finances.acteur), et
@@ -64,7 +65,9 @@ export async function deleteProfile(userId: string): Promise<void> {
 // 20260914170000) ni à ADMIN_SERVICE/ADMIN_APP (transverses, sans notion
 // d'absence). Le suppléant se substitue entièrement au titulaire pendant sa
 // période active — sans que le titulaire ne perde quoi que ce soit
-// techniquement (simple présomption d'absence, décision du 14/09/2026).
+// techniquement au niveau de ces contrôles de rôle génériques ; la lecture seule du
+// titulaire suppléé (décision du 20/09/2026) est appliquée par roleEffectif.service.ts,
+// qui porte les écritures métier DA/FAD.
 export async function hasActiveRole(matricule: string, typeRole: string): Promise<boolean> {
   const { data, error } = await supabase
     .schema('finances')
@@ -112,12 +115,13 @@ export async function hasActiveRoleForService(
  * jamais de résultat pour typeRole='CB', pas besoin de l'exclure ici.
  */
 async function hasActiveSuppleanceRole(matriculeSuppleant: string, typeRole: string, idService?: number): Promise<boolean> {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayParis()
   let query = supabase
     .schema('finances')
     .from('suppleance')
     .select('id_suppleance, role_attribution!inner(type_role, id_service, actif)')
     .eq('matricule_suppleant', matriculeSuppleant)
+    .is('date_retrait', null)
     .lte('date_debut', today)
     .gte('date_fin', today)
     .eq('role_attribution.type_role', typeRole)

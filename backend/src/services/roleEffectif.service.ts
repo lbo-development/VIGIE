@@ -1,6 +1,7 @@
 import * as roleAttributionRepository from '../repositories/roleAttribution.repository.js'
 import * as suppleanceRepository from '../repositories/suppleance.repository.js'
 import { AppError } from '../middlewares/errorHandler.js'
+import { formatDateFr } from '../utils/dates.js'
 import type { TypeRole } from '../repositories/roleAttribution.repository.js'
 
 /**
@@ -17,6 +18,11 @@ import type { TypeRole } from '../repositories/roleAttribution.repository.js'
  * où ADMIN_APP/ADMIN_SERVICE peuvent agir pour un tiers) — assertHasEffectiveRole
  * ne matche donc jamais que le type de rôle demandé (RC/CDS/CB/DS),
  * strictement le titulaire ou son suppléant désigné.
+ *
+ * Décision du 20/09/2026 : un titulaire actuellement suppléé est en LECTURE
+ * SEULE sur ce rôle (`lectureSeule`). Il le voit toujours dans ses rôles
+ * effectifs (la consultation de son périmètre est conservée), mais
+ * assertHasEffectiveRole — utilisée par toutes les écritures métier — le refuse.
  */
 
 export interface EffectiveRole {
@@ -27,21 +33,44 @@ export interface EffectiveRole {
   idDirection: number | null
   /** ID_SUPPLEANCE si l'acteur agit en tant que suppléant, `null` s'il agit en tant que titulaire. */
   idSuppleance: number | null
+  /** `true` : titulaire actuellement suppléé, donc en lecture seule sur ce rôle. Toujours `false` pour un suppléant. */
+  lectureSeule: boolean
+  /** Titulaire suppléé : matricule de son suppléant. `null` sinon. */
+  matriculeSuppleant: string | null
+  /** Suppléant : matricule du titulaire qu'il supplée. `null` pour un rôle détenu en propre. */
+  matriculeTitulaire: string | null
+  /** Date de fin (AAAA-MM-JJ, incluse) de la suppléance active qui concerne ce rôle — côté titulaire suppléé comme côté suppléant. */
+  suppleanceDateFin: string | null
 }
+
+const SUPPLEABLE: readonly TypeRole[] = ['RC', 'CDS', 'DS']
 
 /** Rôles directement détenus (role_attribution actifs) + rôles hérités par suppléance active — un acteur peut cumuler les deux (ex. titulaire RC d'une cellule, suppléant RC d'une autre). */
 export async function findEffectiveRoles(matricule: string): Promise<EffectiveRole[]> {
   const direct = await roleAttributionRepository.findActiveByMatricule(matricule)
-  const directRoles: EffectiveRole[] = direct.map((r) => ({
-    idRole: r.id_role,
-    typeRole: r.type_role,
-    idCellule: r.id_cellule,
-    idService: r.id_service,
-    idDirection: r.id_direction,
-    idSuppleance: null,
-  }))
 
-  // CB exclue du dispositif de suppléance (verrouillé en base, migration 20260914170000) —
+  // Un titulaire dont le rôle est couvert par une suppléance active passe en lecture seule.
+  const supleableIds = direct.filter((r) => SUPPLEABLE.includes(r.type_role)).map((r) => r.id_role)
+  const activeOnDirect = await suppleanceRepository.findActiveByRoles(supleableIds)
+  const activeByRole = new Map(activeOnDirect.map((s) => [s.id_role, s]))
+
+  const directRoles: EffectiveRole[] = direct.map((r) => {
+    const suppleance = activeByRole.get(r.id_role)
+    return {
+      idRole: r.id_role,
+      typeRole: r.type_role,
+      idCellule: r.id_cellule,
+      idService: r.id_service,
+      idDirection: r.id_direction,
+      idSuppleance: null,
+      lectureSeule: suppleance !== undefined,
+      matriculeSuppleant: suppleance?.matricule_suppleant ?? null,
+      matriculeTitulaire: null,
+      suppleanceDateFin: suppleance?.date_fin ?? null,
+    }
+  })
+
+  // CB exclue du dispositif de suppléance (verrouillé en base, trigger check_suppleance) —
   // findActiveForSuppleant ne renverra jamais type_role='CB', pas besoin de l'exclure ici.
   const suppleances = await suppleanceRepository.findActiveForSuppleant(matricule)
   const suppleeRoles: EffectiveRole[] = suppleances.map((s) => ({
@@ -51,6 +80,10 @@ export async function findEffectiveRoles(matricule: string): Promise<EffectiveRo
     idService: s.id_service,
     idDirection: s.id_direction,
     idSuppleance: s.id_suppleance,
+    lectureSeule: false,
+    matriculeSuppleant: null,
+    matriculeTitulaire: s.matricule_titulaire,
+    suppleanceDateFin: s.date_fin,
   }))
 
   return [...directRoles, ...suppleeRoles]
@@ -62,17 +95,28 @@ function perimeterField(typeRole: TypeRole): 'idCellule' | 'idService' | 'idDire
   return 'idService' // CDS, CB, ADMIN_SERVICE
 }
 
+/** Message 403 d'un titulaire suppléé qui tente une écriture — partagé avec demandeAchat.service.ts. */
+export function lectureSeuleMessage(typeRole: TypeRole, suppleanceDateFin: string | null): string {
+  const jusquAu = suppleanceDateFin ? ` jusqu'au ${formatDateFr(suppleanceDateFin)}` : ''
+  return `Votre rôle ${typeRole} est en lecture seule : vous êtes suppléé${jusquAu}. Retirez la suppléance pour reprendre la main.`
+}
+
 /**
  * Lève 403 si aucun rôle effectif de `typeRole` ne couvre `perimeterId`
  * (id_cellule pour RC, id_service pour CDS/CB, id_direction pour DS) —
- * retourne le rôle trouvé (pour en extraire idSuppleance à tracer).
+ * retourne le rôle trouvé (pour en extraire idSuppleance à tracer). Réservée
+ * aux ÉCRITURES : un titulaire actuellement suppléé (lecture seule) est refusé
+ * avec un message dédié, sa consultation passe par findEffectiveRoles.
  */
 export async function assertHasEffectiveRole(matricule: string | null, typeRole: TypeRole, perimeterId: number): Promise<EffectiveRole> {
   if (!matricule) throw new AppError('Authentification requise', 401)
 
   const roles = await findEffectiveRoles(matricule)
   const field = perimeterField(typeRole)
-  const match = roles.find((r) => r.typeRole === typeRole && r[field] === perimeterId)
-  if (!match) throw new AppError('Droits insuffisants', 403)
-  return match
+  const candidates = roles.filter((r) => r.typeRole === typeRole && r[field] === perimeterId)
+  if (candidates.length === 0) throw new AppError('Droits insuffisants', 403)
+
+  const writable = candidates.find((r) => !r.lectureSeule)
+  if (!writable) throw new AppError(lectureSeuleMessage(typeRole, candidates[0].suppleanceDateFin), 403)
+  return writable
 }

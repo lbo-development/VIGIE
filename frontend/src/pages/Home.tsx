@@ -10,6 +10,8 @@ import {
   type DemandeAchat as DemandeAchatRow,
   type AccueilScope,
 } from '../hooks/useDemandeAchat'
+import { SuppleanceButton } from '../components/suppleance/SuppleanceButton'
+import { SuppleanceBanner } from '../components/suppleance/SuppleanceBanner'
 import { Combobox } from '../components/Combobox'
 import { MetricCard } from '../components/MetricCard'
 import { DemandeAchatModal, DeleteDemandeAchatModal, GestionDocumentaireModal } from '../components/demandeAchat/modals'
@@ -169,7 +171,12 @@ export function Home() {
           <h1>Bienvenue, {displayName}</h1>
           <p>Suivi de vos demandes d'achat, de la préparation à la commande.</p>
         </div>
+        <div className="page-actions">
+          <SuppleanceButton />
+        </div>
       </div>
+
+      <SuppleanceBanner roles={currentUser?.roles ?? []} />
 
       {!currentUser?.matricule && !syntheseLoading && (
         <div className="gp-errmsg">

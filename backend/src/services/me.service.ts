@@ -9,6 +9,14 @@ export interface MeRole {
   idService: number | null
   /** ID_CELLULE du rôle (RC) — ajouté le 15/09/2026 (écran de suivi RC) pour construire l'entrée de sidebar "FAD — <cellule>" et interroger la bonne cellule sans dépendre du libellé texte. */
   idCellule: number | null
+  /** Décision du 20/09/2026 : `true` = titulaire actuellement suppléé, rôle en lecture seule (écritures refusées par roleEffectif.service.ts). */
+  lectureSeule: boolean
+  /** Date de fin (AAAA-MM-JJ, incluse) de la suppléance active qui concerne ce rôle, côté titulaire suppléé comme côté suppléant — `null` sinon. */
+  suppleanceDateFin: string | null
+  /** Titulaire suppléé : « Prénom NOM » de son suppléant. */
+  suppleantNomPrenom: string | null
+  /** Suppléant : « Prénom NOM » du titulaire qu'il supplée (bandeau « suppléant de X jusqu'au… »). */
+  enSuppleanceDe: string | null
 }
 
 export interface MeResponse {
@@ -45,6 +53,13 @@ export async function getCurrentUser(matricule: string | null): Promise<MeRespon
     acteurRepository.findIdServiceByMatricule(matricule),
   ])
 
+  const liees = [...new Set(effectiveRoles.flatMap((r) => [r.matriculeSuppleant, r.matriculeTitulaire]).filter((m): m is string => m !== null))]
+  const acteursLies = await acteurRepository.findByMatricules(liees)
+  const nomPrenom = (m: string | null): string | null => {
+    const a = acteursLies.find((x) => x.matricule === m)
+    return a ? `${a.prenom} ${a.nom}` : null
+  }
+
   const roles = await Promise.all(
     effectiveRoles.map(async (role) => {
       // resolvePerimeterLabel ne lit que id_cellule/id_service/id_direction — les autres champs de
@@ -55,7 +70,16 @@ export async function getCurrentUser(matricule: string | null): Promise<MeRespon
         id_service: role.idService,
         id_direction: role.idDirection,
       } as RoleAttributionRow)
-      return { typeRole: role.typeRole, perimeterLabel, idService: role.idService, idCellule: role.idCellule }
+      return {
+        typeRole: role.typeRole,
+        perimeterLabel,
+        idService: role.idService,
+        idCellule: role.idCellule,
+        lectureSeule: role.lectureSeule,
+        suppleanceDateFin: role.suppleanceDateFin,
+        suppleantNomPrenom: nomPrenom(role.matriculeSuppleant),
+        enSuppleanceDe: nomPrenom(role.matriculeTitulaire),
+      }
     }),
   )
 

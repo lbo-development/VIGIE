@@ -4,6 +4,8 @@ import { useCurrentUser } from '../hooks/useCurrentUser'
 import { useFournisseurs } from '../hooks/useFournisseurs'
 import { useCellules } from '../hooks/useCellules'
 import { useDemandeAchatList, useAccueilSynthese, type DemandeAchat as DemandeAchatRow, type AccueilScope } from '../hooks/useDemandeAchat'
+import { SuppleanceButton } from '../components/suppleance/SuppleanceButton'
+import { SuppleanceBanner } from '../components/suppleance/SuppleanceBanner'
 import { Combobox } from '../components/Combobox'
 import { MetricCard } from '../components/MetricCard'
 import { DemandeAchatModal } from '../components/demandeAchat/modals'
@@ -140,7 +142,12 @@ export function SuiviRc() {
           <h1>Suivi RC{rcRole?.perimeterLabel ? ` — ${rcRole.perimeterLabel}` : ''}</h1>
           <p>Bienvenue, {displayName}. Demandes d'achat et fiches d'achat de votre cellule.</p>
         </div>
+        <div className="page-actions">
+          <SuppleanceButton />
+        </div>
       </div>
+
+      <SuppleanceBanner roles={currentUser?.roles ?? []} />
 
       {/* accueil-tiles-grid : même mise en page que pages/Home.tsx (styles/tableauDeBord.css). */}
       <div className="demo-grid accueil-tiles-grid">

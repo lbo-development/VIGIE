@@ -149,3 +149,38 @@ export async function findAllByService(idService: number): Promise<Acteur[]> {
   if (error) throw error
   return data ?? []
 }
+
+/**
+ * Acteurs rattachés (via ID_CELLULE → CELLULE → SERVICE) à l'un des services
+ * de la direction donnée — périmètre des suppléants possibles d'un DS.
+ */
+export async function findAllByDirection(idDirection: number): Promise<Acteur[]> {
+  const { data: services, error: serviceError } = await supabase
+    .schema('finances')
+    .from('service')
+    .select('id_service')
+    .eq('id_direction', idDirection)
+  if (serviceError) throw serviceError
+
+  const serviceIds = (services ?? []).map((s) => s.id_service)
+  if (serviceIds.length === 0) return []
+
+  const { data: cellules, error: celluleError } = await supabase
+    .schema('finances')
+    .from('cellule')
+    .select('id_cellule')
+    .in('id_service', serviceIds)
+  if (celluleError) throw celluleError
+
+  const celluleIds = (cellules ?? []).map((c) => c.id_cellule)
+  if (celluleIds.length === 0) return []
+
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('acteur')
+    .select(SELECT_COLUMNS)
+    .in('id_cellule', celluleIds)
+    .order('nom', { ascending: true })
+  if (error) throw error
+  return data ?? []
+}

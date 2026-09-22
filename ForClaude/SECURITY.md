@@ -145,7 +145,8 @@ route backend ne fait proxy vers l'auth — vérifié : ni `supabase.auth.signIn
   $$;
   ```
 
-- Les écritures sur `role_attribution` et `SUPPLEANCE` (déclarer/clôturer un rôle) sont réservées à `ADMIN_SERVICE` (sur les rôles de son service) et `ADMIN_APP` — jamais en self-service par l'`ACTEUR` concerné. Prévoir des policies `INSERT`/`UPDATE` explicites en ce sens plutôt qu'une policy générique.
+- Les écritures sur `role_attribution` (déclarer/clôturer un rôle) sont réservées à `ADMIN_SERVICE` (sur les rôles de son service) et `ADMIN_APP` — jamais en self-service par l'`ACTEUR` concerné. Prévoir des policies `INSERT`/`UPDATE` explicites en ce sens plutôt qu'une policy générique. **`suppleance` fait exception depuis le 14/09/2026, en sens inverse** : auto-déclarée par le titulaire du rôle exclusivement, jamais par `ADMIN_SERVICE`/`ADMIN_APP` — voir §2.10.
+- La fonction `current_user_has_role` ci-dessus est la version d'origine. Version en vigueur après la migration `20260920090000` : la clause suppléance devient `s.date_retrait is null and finances.aujourdhui() between s.date_debut and s.date_fin` (fin inclusive, suppléances retirées ignorées) — voir §2.10.
 - Ne jamais créer ou réutiliser une table `users`/`utilisateurs` parallèle à `profiles`/`ACTEUR` — c'est une source de bugs de RLS garantie (double source de vérité). Si une telle table existe encore dans le projet, la fusionner plutôt que la faire évoluer.
 - **`matricule` peut rester `null` indéfiniment** (compte authentifié, pas encore rattaché à un `ACTEUR`) — ce n'est pas un état transitoire garanti court. Deux conséquences à traiter explicitement, pas seulement pour `current_user_has_role()` :
   - Toute policy RLS, y compris celles qui n'utilisent pas `current_user_has_role()`/`current_user_matricule()`, doit être relue en se demandant explicitement « que se passe-t-il si `matricule` est `null` pour cet utilisateur ? » — la réponse attendue est toujours un refus, jamais un octroi implicite (attention en particulier aux `NOT IN`, `COALESCE(..., true)` ou toute réécriture qui transformerait un `NULL` en autorisation par défaut).
@@ -429,6 +430,49 @@ schéma complets : `docs/ARCHITECTURE.md` §"Référentiel générique de listes
   avant d'ajouter un nouveau domaine, ne jamais accepter une chaîne libre côté service.
 
 Migration : `supabase/migrations/20260905090000_create_libelle_referentiel.sql`.
+
+### 2.10 Suppléance (`finances.suppleance`, `finances.suppleance_audit`)
+
+Refonte du 20/09/2026 (décisions détaillées : MCD entité SUPPLEANCE, MOT « Suppléance », MLD
+§2.3/§4). Migration : `supabase/migrations/20260920090000_suppleance_refonte_retrait_audit_perimetre.sql`.
+Points de sécurité à ne pas manquer :
+
+- **Écriture : le titulaire du rôle exclusivement, pour son propre rôle** — jamais
+  `ADMIN_SERVICE`/`ADMIN_APP`, jamais un suppléant (pas de suppléance en chaîne). Contrôle
+  applicatif dans `suppleance.service.ts` : matricule appelant = `role_attribution.matricule`
+  (surtout pas `assertManagesService`). **Aucune policy `INSERT`/`UPDATE`/`DELETE` et aucun
+  GRANT d'écriture pour `authenticated`** — tout passe par Express (`service_role`), ce qui
+  n'est pas un oubli : une écriture directe via PostgREST est refusée par défaut.
+- **`service_role` contourne la RLS mais pas les triggers ni les GRANT.** Les règles qui ne
+  doivent jamais dépendre d'un oubli côté Express sont donc en base : trigger
+  `finances.check_suppleance` (rôle RC/CDS/DS et actif, suppléant actif du service — ou de la
+  direction pour un DS —, titulaire ≠ suppléant, pas de rétroactivité, suppléance immuable
+  sauf retrait) et contrainte d'exclusion `excl_suppleance_role_periode` (pas de
+  chevauchement entre suppléances non retirées d'un même rôle). Piège évité : un CHECK simple
+  ne voit pas le `type_role` du rôle référencé, d'où le trigger.
+- **Retrait logique, jamais de `DELETE`** : `HISTORIQUE_STATUT.ID_SUPPLEANCE` référence la
+  ligne (FK `ON DELETE RESTRICT`). Le retrait est le seul `UPDATE` autorisé (colonne
+  `date_retrait`).
+- **`suppleance_audit` immuable** : GRANT `UPDATE`/`DELETE`/`INSERT` retirés à tous les rôles
+  applicatifs, y compris `service_role`. Alimentée par trigger `security definer` — l'acteur
+  enregistré est le titulaire du rôle (seul habilité), pas une identité observée.
+- **Titulaire suppléé en lecture seule** (règle applicative, backend) : la consultation est
+  conservée, toute écriture métier sur DA/FAD (modification, transmission, rejet,
+  annulation) est refusée en 403 tant que la suppléance est active, sauf le retrait de la
+  suppléance elle-même. Aucune policy RLS d'écriture RC/CDS/DS n'existe, donc rien à
+  ajuster côté RLS ; `current_user_has_role` laisse volontairement la lecture au titulaire.
+- **Fin inclusive, heure de Paris** : `finances.aujourdhui()` remplace `now()` (qui, comparé
+  à une colonne `date`, excluait le dernier jour). Le backend doit utiliser la même
+  référence (fuseau Europe/Paris), pas `toISOString().slice(0, 10)` (UTC).
+- **Lecture** (`suppleance_select`, `suppleance_audit_select`) via
+  `finances.can_view_suppleance(id_role)` (`security definer`) : `ADMIN_APP` partout, titulaire
+  du rôle, `ADMIN_SERVICE` sur les rôles de son service (RC : cellule du service ; CDS :
+  service ; DS : direction du service) ; le suppléant lit sa propre ligne. Les demandeurs, la
+  CB et les autres rôles n'ont **aucune** visibilité. Matricule `NULL` : chaque prédicat vaut
+  `NULL` ou faux, donc refus (§2.1).
+- **Liste des suppléants candidats** (écran de déclaration) : construite côté serveur à partir
+  du périmètre du rôle (acteurs actifs du service / de la direction), jamais fournie par le
+  client ; le trigger revérifie de toute façon à l'insertion.
 
 ## 3. Validation et sanitization des données
 

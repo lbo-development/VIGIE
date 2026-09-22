@@ -89,6 +89,7 @@ const findEffectiveRolesMock = vi.fn()
 vi.mock('../services/roleEffectif.service.js', () => ({
   assertHasEffectiveRole: (...args: unknown[]) => assertHasEffectiveRole(...args),
   findEffectiveRoles: (...args: unknown[]) => findEffectiveRolesMock(...args),
+  lectureSeuleMessage: (typeRole: string) => `Votre rôle ${typeRole} est en lecture seule`,
 }))
 const historiqueCreate = vi.fn()
 const serviceFindById = vi.fn()
@@ -167,6 +168,7 @@ vi.mock('../pdf/fadPdfGenerator.js', () => ({
 
 const {
   createDemandeAchat,
+  getDemandeAchat,
   listDemandeAchat,
   updateDemandeAchat,
   deleteDemandeAchat,
@@ -2987,6 +2989,57 @@ describe('downloadPieceDemandeAchat', () => {
     const result = await downloadPieceDemandeAchat(DEMANDEUR, 1, 3)
 
     expect(result).toEqual({ buffer: Buffer.from('%PDF'), nomFichier: 'plan.pdf' })
+  })
+})
+
+describe('titulaire suppléé en lecture seule (décision du 20/09/2026)', () => {
+  const RC_SUPPLEE = { idRole: 1, typeRole: 'RC', idCellule: ID_CELLULE_RC, idService: null, idDirection: null, idSuppleance: null, lectureSeule: true, matriculeSuppleant: '99999', matriculeTitulaire: null, suppleanceDateFin: '2026-09-25' }
+
+  beforeEach(() => {
+    findEffectiveRolesMock.mockResolvedValue([RC_SUPPLEE])
+    celluleFindById.mockResolvedValue({ id_cellule: ID_CELLULE_RC, id_service: ID_SERVICE, code_cellule: 'C1', libelle_cellule: 'C1', actif: true })
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findById.mockResolvedValue(DA)
+  })
+
+  it("conserve la consultation : liste de la cellule et lecture d'une DA du service", async () => {
+    findAllByCellule.mockResolvedValue([{ matricule: DEMANDEUR, nom: 'X', prenom: 'Y', fonction: '', id_cellule: ID_CELLULE_RC }])
+    findAll.mockResolvedValue([DA])
+
+    await expect(listDemandeAchat(RC, {})).resolves.toBeDefined()
+    await expect(getDemandeAchat(RC, 1)).resolves.toBeDefined()
+  })
+
+  it('ne peut plus créer une DA pour un demandeur de son service (403)', async () => {
+    await expect(createDemandeAchat(RC, { matriculeDemandeurCible: DEMANDEUR })).rejects.toMatchObject({ status: 403, message: expect.stringContaining('lecture seule') })
+    expect(createBrouillon).not.toHaveBeenCalled()
+  })
+
+  it('ne peut plus modifier une DA de son périmètre (403)', async () => {
+    await expect(updateDemandeAchat(RC, 1, { objet: 'Achat de fournitures' })).rejects.toMatchObject({ status: 403, message: expect.stringContaining('lecture seule') })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('ne peut plus supprimer une DA de son périmètre (403)', async () => {
+    await expect(deleteDemandeAchat(RC, 1)).rejects.toMatchObject({ status: 403 })
+  })
+
+  it("reste libre d'agir sur ses propres DA en tant que demandeur", async () => {
+    findById.mockResolvedValue({ ...DA, matricule_demandeur: RC })
+    update.mockResolvedValue(DA)
+
+    await updateDemandeAchat(RC, 1, { objet: 'Achat de fournitures' })
+
+    expect(update).toHaveBeenCalled()
+  })
+
+  it("un RC non suppléé garde ses droits d'écriture (contrôle témoin)", async () => {
+    findEffectiveRolesMock.mockResolvedValue([{ ...RC_SUPPLEE, lectureSeule: false, matriculeSuppleant: null, suppleanceDateFin: null }])
+    update.mockResolvedValue(DA)
+
+    await updateDemandeAchat(RC, 1, { objet: 'Achat de fournitures' })
+
+    expect(update).toHaveBeenCalled()
   })
 })
 

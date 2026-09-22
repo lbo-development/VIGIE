@@ -8,6 +8,16 @@ export interface MeRole {
   idService: number | null
   /** ID_CELLULE du rôle (RC) — ajouté le 15/09/2026 (écran de suivi RC) pour construire l'entrée de sidebar "FAD — <cellule>" sans dépendre du libellé texte. */
   idCellule: number | null
+  // Les 4 champs de suppléance sont toujours envoyés par /api/me (me.service.ts) ; optionnels ici uniquement pour ne pas
+  // imposer leur saisie dans chaque fixture de test qui fabrique un rôle sans suppléance.
+  /** `true` = titulaire actuellement suppléé : consultation conservée, aucune écriture (décision du 20/09/2026). */
+  lectureSeule?: boolean
+  /** Fin (AAAA-MM-JJ, incluse) de la suppléance active qui concerne ce rôle, côté titulaire suppléé comme côté suppléant. */
+  suppleanceDateFin?: string | null
+  /** Titulaire suppléé : « Prénom NOM » de son suppléant. */
+  suppleantNomPrenom?: string | null
+  /** Suppléant : « Prénom NOM » du titulaire qu'il supplée. */
+  enSuppleanceDe?: string | null
 }
 
 export interface MeResponse {
