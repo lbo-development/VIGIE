@@ -189,4 +189,17 @@ describe('CompleterCbModal', () => {
     expect(await screen.findByText('Le numéro d\'opération est obligatoire pour une imputation en investissement.')).toBeInTheDocument()
     expect(completerCbMock).not.toHaveBeenCalled()
   })
+
+  // Décision du 23/09/2026 — réponse libre au motif du DS avant de retransmettre.
+  it('transmet la réponse saisie à completerCb', async () => {
+    completerCbMock.mockResolvedValue(DA)
+    render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Numéro d\'opération ajouté.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Retransmettre au DS' }))
+
+    await waitFor(() =>
+      expect(completerCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: 'Numéro d\'opération ajouté.' })),
+    )
+  })
 })

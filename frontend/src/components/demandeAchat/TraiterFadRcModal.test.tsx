@@ -327,6 +327,60 @@ describe('TraiterFadRcModal — DA_VALIDEE_RC/FAD_A_COMPLETER_CDS (complétion +
     expect(await screen.findByText('Le libellé du motif est obligatoire quand le motif est "Autre".')).toBeInTheDocument()
     expect(enregistrerFadMock).not.toHaveBeenCalled()
   })
+
+  it('DA_VALIDEE_RC (première transmission) : ni motif d\'origine, ni champ réponse — ce n\'est pas une reprise', () => {
+    render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+    expect(getHistoriqueMock).not.toHaveBeenCalled()
+    expect(screen.queryByLabelText('Votre réponse (facultatif)')).not.toBeInTheDocument()
+  })
+
+  // Décision du 23/09/2026 — écart corrigé : FAD_A_COMPLETER_CDS n'affichait jusqu'ici aucun motif
+  // (seule la reprise CB l'affichait), et aucune des 3 reprises n'avait de champ de réponse libre.
+  describe('FAD_A_COMPLETER_CDS — motif du CDS et réponse libre (décision du 23/09/2026)', () => {
+    const DA_A_COMPLETER: DemandeAchatRow = { ...DA, code_statut: 'FAD_A_COMPLETER_CDS' }
+    const ROWS: HistoriqueStatutView[] = [
+      {
+        idHisto: 1,
+        codeStatut: 'FAD_A_COMPLETER_CDS',
+        libelleStatut: 'À compléter',
+        dateHeure: '2026-09-09T10:00:00Z',
+        matriculeActeur: '22001',
+        acteurNomPrenom: 'Paul Durand',
+        suppleanceLabel: null,
+        commentaireStatut: 'Numéro de marché manquant',
+      },
+    ]
+
+    it('affiche le motif du CDS, absent jusqu\'ici pour ce statut', async () => {
+      getHistoriqueMock.mockResolvedValue(ROWS)
+      render(<TraiterFadRcModal demandeAchat={DA_A_COMPLETER} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+      expect(await screen.findByText(/Motif du CDS : Numéro de marché manquant/)).toBeInTheDocument()
+    })
+
+    it('transmet la réponse saisie à transmettreFad', async () => {
+      transmettreFadMock.mockResolvedValue(DA_A_COMPLETER)
+      render(<TraiterFadRcModal demandeAchat={DA_A_COMPLETER} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+      remplirChampsObligatoires()
+      fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Marché ajouté, voir pièce jointe.' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
+
+      await waitFor(() =>
+        expect(transmettreFadMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: 'Marché ajouté, voir pièce jointe.' })),
+      )
+    })
+
+    it('omet commentaireStatut si le champ réponse reste vide', async () => {
+      transmettreFadMock.mockResolvedValue(DA_A_COMPLETER)
+      render(<TraiterFadRcModal demandeAchat={DA_A_COMPLETER} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+      remplirChampsObligatoires()
+      fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
+
+      await waitFor(() => expect(transmettreFadMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: undefined })))
+    })
+  })
 })
 
 describe('TraiterFadRcModal — FAD_A_MODIFIER_CB (reprise, retransmission directe à la CB)', () => {
@@ -390,5 +444,16 @@ describe('TraiterFadRcModal — FAD_A_MODIFIER_CB (reprise, retransmission direc
 
     await waitFor(() => expect(enregistrerFadMock).toHaveBeenCalledWith(1, expect.anything()))
     expect(retransmettreCbMock).not.toHaveBeenCalled()
+  })
+
+  // Décision du 23/09/2026 — réponse libre au motif de la CB avant de retransmettre.
+  it('transmet la réponse saisie à retransmettreCb', async () => {
+    retransmettreCbMock.mockResolvedValue(DA_A_MODIFIER)
+    render(<TraiterFadRcModal demandeAchat={DA_A_MODIFIER} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+    fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Montant corrigé.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Retransmettre à la CB' }))
+
+    await waitFor(() => expect(retransmettreCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: 'Montant corrigé.' })))
   })
 })

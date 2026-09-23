@@ -38,6 +38,7 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [motifDs, setMotifDs] = useState<string | null>(null)
+  const [commentaireReponse, setCommentaireReponse] = useState('')
 
   const { cug } = useCug()
   const cugOptions = cug.map((c) => ({ value: c.code_cug, label: `${c.code_cug} — ${c.libelle_cug}` }))
@@ -77,6 +78,8 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
         typeAchat: (typeAchat ?? undefined) as 'TRAVAUX' | 'FOURNITURES' | 'SERVICES' | undefined,
         imputationComptable: (imputationComptable ?? undefined) as 'FONCTIONNEMENT' | 'INVESTISSEMENT' | undefined,
         numeroOperation: imputationComptable === 'INVESTISSEMENT' ? numeroOperation : null,
+        // Réponse au motif du DS (décision du 23/09/2026) — nouvelle ligne d'historique.
+        commentaireStatut: commentaireReponse.trim() || undefined,
       })
       onSaved()
     } catch (err) {
@@ -108,6 +111,20 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
               Motif du DS : {motifDs}
             </p>
           )}
+
+          <div className="gp-field">
+            <label className="gp-label" htmlFor="completercb-commentaire-reponse">
+              Votre réponse (facultatif)
+            </label>
+            <textarea
+              id="completercb-commentaire-reponse"
+              className="gp-textarea"
+              value={commentaireReponse}
+              onChange={(e) => setCommentaireReponse(e.target.value)}
+              maxLength={500}
+              rows={3}
+            />
+          </div>
 
           <div className="row">
             <div className="gp-field" style={{ flex: '0 0 21.25%' }}>

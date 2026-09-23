@@ -999,6 +999,12 @@ const transmettreFadSchema = z
     typeFad: z.enum(['CONTRAT', 'OUVERTE', 'FERMEE']),
     imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']),
     numeroOperation: z.string().trim().min(1).nullable().optional(),
+    // Décision du 23/09/2026 (demande client) — réponse libre au motif de complément du CDS,
+    // affichée comme nouvelle ligne d'historique après le commentaire d'origine (HISTORIQUE_STATUT
+    // est verrouillé en immutabilité, voir migration 20260914160000 : impossible d'append au
+    // commentaire existant). Facultatif, même principe que le reste de l'appli (jamais obligatoire
+    // pour une action positive comme transmettre).
+    commentaireStatut: z.string().trim().min(1).max(500).optional(),
   })
   .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
     message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
@@ -1096,7 +1102,7 @@ export async function transmettreFad(matricule: string | null, idDemandeAchat: n
     code_statut: 'FAD_TRANSMISE_RC_CDS',
     matricule_acteur: matricule,
     id_suppleance: role.idSuppleance,
-    commentaire_statut: null,
+    commentaire_statut: data.commentaireStatut ?? null,
   })
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }
@@ -1251,6 +1257,11 @@ const retransmettreCbSchema = z
     typeFad: z.enum(['CONTRAT', 'OUVERTE', 'FERMEE']).optional(),
     imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']).optional(),
     numeroOperation: z.string().trim().min(1).nullable().optional(),
+    // Décision du 23/09/2026 (demande client) — voir transmettreFadSchema#commentaireStatut,
+    // même principe pour la réponse au motif de modification de la CB. Partagé avec
+    // enregistrerFad (qui réutilise ce schéma) : sans conséquence, cette fonction n'écrit aucune
+    // ligne d'historique, un champ envoyé là serait simplement ignoré.
+    commentaireStatut: z.string().trim().min(1).max(500).optional(),
   })
   .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
     message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
@@ -1307,7 +1318,7 @@ export async function retransmettreCb(matricule: string | null, idDemandeAchat: 
     code_statut: 'FAD_MODIFIEE_TRANSMISE_RC_CB',
     matricule_acteur: matricule,
     id_suppleance: role.idSuppleance,
-    commentaire_statut: null,
+    commentaire_statut: data.commentaireStatut ?? null,
   })
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }
@@ -1511,6 +1522,9 @@ const completerCbSchema = z
     typeAchat: z.enum(['TRAVAUX', 'FOURNITURES', 'SERVICES']).optional(),
     imputationComptable: z.enum(['FONCTIONNEMENT', 'INVESTISSEMENT']).optional(),
     numeroOperation: z.string().trim().min(1).nullable().optional(),
+    // Décision du 23/09/2026 (demande client) — voir transmettreFadSchema#commentaireStatut,
+    // même principe pour la réponse au motif de complément du DS.
+    commentaireStatut: z.string().trim().min(1).max(500).optional(),
   })
   .refine((d) => d.imputationComptable !== 'INVESTISSEMENT' || !!d.numeroOperation, {
     message: 'Le numéro d\'opération est obligatoire pour une imputation en investissement.',
@@ -1552,7 +1566,7 @@ export async function completerCb(matricule: string | null, idDemandeAchat: numb
     code_statut: 'FAD_TRANSMISE_CB_DS',
     matricule_acteur: matricule,
     id_suppleance: role.idSuppleance,
-    commentaire_statut: null,
+    commentaire_statut: data.commentaireStatut ?? null,
   })
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }

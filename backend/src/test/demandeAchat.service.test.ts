@@ -1530,6 +1530,24 @@ describe('transmettreFad', () => {
     expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ motif_choix: 'Autre', libelle_motif_choix: 'Urgence chantier' }))
   })
 
+  // Décision du 23/09/2026 (demande client) — réponse libre au motif de complément du CDS, portée
+  // par une nouvelle ligne d'historique (HISTORIQUE_STATUT immuable, impossible d'append au
+  // commentaire d'origine).
+  describe('commentaireStatut (décision du 23/09/2026)', () => {
+    it('persiste le commentaire fourni sur la ligne FAD_TRANSMISE_RC_CDS', async () => {
+      findById.mockResolvedValue({ ...DA_VALIDEE, code_statut: 'FAD_A_COMPLETER_CDS' })
+      await transmettreFad(RC, 1, { ...FAD_INPUT, commentaireStatut: 'Pièces complétées, voir devis mis à jour.' })
+      expect(historiqueCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ code_statut: 'FAD_TRANSMISE_RC_CDS', commentaire_statut: 'Pièces complétées, voir devis mis à jour.' }),
+      )
+    })
+
+    it('reste null sans commentaire fourni (facultatif)', async () => {
+      await transmettreFad(RC, 1, FAD_INPUT)
+      expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: null }))
+    })
+  })
+
   describe('garde de complétude (assertFadTransmissible, décision du 16/09/2026)', () => {
     it('rejette si OBJET_RC serait vide (ni fourni dans cet appel, ni déjà en base) — 409', async () => {
       findById.mockResolvedValue({ ...DA_VALIDEE, objet_rc: '' })
@@ -1846,6 +1864,21 @@ describe('retransmettreCb', () => {
     await retransmettreCb(RC, 1, { motifChoix: 'Technique', typeFad: 'CONTRAT' })
     expect(update).toHaveBeenCalledWith(1, expect.objectContaining({ motif_choix: 'Technique', libelle_motif_choix: null, type_fad: 'CONTRAT' }))
   })
+
+  // Décision du 23/09/2026 (demande client) — réponse libre au motif de modification de la CB.
+  describe('commentaireStatut (décision du 23/09/2026)', () => {
+    it('persiste le commentaire fourni sur la ligne FAD_MODIFIEE_TRANSMISE_RC_CB', async () => {
+      await retransmettreCb(RC, 1, { commentaireStatut: 'Numéro de marché corrigé.' })
+      expect(historiqueCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ code_statut: 'FAD_MODIFIEE_TRANSMISE_RC_CB', commentaire_statut: 'Numéro de marché corrigé.' }),
+      )
+    })
+
+    it('reste null sans commentaire fourni (facultatif)', async () => {
+      await retransmettreCb(RC, 1, {})
+      expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: null }))
+    })
+  })
 })
 
 describe('enregistrerFad', () => {
@@ -2095,6 +2128,21 @@ describe('completerCb', () => {
   it('sans aucun champ fourni — aucun appel à update()', async () => {
     await completerCb(CB, 1, {})
     expect(update).not.toHaveBeenCalled()
+  })
+
+  // Décision du 23/09/2026 (demande client) — réponse libre au motif de complément du DS.
+  describe('commentaireStatut (décision du 23/09/2026)', () => {
+    it('persiste le commentaire fourni sur la ligne FAD_TRANSMISE_CB_DS', async () => {
+      await completerCb(CB, 1, { commentaireStatut: 'CUG corrigé suite à la demande du DS.' })
+      expect(historiqueCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ code_statut: 'FAD_TRANSMISE_CB_DS', commentaire_statut: 'CUG corrigé suite à la demande du DS.' }),
+      )
+    })
+
+    it('reste null sans commentaire fourni (facultatif)', async () => {
+      await completerCb(CB, 1, {})
+      expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: null }))
+    })
   })
 })
 

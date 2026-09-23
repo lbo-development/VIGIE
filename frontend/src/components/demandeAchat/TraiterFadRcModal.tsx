@@ -45,6 +45,9 @@ export interface TraiterFadRcModalProps {
  */
 export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSaved }: TraiterFadRcModalProps) {
   const isReprisesCb = demandeAchat.code_statut === 'FAD_A_MODIFIER_CB'
+  // Reprise après complément/modification (décision du 23/09/2026) — DA_VALIDEE_RC exclue : c'est
+  // la transmission initiale, aucun motif à afficher ni à répondre.
+  const isReprise = demandeAchat.code_statut === 'FAD_A_COMPLETER_CDS' || isReprisesCb
 
   const [objet, setObjet] = useState(demandeAchat.objet_rc)
   const [description, setDescription] = useState(demandeAchat.description_rc ?? '')
@@ -66,16 +69,22 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const [motifCb, setMotifCb] = useState<string | null>(null)
+  const [motifOrigine, setMotifOrigine] = useState<string | null>(null)
+  const [commentaireReponse, setCommentaireReponse] = useState('')
+  const motifLabel = isReprisesCb ? 'Motif de la CB' : 'Motif du CDS'
 
+  // Motif d'origine (décision du 23/09/2026 : généralisé à FAD_A_COMPLETER_CDS, qui n'affichait
+  // rien jusqu'ici — seule la reprise CB était couverte) affiché en lecture seule, suivi du champ
+  // de réponse libre avant de retransmettre.
   useEffect(() => {
-    if (!isReprisesCb) return
+    if (!isReprise) return
     let cancelled = false
+    const codeStatutRecherche = isReprisesCb ? 'FAD_A_MODIFIER_CB' : 'FAD_A_COMPLETER_CDS'
     getHistoriqueStatuts(demandeAchat.id_demande_achat)
       .then((rows) => {
         if (cancelled) return
-        const dernierRetour = [...rows].reverse().find((r) => r.codeStatut === 'FAD_A_MODIFIER_CB')
-        setMotifCb(dernierRetour?.commentaireStatut ?? null)
+        const dernierRetour = [...rows].reverse().find((r) => r.codeStatut === codeStatutRecherche)
+        setMotifOrigine(dernierRetour?.commentaireStatut ?? null)
       })
       .catch(() => {
         // Best effort — la modale reste utilisable sans le motif affiché.
@@ -83,7 +92,7 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
     return () => {
       cancelled = true
     }
-  }, [isReprisesCb, demandeAchat.id_demande_achat])
+  }, [isReprise, isReprisesCb, demandeAchat.id_demande_achat])
 
   const { sites } = useSites(demandeAchat.id_service)
   const { secteurs } = useSecteurs(demandeAchat.id_service)
@@ -161,14 +170,17 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
     }
 
     const input = buildInput()
+    // Réponse au motif de complément/modification (décision du 23/09/2026) — séparée de
+    // buildInput() car partagée avec handleEnregistrer, qui n'écrit aucune ligne d'historique.
+    const commentaireStatut = commentaireReponse.trim() || undefined
 
     setSubmitting(true)
     try {
       if (isReprisesCb) {
-        await retransmettreCb(demandeAchat.id_demande_achat, input)
+        await retransmettreCb(demandeAchat.id_demande_achat, { ...input, commentaireStatut })
       } else {
         // Champs requis validés ci-dessus — cast sûr vers TransmettreFadInput.
-        await transmettreFad(demandeAchat.id_demande_achat, input as Parameters<typeof transmettreFad>[1])
+        await transmettreFad(demandeAchat.id_demande_achat, { ...input, commentaireStatut } as Parameters<typeof transmettreFad>[1])
       }
       onSaved()
     } catch (err) {
@@ -220,13 +232,29 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
-            {isReprisesCb && motifCb && (
+            {isReprise && motifOrigine && (
               <p className="gp-errmsg" style={{ background: 'var(--gp-warning-bg)', color: 'var(--gp-warning-text)' }}>
                 <svg className="ti">
                   <use href="#i-alert-circle" />
                 </svg>
-                Motif de la CB : {motifCb}
+                {motifLabel} : {motifOrigine}
               </p>
+            )}
+
+            {isReprise && (
+              <div className="gp-field">
+                <label className="gp-label" htmlFor="traiterfad-commentaire-reponse">
+                  Votre réponse (facultatif)
+                </label>
+                <textarea
+                  id="traiterfad-commentaire-reponse"
+                  className="gp-textarea"
+                  value={commentaireReponse}
+                  onChange={(e) => setCommentaireReponse(e.target.value)}
+                  maxLength={500}
+                  rows={3}
+                />
+              </div>
             )}
 
             <div className="gp-field">

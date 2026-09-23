@@ -323,6 +323,8 @@ export interface TransmettreFadInput {
   typeFad: TypeFad
   imputationComptable: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
   numeroOperation?: string | null
+  /** Réponse libre au motif de complément du CDS (décision du 23/09/2026) — nouvelle ligne d'historique, affichée après le commentaire d'origine (HISTORIQUE_STATUT immuable). */
+  commentaireStatut?: string
 }
 
 /** OP1.2b — bascule DA → FAD, transmission au CDS (et reprise depuis FAD_A_COMPLETER_CDS). */
@@ -395,6 +397,8 @@ export interface RetransmettreCbInput {
   typeFad?: TypeFad
   imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
   numeroOperation?: string | null
+  /** Réponse libre au motif de modification de la CB (décision du 23/09/2026) — voir TransmettreFadInput#commentaireStatut. */
+  commentaireStatut?: string
 }
 
 /** Reprise OP1.4 — le RC corrige (partiellement) et retransmet directement à la CB, sans repasser par le CDS. */
@@ -422,6 +426,8 @@ export interface CompleterCbInput {
   typeAchat?: 'TRAVAUX' | 'FOURNITURES' | 'SERVICES'
   imputationComptable?: 'FONCTIONNEMENT' | 'INVESTISSEMENT'
   numeroOperation?: string | null
+  /** Réponse libre au motif de complément du DS (décision du 23/09/2026) — voir TransmettreFadInput#commentaireStatut. */
+  commentaireStatut?: string
 }
 
 /** Reprise OP1.5 — la CB complète et retransmet directement au DS (réutilise le statut nominal). */
