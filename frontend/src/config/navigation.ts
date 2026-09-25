@@ -300,7 +300,12 @@ export const PARAMETRES_ITEMS: NavItem[] = [
   // ADMIN_SERVICE scopé à son service, même périmètre que Rôles) — décision du 19/09/2026,
   // alimente la fiche FAD papier générée par la CB (demandeAchat.service.ts#genererFadPdf).
   { to: '/parametres/signatures', label: 'Signatures', icon: '' },
-  { to: '/parametres/reglages', label: 'Réglages', icon: '', separatorBefore: true },
+  { to: '/parametres/reglages', label: 'Réglages', icon: '' },
+  // Suppression massive des DA/FAD d'un service (ADMIN_APP seul, décision du
+  // 25/09/2026) — action destructive la plus large de l'application, isolée
+  // en dernière position avec un séparateur pour ne jamais être confondue
+  // avec les entrées de paramétrage ordinaires au-dessus.
+  { to: '/parametres/purge-da-fad-service', label: 'Suppression massive DA/FAD', icon: '', separatorBefore: true },
 ]
 
 /** Vrai si la route courante appartient à la section "Paramètres" (voir AppShell.tsx). */
@@ -318,9 +323,20 @@ export function isParametresSection(pathname: string): boolean {
  * référentiel générique transverse (finances.libelle_referentiel), sans
  * notion de service propriétaire, contrairement à CUG. "Seuils de validation
  * DS" et "CUG" sont accessibles à ADMIN_SERVICE (scopé à son service) : ils
- * ne sont donc pas dans cet ensemble.
+ * ne sont donc pas dans cet ensemble. "Suppression massive DA/FAD" (décision
+ * du 25/09/2026) les rejoint : demande explicite du client, ADMIN_APP
+ * uniquement — aucun périmètre ADMIN_SERVICE, la suppression cible un
+ * service arbitraire, pas nécessairement le sien.
  */
-const ADMIN_APP_ONLY_LABELS = new Set(['Réglages', 'Directions', 'Services', 'Cellules', 'Référentiel libellé', 'Utilisateurs'])
+const ADMIN_APP_ONLY_LABELS = new Set([
+  'Réglages',
+  'Directions',
+  'Services',
+  'Cellules',
+  'Référentiel libellé',
+  'Utilisateurs',
+  'Suppression massive DA/FAD',
+])
 
 /**
  * Filtre les pages de "Paramètres" selon les rôles courants : section

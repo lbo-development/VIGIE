@@ -20,6 +20,7 @@ const DA: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  numero_commande: null,
   validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
@@ -160,11 +161,11 @@ describe('ValiderCommandeCbModal — FAD_TRANSMISE_CDS_CB (décision)', () => {
     expect(screen.getByText('Fourniture de bureau')).toBeInTheDocument()
   })
 
-  it('propose Valider/Modifier/Rejeter, jamais de bouton Annuler ni Transmettre', () => {
+  it('propose Valider/Demande de modifications/Rejeter, jamais de bouton Annuler ni Transmettre', () => {
     render(<ValiderCommandeCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Valider' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Modifier' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Demande de modifications' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Rejeter' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Annuler' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Transmettre' })).not.toBeInTheDocument()
@@ -207,12 +208,12 @@ describe('ValiderCommandeCbModal — FAD_TRANSMISE_CDS_CB (décision)', () => {
     expect(onSaved).toHaveBeenCalled()
   })
 
-  it('Modifier avec commentaire transmet le motif', async () => {
+  it('Demande de modifications avec commentaire transmet le motif', async () => {
     decisionCbMock.mockResolvedValue(DA)
     render(<ValiderCommandeCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
 
     fireEvent.change(screen.getByLabelText('Commentaire (obligatoire sauf pour Valider)'), { target: { value: 'À revoir' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Modifier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Demande de modifications' }))
 
     await waitFor(() => expect(decisionCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ decision: 'MODIFIER', commentaireStatut: 'À revoir' })))
   })

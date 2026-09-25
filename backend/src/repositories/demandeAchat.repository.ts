@@ -39,6 +39,8 @@ export interface DemandeAchat {
   libelle_motif_choix: string | null
   montant_retenu: number | null
   montant_commande: number | null
+  /** Numéro de commande PGI (décision du 25/09/2026, OP1.6) — texte libre, renseigné par la CB au constat de la commande (`commander`), jamais avant. */
+  numero_commande: string | null
   /** Posée une seule fois par demandeAchat.service.ts#transmettreDsOuSeuil (exemption automatique sous le seuil de validation DS, décision du 18/09/2026) — jamais réinitialisée ensuite. */
   validee_sur_seuil_ds: boolean
   date_creation: string
@@ -58,7 +60,7 @@ export interface DemandeAchat {
 }
 
 const SELECT_COLUMNS =
-  'id_demande_achat, numero, id_service, objet_demandeur, description_demandeur, objet_rc, description_rc, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, validee_sur_seuil_ds, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
+  'id_demande_achat, numero, id_service, objet_demandeur, description_demandeur, objet_rc, description_rc, montant_demande, imputation_comptable, procedure_achat, type_achat, type_fad, motif_choix, libelle_motif_choix, montant_retenu, montant_commande, numero_commande, validee_sur_seuil_ds, date_creation, matricule_demandeur, code_site, code_sous_site, code_secteur, code_sous_secteur, code_cug, numero_operation, nummarche, id_marche_tiers, id_fournisseur_retenu, code_statut, created_at, updated_at'
 
 /** Crée le brouillon (NUMERO alloué, DA_EN_PREPARATION, historique posé) — voir la fonction Postgres pour le détail. */
 export async function createBrouillon(idService: number, matriculeDemandeur: string): Promise<DemandeAchat> {
@@ -147,6 +149,7 @@ export interface DemandeAchatUpdate {
   libelle_motif_choix?: string | null
   type_fad?: TypeFad | null
   montant_commande?: number
+  numero_commande?: string
   validee_sur_seuil_ds?: boolean
 }
 

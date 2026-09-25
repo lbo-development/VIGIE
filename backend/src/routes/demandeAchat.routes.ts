@@ -34,7 +34,9 @@ import {
   postDemandeAchatDecisionDs,
   postDemandeAchatTransmettreOrdreCb,
   postDemandeAchatCompleterCb,
+  postDemandeAchatDemanderModificationRc,
   postDemandeAchatCommander,
+  putDemandeAchatNumeroCommande,
   getDemandeAchatHistorique,
   getDemandeAchatSynthese,
 } from '../controllers/demandeAchat.controller.js'
@@ -82,7 +84,9 @@ router.post('/:id/transmettre-ds-ou-seuil', postDemandeAchatTransmettreDsOuSeuil
 router.post('/:id/decision-ds', postDemandeAchatDecisionDs)
 router.post('/:id/transmettre-ordre-cb', postDemandeAchatTransmettreOrdreCb)
 router.post('/:id/completer-cb', postDemandeAchatCompleterCb)
+router.post('/:id/demander-modification-rc', postDemandeAchatDemanderModificationRc)
 router.post('/:id/commander', postDemandeAchatCommander)
+router.put('/:id/numero-commande', putDemandeAchatNumeroCommande)
 router.delete('/:id', deleteDemandeAchat)
 
 export default router

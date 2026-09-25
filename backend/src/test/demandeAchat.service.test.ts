@@ -187,7 +187,9 @@ const {
   decisionDs,
   transmettreOrdreCb,
   completerCb,
+  demanderModificationRc,
   commander,
+  modifierNumeroCommande,
   getHistoriqueStatuts,
   getSynthese,
   ACCUEIL_SCOPE_STATUTS,
@@ -1316,6 +1318,28 @@ describe('transmettreRc', () => {
 
     expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ code_statut: 'DA_TRANSMISE_DEM_RC' }))
   })
+
+  it('reprise DA_A_COMPLETER_RC — transmet la réponse libre au motif du RC dans COMMENTAIRE_STATUT', async () => {
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findById.mockResolvedValue({ ...DA_PRETE, code_statut: 'DA_A_COMPLETER_RC' })
+    historiqueCreate.mockResolvedValue({})
+
+    await transmettreRc(DEMANDEUR, 1, { commentaireStatut: 'Voici le complément demandé.' })
+
+    expect(historiqueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ code_statut: 'DA_TRANSMISE_DEM_RC', commentaire_statut: 'Voici le complément demandé.' }),
+    )
+  })
+
+  it('sans réponse fournie, COMMENTAIRE_STATUT reste null (réponse facultative)', async () => {
+    findIdServiceByMatricule.mockResolvedValue(ID_SERVICE)
+    findById.mockResolvedValue({ ...DA_PRETE, code_statut: 'DA_A_COMPLETER_RC' })
+    historiqueCreate.mockResolvedValue({})
+
+    await transmettreRc(DEMANDEUR, 1)
+
+    expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: null }))
+  })
 })
 
 describe('decisionRc', () => {
@@ -2146,6 +2170,48 @@ describe('completerCb', () => {
   })
 })
 
+describe('demanderModificationRc (décision du 25/09/2026 — alternative à completerCb)', () => {
+  const FAD_A_COMPLETER = { ...DA, code_statut: 'FAD_A_COMPLETER_CB' }
+
+  beforeEach(() => {
+    findById.mockResolvedValue(FAD_A_COMPLETER)
+    assertHasEffectiveRole.mockResolvedValue(ROLE_CB_EFFECTIF)
+    historiqueCreate.mockResolvedValue({})
+  })
+
+  it('rejette sans authentification (401)', async () => {
+    await expect(demanderModificationRc(null, 1, { commentaireStatut: 'x' })).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('rejette si la FAD n\'est pas FAD_A_COMPLETER_CB (409)', async () => {
+    findById.mockResolvedValue({ ...FAD_A_COMPLETER, code_statut: 'FAD_TRANSMISE_CB_DS' })
+    await expect(demanderModificationRc(CB, 1, { commentaireStatut: 'x' })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('exige un motif (400)', async () => {
+    await expect(demanderModificationRc(CB, 1, {})).rejects.toMatchObject({ status: 400 })
+    await expect(demanderModificationRc(CB, 1, { commentaireStatut: '  ' })).rejects.toMatchObject({ status: 400 })
+    expect(historiqueCreate).not.toHaveBeenCalled()
+  })
+
+  it('rejette un tiers qui n\'est pas CB (403 via assertHasEffectiveRole)', async () => {
+    assertHasEffectiveRole.mockRejectedValue(Object.assign(new Error('forbidden'), { status: 403 }))
+    await expect(demanderModificationRc(DEMANDEUR, 1, { commentaireStatut: 'x' })).rejects.toMatchObject({ status: 403 })
+  })
+
+  it('relaie au RC — réutilise FAD_A_MODIFIER_CB, motif obligatoire persisté', async () => {
+    await demanderModificationRc(CB, 1, { commentaireStatut: 'Il manque un justificatif sur la nature de l\'achat.' })
+    expect(historiqueCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id_demande_achat: 1,
+        code_statut: 'FAD_A_MODIFIER_CB',
+        matricule_acteur: CB,
+        commentaire_statut: 'Il manque un justificatif sur la nature de l\'achat.',
+      }),
+    )
+  })
+})
+
 describe('commander', () => {
   const FAD_A_COMMANDER = { ...DA, code_statut: 'FAD_A_COMMANDER' }
 
@@ -2157,22 +2223,86 @@ describe('commander', () => {
   })
 
   it('rejette sans authentification (401)', async () => {
-    await expect(commander(null, 1, { montantCommande: 100 })).rejects.toMatchObject({ status: 401 })
+    await expect(commander(null, 1, { montantCommande: 100, numeroCommande: 'BC-001' })).rejects.toMatchObject({ status: 401 })
   })
 
   it('rejette une entrée invalide — montant manquant (400)', async () => {
-    await expect(commander(CB, 1, {})).rejects.toMatchObject({ status: 400 })
+    await expect(commander(CB, 1, { numeroCommande: 'BC-001' })).rejects.toMatchObject({ status: 400 })
+  })
+
+  // Décision du 25/09/2026 — numéro de commande PGI, obligatoire.
+  it('rejette une entrée invalide — numéro de commande manquant ou vide (400)', async () => {
+    await expect(commander(CB, 1, { montantCommande: 100 })).rejects.toMatchObject({ status: 400 })
+    await expect(commander(CB, 1, { montantCommande: 100, numeroCommande: '   ' })).rejects.toMatchObject({ status: 400 })
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('rejette si la FAD n\'est pas FAD_A_COMMANDER (409)', async () => {
     findById.mockResolvedValue({ ...FAD_A_COMMANDER, code_statut: 'FAD_VALIDEE_DS_SEUIL' })
-    await expect(commander(CB, 1, { montantCommande: 100 })).rejects.toMatchObject({ status: 409 })
+    await expect(commander(CB, 1, { montantCommande: 100, numeroCommande: 'BC-001' })).rejects.toMatchObject({ status: 409 })
   })
 
-  it('enregistre MONTANT_COMMANDE puis FAD_COMMANDEE', async () => {
-    await commander(CB, 1, { montantCommande: 1234.5 })
-    expect(update).toHaveBeenCalledWith(1, { montant_commande: 1234.5 })
+  it('enregistre MONTANT_COMMANDE et NUMERO_COMMANDE puis FAD_COMMANDEE', async () => {
+    await commander(CB, 1, { montantCommande: 1234.5, numeroCommande: 'BC-2026-001' })
+    expect(update).toHaveBeenCalledWith(1, { montant_commande: 1234.5, numero_commande: 'BC-2026-001' })
     expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ code_statut: 'FAD_COMMANDEE' }))
+  })
+})
+
+describe('modifierNumeroCommande (décision du 25/09/2026 — correction par un administrateur)', () => {
+  const FAD_COMMANDEE = { ...DA, code_statut: 'FAD_COMMANDEE', id_service: ID_SERVICE }
+
+  beforeEach(() => {
+    findById.mockResolvedValue(FAD_COMMANDEE)
+    update.mockResolvedValue(FAD_COMMANDEE)
+    hasActiveRole.mockResolvedValue(false)
+    findEffectiveRolesMock.mockResolvedValue([])
+  })
+
+  it('rejette sans authentification (401)', async () => {
+    await expect(modifierNumeroCommande(null, 1, { numeroCommande: 'BC-CORRIGE' })).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('exige un numéro non vide (400)', async () => {
+    hasActiveRole.mockResolvedValue(true)
+    await expect(modifierNumeroCommande(ADMIN_SERVICE, 1, {})).rejects.toMatchObject({ status: 400 })
+    await expect(modifierNumeroCommande(ADMIN_SERVICE, 1, { numeroCommande: '  ' })).rejects.toMatchObject({ status: 400 })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('rejette si la FAD n\'est pas FAD_COMMANDEE (409)', async () => {
+    hasActiveRole.mockResolvedValue(true)
+    findById.mockResolvedValue({ ...FAD_COMMANDEE, code_statut: 'FAD_A_COMMANDER' })
+    await expect(modifierNumeroCommande(ADMIN_SERVICE, 1, { numeroCommande: 'BC-CORRIGE' })).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('rejette un Demandeur/RC/CDS/CB/DS sans rôle admin (403)', async () => {
+    await expect(modifierNumeroCommande(DEMANDEUR, 1, { numeroCommande: 'BC-CORRIGE' })).rejects.toMatchObject({ status: 403 })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('ADMIN_APP corrige sans restriction de service', async () => {
+    hasActiveRole.mockResolvedValue(true)
+    await modifierNumeroCommande('40001', 1, { numeroCommande: 'BC-CORRIGE' })
+    expect(update).toHaveBeenCalledWith(1, { numero_commande: 'BC-CORRIGE' })
+  })
+
+  it('ADMIN_SERVICE corrige une FAD de son propre service', async () => {
+    findEffectiveRolesMock.mockResolvedValue([{ idRole: 1, typeRole: 'ADMIN_SERVICE', idCellule: null, idService: ID_SERVICE, idDirection: null, idSuppleance: null }])
+    await modifierNumeroCommande(ADMIN_SERVICE, 1, { numeroCommande: 'BC-CORRIGE' })
+    expect(update).toHaveBeenCalledWith(1, { numero_commande: 'BC-CORRIGE' })
+  })
+
+  it('ADMIN_SERVICE rejeté hors de son service (403)', async () => {
+    findEffectiveRolesMock.mockResolvedValue([{ idRole: 1, typeRole: 'ADMIN_SERVICE', idCellule: null, idService: 999, idDirection: null, idSuppleance: null }])
+    await expect(modifierNumeroCommande(ADMIN_SERVICE, 1, { numeroCommande: 'BC-CORRIGE' })).rejects.toMatchObject({ status: 403 })
+    expect(update).not.toHaveBeenCalled()
+  })
+
+  it('aucune ligne HISTORIQUE_STATUT écrite — pas un changement de statut', async () => {
+    hasActiveRole.mockResolvedValue(true)
+    await modifierNumeroCommande('40001', 1, { numeroCommande: 'BC-CORRIGE' })
+    expect(historiqueCreate).not.toHaveBeenCalled()
   })
 })
 

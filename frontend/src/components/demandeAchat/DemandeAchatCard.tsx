@@ -53,6 +53,11 @@ export function DemandeAchatCard({ demandeAchat: da, fournisseurLabel, actions }
         </span>
         <span aria-hidden="true">-</span>
         <span>{fournisseurLabel(da.id_fournisseur_retenu)}</span>
+        {da.numero_commande && (
+          <span className="gp-help" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+            N° commande : {da.numero_commande}
+          </span>
+        )}
       </div>
     </article>
   )

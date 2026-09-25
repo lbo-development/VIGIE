@@ -25,6 +25,7 @@ import certificatServiceFaitRoutes from './certificatServiceFait.routes.js'
 import acteurRoutes from './acteur.routes.js'
 import roleAttributionRoutes from './roleAttribution.routes.js'
 import suppleanceRoutes from './suppleance.routes.js'
+import purgeDaFadRoutes from './purgeDaFad.routes.js'
 
 /**
  * Point d'entrée unique des routes : toute nouvelle ressource se déclare ici.
@@ -58,5 +59,6 @@ router.use('/certificats-service-fait', certificatServiceFaitRoutes)
 router.use('/acteurs', acteurRoutes)
 router.use('/role-attributions', roleAttributionRoutes)
 router.use('/suppleances', suppleanceRoutes)
+router.use('/purge-da-fad-service', purgeDaFadRoutes)
 
 export default router

@@ -39,7 +39,7 @@ describe('filterParametresItems', () => {
     ])
   })
 
-  it('ADMIN_APP voit toutes les entrées, dans l\'ordre Directions/Services/Cellules/CUG/gisements puis Seuils de validation DS/Référentiel libellé/Utilisateurs/Rôles/Signatures puis Réglages', () => {
+  it('ADMIN_APP voit toutes les entrées, dans l\'ordre Directions/Services/Cellules/CUG/gisements puis Seuils de validation DS/Référentiel libellé/Utilisateurs/Rôles/Signatures puis Réglages puis Suppression massive DA/FAD', () => {
     const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: true, isAdminService: false })
 
     expect(result.map((i) => i.label)).toEqual([
@@ -55,6 +55,7 @@ describe('filterParametresItems', () => {
       'Rôles',
       'Signatures',
       'Réglages',
+      'Suppression massive DA/FAD',
     ])
   })
 
@@ -62,9 +63,14 @@ describe('filterParametresItems', () => {
     expect(PARAMETRES_ITEMS.map((i) => i.label)).not.toContain('Fournisseurs')
   })
 
-  it('un séparateur (separatorBefore) précède "Seuils de validation DS", "Utilisateurs" et "Réglages", et eux seuls', () => {
+  it('un séparateur (separatorBefore) précède "Seuils de validation DS", "Utilisateurs" et "Suppression massive DA/FAD", et eux seuls', () => {
     const withSeparator = PARAMETRES_ITEMS.filter((i) => i.separatorBefore).map((i) => i.label)
-    expect(withSeparator).toEqual(['Seuils de validation DS', 'Utilisateurs', 'Réglages'])
+    expect(withSeparator).toEqual(['Seuils de validation DS', 'Utilisateurs', 'Suppression massive DA/FAD'])
+  })
+
+  it('"Suppression massive DA/FAD" est réservée à ADMIN_APP (absente pour ADMIN_SERVICE)', () => {
+    const result = filterParametresItems(PARAMETRES_ITEMS, { isAdminApp: false, isAdminService: true })
+    expect(result.map((i) => i.label)).not.toContain('Suppression massive DA/FAD')
   })
 })
 

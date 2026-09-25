@@ -93,6 +93,7 @@ const {
   demanderComplementBudget,
   constaterLiquidation,
   supprimer,
+  listPieces,
   addPiece,
   removePiece,
   getSyntheseFacturationDemandeur,
@@ -276,6 +277,22 @@ describe('transmettreRc (R5 — justificatif requis)', () => {
   it('rejette depuis CSF_A_TRAITER (déjà transmis, 409)', async () => {
     findById.mockResolvedValue({ ...CSF_EN_PREPARATION, code_statut_csf: 'CSF_A_TRAITER' })
     await expect(transmettreRc(DEMANDEUR, ID_CSF)).rejects.toMatchObject({ status: 409 })
+  })
+
+  it('reprise CSF_A_COMPLETER_RC — transmet la réponse libre au motif du RC dans COMMENTAIRE_STATUT', async () => {
+    findById.mockResolvedValue({ ...CSF_EN_PREPARATION, code_statut_csf: 'CSF_A_COMPLETER_RC' })
+    pieceFindAllByCsf.mockResolvedValue([{ id_piece: 1 }])
+    historiqueCreate.mockResolvedValue({})
+    await transmettreRc(DEMANDEUR, ID_CSF, { commentaire: 'Voici le complément demandé.' })
+    expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: 'Voici le complément demandé.' }))
+  })
+
+  it('sans réponse fournie, COMMENTAIRE_STATUT reste null (réponse facultative)', async () => {
+    findById.mockResolvedValue({ ...CSF_EN_PREPARATION, code_statut_csf: 'CSF_A_COMPLETER_RC' })
+    pieceFindAllByCsf.mockResolvedValue([{ id_piece: 1 }])
+    historiqueCreate.mockResolvedValue({})
+    await transmettreRc(DEMANDEUR, ID_CSF)
+    expect(historiqueCreate).toHaveBeenCalledWith(expect.objectContaining({ commentaire_statut: null }))
   })
 })
 
@@ -465,6 +482,36 @@ describe('Justificatifs — addPiece / removePiece', () => {
     expect(pieceRemove).toHaveBeenCalledWith(1)
     expect(pieceRemoveFile).toHaveBeenCalledWith('csf/42/a.pdf')
   })
+
+  // Bug corrigé le 25/09/2026 : listPieces/addPiece renvoyaient la ligne brute du repository
+  // (snake_case, id_piece/nom_fichier_original) au lieu d'une vue camelCase (idPiece/
+  // nomFichierOriginal) — le frontend (PieceJointeCsf) affichait alors des lignes de justificatif
+  // vides et le téléchargement échouait (idPiece undefined → route /pieces/undefined/fichier).
+  // Voir demandeAchat.service.ts#toPieceJointeView pour le même principe côté DA/FAD, qui n'avait
+  // jamais cette régression.
+  describe('camelCase de la vue (bug corrigé le 25/09/2026)', () => {
+    it('listPieces renvoie idPiece/nomFichierOriginal/typePiece/tailleOctets, jamais les clés snake_case', async () => {
+      pieceFindAllByCsf.mockResolvedValue([
+        { id_piece: 7, id_csf: ID_CSF, type_piece: 'PV_RECEPTION', origine: 'UTILISATEUR', nom_fichier_original: 'pv.pdf', storage_path: 'csf/1/pv.pdf', taille_octets: 1234 },
+      ])
+      const result = await listPieces(DEMANDEUR, ID_CSF)
+      expect(result).toEqual([{ idPiece: 7, typePiece: 'PV_RECEPTION', nomFichierOriginal: 'pv.pdf', tailleOctets: 1234 }])
+    })
+
+    it('addPiece renvoie la même vue camelCase pour la pièce tout juste créée', async () => {
+      pieceCreateForCsf.mockResolvedValue({
+        id_piece: 9,
+        id_csf: ID_CSF,
+        type_piece: 'PV_RECEPTION',
+        origine: 'UTILISATEUR',
+        nom_fichier_original: 'pv.pdf',
+        storage_path: 'csf/1/pv.pdf',
+        taille_octets: pdfBuffer.length,
+      })
+      const result = await addPiece(DEMANDEUR, ID_CSF, { typePiece: 'PV_RECEPTION' }, { buffer: pdfBuffer, size: pdfBuffer.length, originalname: 'pv.pdf' })
+      expect(result).toEqual({ idPiece: 9, typePiece: 'PV_RECEPTION', nomFichierOriginal: 'pv.pdf', tailleOctets: pdfBuffer.length })
+    })
+  })
 })
 
 describe('Suivi de la facturation (décision du 24/09/2026)', () => {
@@ -477,12 +524,16 @@ describe('Suivi de la facturation (décision du 24/09/2026)', () => {
     await expect(getSyntheseFacturationCb(null)).rejects.toMatchObject({ status: 401 })
   })
 
-  it('Demandeur : ne compte que les CSF validés/liquidés, isole les commandes sans aucun CSF', async () => {
+  // Décision du 25/09/2026 — redéfinition des tuiles : `csf` = tous les CSF existants (hors
+  // CSF_EN_PREPARATION), `certifie` = CSF_VALIDE_BUDGET uniquement, `liquide` = CSF_LIQUIDE
+  // uniquement (buckets désormais mutuellement exclusifs par statut courant, comme les tuiles).
+  it('Demandeur : CSF = tous sauf EN_PREPARATION, certifie/liquide isolés par statut, isole les commandes sans aucun CSF', async () => {
     demandeAchatFindAll.mockResolvedValue([COMMANDE_A, COMMANDE_B])
     findAllByDemandeAchatIn.mockResolvedValue([
       { id_demande_achat: 101, code_statut_csf: 'CSF_VALIDE_BUDGET', montant_csf: 400 },
       { id_demande_achat: 101, code_statut_csf: 'CSF_LIQUIDE', montant_csf: 200 },
       { id_demande_achat: 101, code_statut_csf: 'CSF_A_TRAITER', montant_csf: 999 },
+      { id_demande_achat: 101, code_statut_csf: 'CSF_EN_PREPARATION', montant_csf: 111 },
       // COMMANDE_B (102) n'a aucune ligne → doit apparaître dans commandesSansCsf.
     ])
 
@@ -490,8 +541,10 @@ describe('Suivi de la facturation (décision du 24/09/2026)', () => {
 
     expect(demandeAchatFindAll).toHaveBeenCalledWith({ matriculeDemandeurIn: [DEMANDEUR], statuts: ['FAD_COMMANDEE'] })
     expect(result).toEqual({
-      csf: { nombre: 2, montant: 600 }, // seuls VALIDE_BUDGET + LIQUIDE comptent, pas A_TRAITER
+      csf: { nombre: 3, montant: 1599 }, // tous sauf EN_PREPARATION (400+200+999)
       commandes: { nombre: 2, montant: 1500 },
+      certifie: { nombre: 1, montant: 400 },
+      liquide: { nombre: 1, montant: 200 },
       commandesSansCsf: { nombre: 1, montant: 500 }, // COMMANDE_B seule, aucun CSF quel que soit son statut
     })
   })
@@ -499,7 +552,13 @@ describe('Suivi de la facturation (décision du 24/09/2026)', () => {
   it('RC : périmètre vide (aucun rôle RC) renvoie une synthèse à zéro sans appeler demandeAchatRepository', async () => {
     findEffectiveRolesMock.mockResolvedValue([])
     const result = await getSyntheseFacturationRc(RC)
-    expect(result).toEqual({ csf: { nombre: 0, montant: 0 }, commandes: { nombre: 0, montant: 0 }, commandesSansCsf: { nombre: 0, montant: 0 } })
+    expect(result).toEqual({
+      csf: { nombre: 0, montant: 0 },
+      commandes: { nombre: 0, montant: 0 },
+      certifie: { nombre: 0, montant: 0 },
+      liquide: { nombre: 0, montant: 0 },
+      commandesSansCsf: { nombre: 0, montant: 0 },
+    })
     expect(demandeAchatFindAll).not.toHaveBeenCalled()
   })
 
@@ -517,7 +576,7 @@ describe('Suivi de la facturation (décision du 24/09/2026)', () => {
     expect(result.commandesSansCsf).toEqual({ nombre: 1, montant: 1000 })
   })
 
-  it('CB : agrège sur tous les services où l\'acteur détient un rôle CB actif', async () => {
+  it('CB : agrège sur tous les services où l\'acteur détient un rôle CB actif — CSF liquidés comptent dans `csf` et dans `liquide`', async () => {
     findEffectiveRolesMock.mockResolvedValue([ROLE_CB])
     demandeAchatFindAll.mockResolvedValue([COMMANDE_A, COMMANDE_B])
     findAllByDemandeAchatIn.mockResolvedValue([
@@ -531,6 +590,8 @@ describe('Suivi de la facturation (décision du 24/09/2026)', () => {
     expect(result).toEqual({
       csf: { nombre: 2, montant: 1500 },
       commandes: { nombre: 2, montant: 1500 },
+      certifie: { nombre: 0, montant: 0 },
+      liquide: { nombre: 2, montant: 1500 },
       commandesSansCsf: { nombre: 0, montant: 0 },
     })
   })

@@ -21,6 +21,7 @@ const FAD_A_TRAITER: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  numero_commande: null,
   validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',

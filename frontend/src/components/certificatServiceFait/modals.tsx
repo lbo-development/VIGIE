@@ -193,6 +193,31 @@ export function CertificatServiceFaitFormModal({ certificat, onClose, onSaved, o
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Reprise après demande de complément du RC (décision du 25/09/2026) — motif du RC affiché en
+  // lecture seule, suivi d'un champ de réponse libre facultatif, même principe que
+  // TraiterFadRcModal/CompleterCbModal côté DA/FAD. CSF_EN_PREPARATION exclue : c'est la
+  // transmission initiale, aucun motif à afficher ni à répondre.
+  const isReprise = certificat.code_statut_csf === 'CSF_A_COMPLETER_RC'
+  const [motifRc, setMotifRc] = useState<string | null>(null)
+  const [commentaireReponse, setCommentaireReponse] = useState('')
+
+  useEffect(() => {
+    if (!isReprise) return
+    let cancelled = false
+    getHistoriqueStatutsCsf(certificat.id_csf)
+      .then((rows) => {
+        if (cancelled) return
+        const dernierComplement = [...rows].reverse().find((r) => r.codeStatutCsf === 'CSF_A_COMPLETER_RC')
+        setMotifRc(dernierComplement?.commentaireStatut ?? null)
+      })
+      .catch(() => {
+        // Best effort — la modale reste utilisable sans le motif affiché.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isReprise, certificat.id_csf])
+
   async function handleSave() {
     setError(null)
     setSaving(true)
@@ -219,7 +244,7 @@ export function CertificatServiceFaitFormModal({ certificat, onClose, onSaved, o
         dateServiceFait,
         description: description.trim() || null,
       })
-      await transmettreRc(certificat.id_csf)
+      await transmettreRc(certificat.id_csf, commentaireReponse.trim() || undefined)
       onSaved()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
@@ -254,6 +279,36 @@ export function CertificatServiceFaitFormModal({ certificat, onClose, onSaved, o
           </button>
         </div>
         <div className="gp-modal__bd gp-scroll stack">
+          {/* Échange motif/réponse présenté comme un fil (décision du 25/09/2026) — même
+              construction que TraiterFadRcModal/CompleterCbModal côté DA/FAD (primitives gp-*
+              existantes, pas de composant "chat" dédié, absent du design system GPMM). */}
+          {isReprise && (
+            <div className="stack" style={{ gap: 8 }}>
+              {motifRc && (
+                <div style={{ background: 'var(--gp-warning-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                  <p className="gp-label" style={{ color: 'var(--gp-warning-text)', margin: '0 0 4px' }}>
+                    RC
+                  </p>
+                  <p style={{ margin: 0, color: 'var(--gp-warning-text)' }}>{motifRc}</p>
+                </div>
+              )}
+              <div style={{ background: 'var(--gp-info-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                <label className="gp-label" htmlFor="csf-commentaire-reponse" style={{ color: 'var(--gp-info-text)' }}>
+                  Vous (facultatif)
+                </label>
+                <textarea
+                  id="csf-commentaire-reponse"
+                  className="gp-textarea"
+                  value={commentaireReponse}
+                  onChange={(e) => setCommentaireReponse(e.target.value)}
+                  placeholder="Votre réponse…"
+                  maxLength={500}
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <div className="gp-field" style={{ flex: 1 }}>
               <label className="gp-label">Montant certifié</label>
@@ -298,7 +353,7 @@ export function CertificatServiceFaitFormModal({ certificat, onClose, onSaved, o
             {saving ? 'Enregistrement…' : 'Enregistrer'}
           </button>
           <button type="button" className="gp-btn gp-btn--primary" disabled={saving || transmitting} onClick={() => void handleTransmettre()}>
-            {transmitting ? 'Envoi…' : 'Transmettre au RC'}
+            {transmitting ? 'Envoi…' : isReprise ? 'Retransmettre au RC' : 'Transmettre au RC'}
           </button>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useCug } from '../../hooks/useCug'
 import { useInvestissementsPgi } from '../../hooks/useInvestissementsPgi'
 import {
   completerCb,
+  demanderModificationRc,
   getHistoriqueStatuts,
   type DemandeAchat as DemandeAchatRow,
 } from '../../hooks/useDemandeAchat'
@@ -35,10 +36,14 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
   const [numeroOperation, setNumeroOperation] = useState<string | null>(demandeAchat.numero_operation)
   const [investissementModalOpen, setInvestissementModalOpen] = useState(false)
   const [gestionDocumentaireOpen, setGestionDocumentaireOpen] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting, setSubmitting] = useState<'DS' | 'RC' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [motifDs, setMotifDs] = useState<string | null>(null)
   const [commentaireReponse, setCommentaireReponse] = useState('')
+  // Alternative à la réponse directe au DS (décision du 25/09/2026) — la CB relaie la demande au RC
+  // quand elle dépasse ce qu'elle peut traiter seule. Motif distinct de commentaireReponse ci-dessus
+  // (thread CB→DS) : celui-ci ouvre un nouveau thread CB→RC, motif obligatoire.
+  const [commentaireRc, setCommentaireRc] = useState('')
 
   const { cug } = useCug()
   const cugOptions = cug.map((c) => ({ value: c.code_cug, label: `${c.code_cug} — ${c.libelle_cug}` }))
@@ -71,7 +76,7 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
       setError('Le numéro d\'opération est obligatoire pour une imputation en investissement.')
       return
     }
-    setSubmitting(true)
+    setSubmitting('DS')
     try {
       await completerCb(demandeAchat.id_demande_achat, {
         codeCug: codeCug ?? undefined,
@@ -85,7 +90,29 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
     } finally {
-      setSubmitting(false)
+      setSubmitting(null)
+    }
+  }
+
+  /**
+   * Relais au RC (décision du 25/09/2026) — alternative à handleSubmit quand le complément demandé
+   * par le DS dépasse ce que la CB peut traiter seule. Réutilise FAD_A_MODIFIER_CB (même circuit
+   * qu'OP1.4) : le RC verra le motif dans TraiterFadRcModal et retransmettra directement à la CB.
+   */
+  async function handleDemanderModificationRc() {
+    setError(null)
+    if (!commentaireRc.trim()) {
+      setError('Un motif est requis pour demander un complément au RC.')
+      return
+    }
+    setSubmitting('RC')
+    try {
+      await demanderModificationRc(demandeAchat.id_demande_achat, commentaireRc.trim())
+      onSaved()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setSubmitting(null)
     }
   }
 
@@ -212,6 +239,23 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
             )}
           </div>
 
+          {/* Alternative à la réponse directe (décision du 25/09/2026) — relais au RC, motif dédié
+              et obligatoire, distinct du fil CB→DS ci-dessus. */}
+          <div style={{ background: 'var(--gp-warning-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+            <label className="gp-label" htmlFor="completercb-commentaire-rc" style={{ color: 'var(--gp-warning-text)' }}>
+              Demander un complément au RC (motif obligatoire)
+            </label>
+            <textarea
+              id="completercb-commentaire-rc"
+              className="gp-textarea"
+              value={commentaireRc}
+              onChange={(e) => setCommentaireRc(e.target.value)}
+              placeholder="Précisez ce que le RC doit compléter ou corriger…"
+              maxLength={500}
+              rows={3}
+            />
+          </div>
+
           {error && (
             <p className="gp-errmsg">
               <svg className="ti">
@@ -221,12 +265,15 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
             </p>
           )}
         </div>
-        <div className="gp-modal__ft">
-          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose} disabled={submitting}>
+        <div className="gp-modal__ft" style={{ flexWrap: 'wrap' }}>
+          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose} disabled={submitting !== null}>
             Retour
           </button>
-          <button type="button" className="gp-btn gp-btn--primary" disabled={submitting} onClick={() => void handleSubmit()}>
-            {submitting ? 'Envoi…' : 'Retransmettre au DS'}
+          <button type="button" className="gp-btn gp-btn--secondary" disabled={submitting !== null} onClick={() => void handleDemanderModificationRc()}>
+            {submitting === 'RC' ? 'Envoi…' : 'Demander un complément au RC'}
+          </button>
+          <button type="button" className="gp-btn gp-btn--primary" disabled={submitting !== null} onClick={() => void handleSubmit()}>
+            {submitting === 'DS' ? 'Envoi…' : 'Retransmettre au DS'}
           </button>
         </div>
       </div>

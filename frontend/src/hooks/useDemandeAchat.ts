@@ -24,6 +24,8 @@ export interface DemandeAchat {
   libelle_motif_choix: string | null
   montant_retenu: number | null
   montant_commande: number | null
+  /** Numéro de commande PGI (décision du 25/09/2026, OP1.6) — texte libre, renseigné par la CB au constat de la commande, jamais avant. */
+  numero_commande: string | null
   /** Posée une seule fois à l'exemption du seuil de validation DS (décision du 18/09/2026) — voir DemandeAchatCard.tsx (badge « Seuil DS »). */
   validee_sur_seuil_ds: boolean
   date_creation: string
@@ -284,9 +286,13 @@ export interface DecisionInput {
   commentaireStatut?: string
 }
 
-/** OP1.1 (résultat final) — bouton « Transmettre au RC » de l'onglet "A finaliser". */
-export async function transmettreRc(idDemandeAchat: number): Promise<DemandeAchat> {
-  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-rc`, {})
+/**
+ * OP1.1 (résultat final) — bouton « Transmettre au RC » de l'onglet "A finaliser".
+ * `commentaireStatut` : réponse libre au motif du RC en reprise DA_A_COMPLETER_RC (décision du
+ * 25/09/2026) — sans effet en DA_EN_PREPARATION.
+ */
+export async function transmettreRc(idDemandeAchat: number, commentaireStatut?: string): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/transmettre-rc`, { commentaireStatut })
 }
 
 /**
@@ -435,9 +441,29 @@ export async function completerCb(idDemandeAchat: number, input: CompleterCbInpu
   return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/completer-cb`, input)
 }
 
-/** OP1.6 — constat de la commande (saisie du BON dans le PGI = tâche manuelle hors application). */
-export async function commander(idDemandeAchat: number, montantCommande: number): Promise<DemandeAchat> {
-  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/commander`, { montantCommande })
+/**
+ * Alternative à completerCb (décision du 25/09/2026) — depuis FAD_A_COMPLETER_CB, la CB relaie la
+ * demande de complément du DS au RC plutôt que d'y répondre elle-même. Réutilise FAD_A_MODIFIER_CB
+ * (même circuit qu'OP1.4) — motif obligatoire.
+ */
+export async function demanderModificationRc(idDemandeAchat: number, commentaireStatut: string): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/demander-modification-rc`, { commentaireStatut })
+}
+
+/**
+ * OP1.6 — constat de la commande (saisie du BON dans le PGI = tâche manuelle hors application).
+ * `numeroCommande` : numéro de commande PGI (décision du 25/09/2026), obligatoire.
+ */
+export async function commander(idDemandeAchat: number, montantCommande: number, numeroCommande: string): Promise<DemandeAchat> {
+  return api.post<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/commander`, { montantCommande, numeroCommande })
+}
+
+/**
+ * Correction du numéro de commande PGI (décision du 25/09/2026) — réservée à ADMIN_APP/
+ * ADMIN_SERVICE, uniquement sur une FAD_COMMANDEE (voir DemandeAchatModal).
+ */
+export async function modifierNumeroCommande(idDemandeAchat: number, numeroCommande: string): Promise<DemandeAchat> {
+  return api.put<DemandeAchat>(`/demandes-achat/${idDemandeAchat}/numero-commande`, { numeroCommande })
 }
 
 /** Vue d'une ligne d'historique (modale « Historique des statuts », icône calendrier — écran d'accueil). */

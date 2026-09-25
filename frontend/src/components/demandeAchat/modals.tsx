@@ -22,12 +22,16 @@ import {
   removePieceDemandeAchat,
   downloadPieceDemandeAchatBlob,
   deleteDemandeAchat,
+  transmettreRc,
+  modifierNumeroCommande,
+  getHistoriqueStatuts,
   type DemandeAchat as DemandeAchatRow,
   type ProcedureAchat,
   type MotifChoix,
   type ConsultationCandidat,
   type PieceJointe,
 } from '../../hooks/useDemandeAchat'
+import { useCurrentUser } from '../../hooks/useCurrentUser'
 import { Combobox } from '../Combobox'
 import { FileDropzone } from '../FileDropzone'
 import { PieceCountBadge } from '../PieceCountBadge'
@@ -96,6 +100,42 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
   const [procedureAchat, setProcedureAchat] = useState<ProcedureAchat>(demandeAchat.procedure_achat)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Correction du numéro de commande PGI par un administrateur (décision du 25/09/2026) —
+  // ADMIN_APP (transverse) ou ADMIN_SERVICE (son propre service), uniquement sur FAD_COMMANDEE.
+  // État local plutôt que demandeAchat.numero_commande directement : reflète la correction
+  // immédiatement dans le titre sans attendre la fermeture/le refetch de cette modale.
+  const { data: currentUser } = useCurrentUser()
+  const isAdminApp = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_APP') ?? false
+  const isAdminServiceIci = currentUser?.roles.some((r) => r.typeRole === 'ADMIN_SERVICE' && r.idService === demandeAchat.id_service) ?? false
+  const canEditNumeroCommande = demandeAchat.code_statut === 'FAD_COMMANDEE' && (isAdminApp || isAdminServiceIci)
+  const [numeroCommandeAffiche, setNumeroCommandeAffiche] = useState(demandeAchat.numero_commande)
+  const [numeroCommandeModalOpen, setNumeroCommandeModalOpen] = useState(false)
+
+  // Reprise après demande de complément du RC (décision du 25/09/2026) — motif du RC affiché en
+  // lecture seule, suivi d'un champ de réponse libre facultatif, sur le même principe que
+  // TraiterFadRcModal (motif CDS/CB) et CompleterCbModal (motif DS). DA_EN_PREPARATION exclue :
+  // c'est la transmission initiale, aucun motif à afficher ni à répondre.
+  const isReprise = demandeAchat.code_statut === 'DA_A_COMPLETER_RC'
+  const [motifRc, setMotifRc] = useState<string | null>(null)
+  const [commentaireReponse, setCommentaireReponse] = useState('')
+
+  useEffect(() => {
+    if (!isReprise || readOnly) return
+    let cancelled = false
+    getHistoriqueStatuts(demandeAchat.id_demande_achat)
+      .then((rows) => {
+        if (cancelled) return
+        const dernierComplement = [...rows].reverse().find((r) => r.codeStatut === 'DA_A_COMPLETER_RC')
+        setMotifRc(dernierComplement?.commentaireStatut ?? null)
+      })
+      .catch(() => {
+        // Best effort — la modale reste utilisable sans le motif affiché.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isReprise, readOnly, demandeAchat.id_demande_achat])
 
   const [nummarche, setNummarche] = useState(demandeAchat.nummarche)
   const [idMarcheTiers, setIdMarcheTiers] = useState(demandeAchat.id_marche_tiers)
@@ -215,14 +255,63 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
     }
   }
 
+  /**
+   * Reprise DA_A_COMPLETER_RC (décision du 25/09/2026) : enregistre les champs édités puis
+   * retransmet au RC en une seule action, réponse au motif comprise — même principe que
+   * « Retransmettre à la CB »/« Retransmettre au DS » (TraiterFadRcModal/CompleterCbModal).
+   */
+  async function handleTransmettreRc() {
+    setError(null)
+    if (objet.trim().length < 15) {
+      setError("L'objet est obligatoire (15 caractères minimum).")
+      return
+    }
+    if (!description.trim()) {
+      setError('La description est obligatoire.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await updateDemandeAchat(demandeAchat.id_demande_achat, {
+        objet: objet.trim(),
+        description: description.trim(),
+        procedureAchat,
+      })
+      await transmettreRc(demandeAchat.id_demande_achat, commentaireReponse.trim() || undefined)
+      onSaved()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <div className="gp-overlay is-open">
       {/* 760 (élargi depuis 640 le 09/09/2026) : la ligne Type procédure d'achat / Montant & marché / Gestion documentaire tient sur trois boutons/champs — 640px ne suffisait plus une fois "Gestion documentaire" ajouté (bascule à la ligne suivante, .row a flex-wrap:wrap et .gp-btn white-space:nowrap, gpmm.css). */}
       <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="demandeAchatModalTitle" style={{ maxWidth: 760 }}>
         <div className="gp-modal__hd">
-          <h3 className="gp-modal__title" id="demandeAchatModalTitle">
-            {demandeAchat.numero}
-          </h3>
+          <div className="row" style={{ alignItems: 'center', gap: 6 }}>
+            <h3 className="gp-modal__title" id="demandeAchatModalTitle">
+              {demandeAchat.numero}
+              {numeroCommandeAffiche && ` / n°CMD ${numeroCommandeAffiche}`}
+            </h3>
+            {canEditNumeroCommande && (
+              <span className="gp-tip" data-tip="Modifier le numéro de commande">
+                <button
+                  type="button"
+                  aria-label="Modifier le numéro de commande"
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--gp-text-secondary)', display: 'flex' }}
+                  onClick={() => setNumeroCommandeModalOpen(true)}
+                >
+                  <svg className="ti">
+                    <use href="#i-pencil" />
+                  </svg>
+                </button>
+              </span>
+            )}
+          </div>
           <button className="gp-modal__close" aria-label="Fermer" onClick={() => void handleClose()}>
             <svg className="ti">
               <use href="#i-x" />
@@ -231,6 +320,36 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
+            {/* Échange motif/réponse présenté comme un fil (décision du 25/09/2026) — même
+                construction que TraiterFadRcModal/CompleterCbModal (primitives gp-* existantes,
+                pas de composant "chat" dédié, absent du design system GPMM). */}
+            {isReprise && !readOnly && (
+              <div className="stack" style={{ gap: 8 }}>
+                {motifRc && (
+                  <div style={{ background: 'var(--gp-warning-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                    <p className="gp-label" style={{ color: 'var(--gp-warning-text)', margin: '0 0 4px' }}>
+                      RC
+                    </p>
+                    <p style={{ margin: 0, color: 'var(--gp-warning-text)' }}>{motifRc}</p>
+                  </div>
+                )}
+                <div style={{ background: 'var(--gp-info-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                  <label className="gp-label" htmlFor="da-commentaire-reponse" style={{ color: 'var(--gp-info-text)' }}>
+                    Vous (facultatif)
+                  </label>
+                  <textarea
+                    id="da-commentaire-reponse"
+                    className="gp-textarea"
+                    value={commentaireReponse}
+                    onChange={(e) => setCommentaireReponse(e.target.value)}
+                    placeholder="Votre réponse…"
+                    maxLength={500}
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
+
             <div className="gp-field">
               <label className="gp-label" htmlFor="da-objet">
                 Objet de la DA
@@ -386,8 +505,13 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
               {readOnly ? 'Fermer' : 'Retour'}
             </button>
             {!readOnly && (
-              <button type="submit" className="gp-btn gp-btn--primary" disabled={submitting}>
+              <button type="submit" className={isReprise ? 'gp-btn gp-btn--secondary' : 'gp-btn gp-btn--primary'} disabled={submitting}>
                 {submitting ? 'Enregistrement…' : 'Enregistrer'}
+              </button>
+            )}
+            {!readOnly && isReprise && (
+              <button type="button" className="gp-btn gp-btn--primary" disabled={submitting} onClick={() => void handleTransmettreRc()}>
+                {submitting ? 'Envoi…' : 'Retransmettre au RC'}
               </button>
             )}
           </div>
@@ -445,6 +569,102 @@ export function DemandeAchatModal({ demandeAchat, procedureEditable, readOnly = 
           onClose={() => setGestionDocumentaireOpen(false)}
         />
       )}
+
+      {numeroCommandeModalOpen && (
+        <ModifierNumeroCommandeModal
+          idDemandeAchat={demandeAchat.id_demande_achat}
+          numeroCommandeActuel={numeroCommandeAffiche}
+          onClose={() => setNumeroCommandeModalOpen(false)}
+          onSaved={(numero) => {
+            setNumeroCommandeAffiche(numero)
+            setNumeroCommandeModalOpen(false)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+interface ModifierNumeroCommandeModalProps {
+  idDemandeAchat: number
+  numeroCommandeActuel: string | null
+  onClose: () => void
+  onSaved: (numeroCommande: string) => void
+}
+
+/**
+ * Correction du numéro de commande PGI par un administrateur (décision du 25/09/2026) — voir
+ * DemandeAchatModal#canEditNumeroCommande pour les droits d'accès (déjà vérifiés par l'appelant,
+ * cette modale ne fait que la saisie). Aucune ligne HISTORIQUE_STATUT : pas un changement de
+ * statut, simple correction de valeur.
+ */
+function ModifierNumeroCommandeModal({ idDemandeAchat, numeroCommandeActuel, onClose, onSaved }: ModifierNumeroCommandeModalProps) {
+  const [numeroCommande, setNumeroCommande] = useState(numeroCommandeActuel ?? '')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleSubmit() {
+    setError(null)
+    if (!numeroCommande.trim()) {
+      setError('Le numéro de commande est obligatoire.')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await modifierNumeroCommande(idDemandeAchat, numeroCommande.trim())
+      onSaved(numeroCommande.trim())
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="gp-overlay is-open">
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="modifierNumeroCommandeModalTitle" style={{ maxWidth: 420 }}>
+        <div className="gp-modal__hd">
+          <h3 className="gp-modal__title" id="modifierNumeroCommandeModalTitle">
+            Modifier le numéro de commande
+          </h3>
+          <button className="gp-modal__close" aria-label="Fermer" onClick={onClose}>
+            <svg className="ti">
+              <use href="#i-x" />
+            </svg>
+          </button>
+        </div>
+        <div className="gp-modal__bd gp-scroll stack">
+          <div className="gp-field">
+            <label className="gp-label" htmlFor="modifiernumerocommande-numero">
+              Numéro de commande
+            </label>
+            <input
+              id="modifiernumerocommande-numero"
+              className="gp-input"
+              value={numeroCommande}
+              onChange={(e) => setNumeroCommande(e.target.value)}
+              maxLength={80}
+              disabled={submitting}
+            />
+          </div>
+          {error && (
+            <p className="gp-errmsg">
+              <svg className="ti">
+                <use href="#i-alert-circle" />
+              </svg>
+              {error}
+            </p>
+          )}
+        </div>
+        <div className="gp-modal__ft">
+          <button type="button" className="gp-btn gp-btn--secondary" onClick={onClose} disabled={submitting}>
+            Retour
+          </button>
+          <button type="button" className="gp-btn gp-btn--primary" disabled={submitting} onClick={() => void handleSubmit()}>
+            {submitting ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

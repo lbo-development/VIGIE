@@ -335,13 +335,18 @@ export function Home() {
                               </svg>
                             </button>
                           </span>
-                          <span className="gp-tip" data-tip="Transmettre au RC">
-                            <button aria-label="Transmettre au RC" onClick={() => setConfirmTransmettreDa(da)}>
-                              <svg className="ti">
-                                <use href="#i-log-out" />
-                              </svg>
-                            </button>
-                          </span>
+                          {/* DA_A_COMPLETER_RC exclue (décision du 25/09/2026) : la retransmission avec
+                              réponse au motif du RC se fait désormais depuis la modale d'édition
+                              (« Modifier la demande » ci-dessus, bouton « Retransmettre au RC »). */}
+                          {da.code_statut === 'DA_EN_PREPARATION' && (
+                            <span className="gp-tip" data-tip="Transmettre au RC">
+                              <button aria-label="Transmettre au RC" onClick={() => setConfirmTransmettreDa(da)}>
+                                <svg className="ti">
+                                  <use href="#i-log-out" />
+                                </svg>
+                              </button>
+                            </span>
+                          )}
                         </>
                       )}
                       {da.code_statut === 'FAD_COMMANDEE' && (

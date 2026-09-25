@@ -98,7 +98,7 @@ export async function putCertificatServiceFaitRc(req: Request, res: Response, ne
 export async function postCertificatServiceFaitTransmettreRc(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
-    const csf = await certificatServiceFaitService.transmettreRc(req.matricule ?? null, id)
+    const csf = await certificatServiceFaitService.transmettreRc(req.matricule ?? null, id, req.body)
     res.json(csf)
   } catch (err) {
     next(err)

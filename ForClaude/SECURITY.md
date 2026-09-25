@@ -571,6 +571,42 @@ ce chantier : aucune policy existante, `certificat_service_fait` et
   l'édition en place du RC et les suppressions physiques R7) passe
   exclusivement par le backend Express (`service_role`).
 
+### 2.13 Suppression massive des DA/FAD d'un service (décision du 25/09/2026)
+
+Fonctionnalité destructive la plus large de l'application (`pages/PurgeDaFad.tsx`,
+`/parametres/purge-da-fad-service`) — supprime **toutes** les `DEMANDE_ACHAT` d'un service,
+sans exception de statut (y compris `FAD_COMMANDEE` et leurs `CERTIFICAT_SERVICE_FAIT` même
+`CSF_LIQUIDE`), avec toutes leurs dépendances (`PIECE_JOINTE`, `DEVIS_CONSULTE`,
+`HISTORIQUE_STATUT`, `CERTIFICAT_SERVICE_FAIT`, `HISTORIQUE_STATUT_CSF`, fichiers Storage). **Décision
+client explicite : aucune piste d'audit conservée après coup** — dérogation assumée au principe
+de traçabilité appliqué partout ailleurs dans ce document (§2.11, §2.12), à ne jamais généraliser
+sans redemander confirmation.
+
+- **Autorisation** : `ADMIN_APP` uniquement (pas de périmètre `ADMIN_SERVICE`, la cible est un
+  service arbitraire, pas nécessairement le sien) — revérifiée côté backend
+  (`purgeDaFad.service.ts#assertAdminApp`), entrée de menu déjà réservée `ADMIN_APP`
+  (`config/navigation.ts`, `ADMIN_APP_ONLY_LABELS`) en défense en profondeur, même principe que
+  les autres pages ADMIN_APP seul (`Utilisateurs.tsx` : « pas de vérification de rôle côté écran,
+  seul le backend fait foi »).
+- **Double confirmation (§1, « route sensible »)** : (1) question affichant le nombre réel de
+  DA/FAD du service (`GET /purge-da-fad-service/compte`) ; (2) ré-authentification par mot de
+  passe via `supabase.auth.signInWithPassword` avec l'email de la session active — même mécanique
+  que `ChangePasswordModal.tsx`. Le mot de passe n'est **jamais** transmis au backend Express :
+  seul Supabase Auth le vérifie, le frontend n'appelle `POST /purge-da-fad-service` qu'après un
+  `signInWithPassword` réussi. Exactement 2 étapes, aucune friction supplémentaire (pas de
+  ressaisie du code service) — décision explicite du client.
+- **Suppression atomique** : fonction Postgres `finances.purger_da_fad_service(p_id_service)`
+  (migration `20260925090000_purger_da_fad_service.sql`), une seule transaction — préféré à une
+  séquence de `DELETE` applicatifs (comme pour une DA_EN_PREPARATION isolée) vu le volume
+  potentiel (tout un service) et le risque d'un état à moitié supprimé en cas de coupure en cours
+  de route. Les fichiers Storage (`piece-jointe-fad`, `devis-consulte-pieces`) ne peuvent pas être
+  supprimés depuis Postgres : `purgeDaFad.service.ts` liste tous les `storage_path` concernés
+  **avant** d'appeler la fonction (impossible de les retrouver après, les lignes ayant disparu),
+  puis les nettoie en best-effort une fois la transaction Postgres validée.
+- **Aucune donnée sensible en clair côté client** : la page envoie seulement `idService` au
+  backend ; le mot de passe reste local au navigateur, transmis uniquement à l'API Auth de
+  Supabase (HTTPS direct, comme `Login.tsx`).
+
 ## 3. Validation et sanitization des données
 
 - Toute donnée entrante (body, query params, headers, params d'URL) côté Express doit être validée avec un schéma explicite (ex. `zod` ou `yup`) avant traitement — jamais utilisée brute.

@@ -25,6 +25,7 @@ import { LibelleReferentiel } from './pages/LibelleReferentiel'
 import { Utilisateurs } from './pages/Utilisateurs'
 import { RolesUtilisateurs } from './pages/RolesUtilisateurs'
 import { SignaturesActeurs } from './pages/SignaturesActeurs'
+import { PurgeDaFad } from './pages/PurgeDaFad'
 import { MarchesPGI } from './pages/MarchesPGI'
 import { ImportMarches } from './pages/ImportMarches'
 import { MarchesTiers } from './pages/MarchesTiers'
@@ -76,6 +77,7 @@ function App() {
               <Route path="/parametres/utilisateurs" element={<Utilisateurs />} />
               <Route path="/parametres/roles" element={<RolesUtilisateurs />} />
               <Route path="/parametres/signatures" element={<SignaturesActeurs />} />
+              <Route path="/parametres/purge-da-fad-service" element={<PurgeDaFad />} />
               <Route path="/marches" element={<MarchesPGI />} />
               <Route path="/marches/import" element={<ImportMarches />} />
               <Route path="/marches/tiers" element={<MarchesTiers />} />

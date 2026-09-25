@@ -20,6 +20,7 @@ const DA: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  numero_commande: null,
   validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
@@ -38,12 +39,14 @@ const DA: DemandeAchatRow = {
 }
 
 const completerCbMock = vi.fn()
+const demanderModificationRcMock = vi.fn()
 const getHistoriqueMock = vi.fn()
 const getConsultationMock = vi.fn()
 const getPiecesMock = vi.fn()
 
 vi.mock('../../hooks/useDemandeAchat', () => ({
   completerCb: (...args: unknown[]) => completerCbMock(...args),
+  demanderModificationRc: (...args: unknown[]) => demanderModificationRcMock(...args),
   getHistoriqueStatuts: (...args: unknown[]) => getHistoriqueMock(...args),
   // GestionDocumentaireModal importe tout ce module — voir TraiterFadRcModal.test.tsx.
   updateDemandeAchat: vi.fn(),
@@ -137,6 +140,7 @@ const HISTORIQUE: HistoriqueStatutView[] = [
 
 beforeEach(() => {
   completerCbMock.mockReset()
+  demanderModificationRcMock.mockReset()
   getHistoriqueMock.mockReset().mockResolvedValue(HISTORIQUE)
   getConsultationMock.mockReset().mockResolvedValue([])
   getPiecesMock.mockReset().mockResolvedValue([])
@@ -202,5 +206,40 @@ describe('CompleterCbModal', () => {
     await waitFor(() =>
       expect(completerCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: 'Numéro d\'opération ajouté.' })),
     )
+  })
+
+  // Décision du 25/09/2026 — la CB peut relayer la demande du DS au RC plutôt que d'y répondre elle-même.
+  describe('Demander un complément au RC (décision du 25/09/2026)', () => {
+    it('refuse sans motif', async () => {
+      render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+      fireEvent.click(screen.getByRole('button', { name: 'Demander un complément au RC' }))
+
+      expect(await screen.findByText('Un motif est requis pour demander un complément au RC.')).toBeInTheDocument()
+      expect(demanderModificationRcMock).not.toHaveBeenCalled()
+    })
+
+    it('appelle demanderModificationRc avec le motif saisi, sans toucher à completerCb', async () => {
+      const onSaved = vi.fn()
+      demanderModificationRcMock.mockResolvedValue(DA)
+      render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={onSaved} />)
+
+      fireEvent.change(screen.getByLabelText('Demander un complément au RC (motif obligatoire)'), {
+        target: { value: 'Il manque un justificatif sur la nature de l\'achat.' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Demander un complément au RC' }))
+
+      await waitFor(() => expect(demanderModificationRcMock).toHaveBeenCalledWith(1, 'Il manque un justificatif sur la nature de l\'achat.'))
+      expect(completerCbMock).not.toHaveBeenCalled()
+      expect(onSaved).toHaveBeenCalled()
+    })
+
+    it('le motif RC et la réponse au DS restent des champs distincts', async () => {
+      render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
+
+      fireEvent.change(screen.getByLabelText('Demander un complément au RC (motif obligatoire)'), { target: { value: 'Motif pour le RC.' } })
+
+      expect(screen.getByLabelText('Vous (facultatif)')).toHaveValue('')
+    })
   })
 })

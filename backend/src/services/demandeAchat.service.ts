@@ -856,8 +856,17 @@ export async function updateDemandeAchat(matricule: string | null, idDemandeAcha
  * (même principe qu'OP1.1 création). Le Demandeur n'a pas de rôle dédié
  * (ROLE_ATTRIBUTION) : jamais de suppléance à tracer ici (ID_SUPPLEANCE=null).
  */
-export async function transmettreRc(matricule: string | null, idDemandeAchat: number): Promise<DemandeAchat> {
+const transmettreRcSchema = z.object({
+  // Réponse libre au motif du RC en reprise DA_A_COMPLETER_RC (décision du 25/09/2026) — voir
+  // completerCbSchema#commentaireStatut, même principe. Sans effet en DA_EN_PREPARATION (rien à répondre).
+  commentaireStatut: z.string().trim().min(1).max(500).optional(),
+})
+
+export async function transmettreRc(matricule: string | null, idDemandeAchat: number, input: unknown = {}): Promise<DemandeAchat> {
   if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = transmettreRcSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
 
   const existing = await demandeAchatRepository.findById(idDemandeAchat)
   if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
@@ -889,7 +898,7 @@ export async function transmettreRc(matricule: string | null, idDemandeAchat: nu
     code_statut: 'DA_TRANSMISE_DEM_RC',
     matricule_acteur: matricule,
     id_suppleance: null,
-    commentaire_statut: null,
+    commentaire_statut: result.data.commentaireStatut ?? null,
   })
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }
@@ -1532,10 +1541,11 @@ const completerCbSchema = z
 
 /**
  * Reprise OP1.5 — FAD à compléter par la CB (CB, uniquement si
- * FAD_A_COMPLETER_CB) : seule boucle de reprise qui ne remonte pas jusqu'au
- * RC — la CB apporte elle-même le complément sur la nature de l'achat ou les
- * aspects budgétaires/comptables et retransmet **directement au DS**, en
- * réutilisant le statut nominal FAD_TRANSMISE_CB_DS (pas de duplication).
+ * FAD_A_COMPLETER_CB) : la CB apporte elle-même le complément sur les aspects
+ * budgétaires/comptables et retransmet **directement au DS**, en réutilisant
+ * le statut nominal FAD_TRANSMISE_CB_DS (pas de duplication). Alternative
+ * depuis le 25/09/2026 : demanderModificationRc, quand le complément demandé
+ * par le DS dépasse ce que la CB peut répondre seule.
  */
 export async function completerCb(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
   if (!matricule) throw new AppError('Authentification requise', 401)
@@ -1571,16 +1581,59 @@ export async function completerCb(matricule: string | null, idDemandeAchat: numb
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
 }
 
+const demanderModificationRcSchema = z.object({
+  commentaireStatut: z.string().trim().min(1, 'Le motif est requis.').max(500),
+})
+
+/**
+ * Alternative à completerCb (décision du 25/09/2026) — depuis FAD_A_COMPLETER_CB, la CB peut
+ * relayer la demande de complément du DS au RC plutôt que d'y répondre elle-même, quand elle
+ * dépasse ce qu'elle peut traiter seule (ex. nature de l'achat, document manquant). Réutilise
+ * FAD_A_MODIFIER_CB (même circuit qu'OP1.4 : TraiterFadRcModal affiche le motif « CB » + réponse
+ * libre facultative, le RC corrige et retransmet **directement à la CB** via
+ * FAD_MODIFIEE_TRANSMISE_RC_CB, sans repasser par le CDS) — la FAD revient ensuite dans la file de
+ * décision normale de la CB (Valider/Modifier/Rejeter), jamais directement chez le DS : la CB
+ * garde la main pour contrôler ce que le RC a modifié avant de retransmettre elle-même au DS.
+ * Motif obligatoire (même principe que toutes les autres demandes de complément/modification).
+ */
+export async function demanderModificationRc(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = demanderModificationRcSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_A_COMPLETER_CB') {
+    throw new AppError('Cette action n\'est possible qu\'après une demande de complément du DS.', 409)
+  }
+
+  const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
+
+  await historiqueStatutRepository.create({
+    id_demande_achat: idDemandeAchat,
+    code_statut: 'FAD_A_MODIFIER_CB',
+    matricule_acteur: matricule,
+    id_suppleance: role.idSuppleance,
+    commentaire_statut: result.data.commentaireStatut,
+  })
+  return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
 const commanderSchema = z.object({
   montantCommande: z.number().nonnegative(),
+  // Numéro de commande PGI (décision du 25/09/2026) — texte libre, obligatoire : sans lui,
+  // impossible de retrouver la commande correspondante dans le PGI depuis VIGIE.
+  numeroCommande: z.string().trim().min(1, 'Le numéro de commande est requis.'),
 })
 
 /**
  * OP1.6 — Élaborer et constater la commande (CB), uniquement si
  * FAD_A_COMMANDER. La saisie du BON dans le PGI est une tâche manuelle hors
  * application (TM, ForClaude/CDC/mot-phases-1-2.md) — cette fonction
- * n'enregistre que le constat côté VIGIE : MONTANT_COMMANDE puis
- * FAD_COMMANDEE.
+ * enregistre le constat côté VIGIE : MONTANT_COMMANDE et NUMERO_COMMANDE
+ * (décision du 25/09/2026 — le numéro n'était jusqu'ici saisi nulle part),
+ * puis FAD_COMMANDEE.
  */
 export async function commander(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
   if (!matricule) throw new AppError('Authentification requise', 401)
@@ -1596,7 +1649,10 @@ export async function commander(matricule: string | null, idDemandeAchat: number
 
   const role = await roleEffectifService.assertHasEffectiveRole(matricule, 'CB', existing.id_service)
 
-  await demandeAchatRepository.update(idDemandeAchat, { montant_commande: result.data.montantCommande })
+  await demandeAchatRepository.update(idDemandeAchat, {
+    montant_commande: result.data.montantCommande,
+    numero_commande: result.data.numeroCommande,
+  })
   await historiqueStatutRepository.create({
     id_demande_achat: idDemandeAchat,
     code_statut: 'FAD_COMMANDEE',
@@ -1605,6 +1661,42 @@ export async function commander(matricule: string | null, idDemandeAchat: number
     commentaire_statut: null,
   })
   return (await demandeAchatRepository.findById(idDemandeAchat)) as DemandeAchat
+}
+
+const modifierNumeroCommandeSchema = z.object({
+  numeroCommande: z.string().trim().min(1, 'Le numéro de commande est requis.'),
+})
+
+/**
+ * Correction du numéro de commande PGI (décision du 25/09/2026) — réservée à ADMIN_APP
+ * (transverse) et ADMIN_SERVICE (limité à son propre service, même périmètre que le reste de
+ * l'application) ; ni RC, ni CDS, ni CB, ni DS, contrairement à `assertCanActFor`, d'où une
+ * vérification de rôle dédiée plutôt que sa réutilisation. Uniquement sur FAD_COMMANDEE — jamais
+ * avant (le champ n'existe pas encore) ni après (aucun statut ultérieur ne le concerne). Reste
+ * obligatoire, même règle qu'à la saisie initiale (`commander`). Aucune ligne HISTORIQUE_STATUT :
+ * ce n'est pas un changement de statut, une simple correction de valeur.
+ */
+export async function modifierNumeroCommande(matricule: string | null, idDemandeAchat: number, input: unknown): Promise<DemandeAchat> {
+  if (!matricule) throw new AppError('Authentification requise', 401)
+
+  const result = modifierNumeroCommandeSchema.safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
+
+  const existing = await demandeAchatRepository.findById(idDemandeAchat)
+  if (!existing) throw new AppError('Demande d\'achat introuvable', 404)
+  if (existing.code_statut !== 'FAD_COMMANDEE') {
+    throw new AppError('Le numéro de commande ne peut être corrigé que sur une FAD commandée.', 409)
+  }
+
+  const context = await resolveAccessContext(matricule)
+  if (context.role !== 'ADMIN_APP' && context.role !== 'ADMIN_SERVICE') {
+    throw new AppError('Droits insuffisants.', 403)
+  }
+  if (context.role === 'ADMIN_SERVICE' && context.ownIdService !== existing.id_service) {
+    throw new AppError('Droits insuffisants pour ce service.', 403)
+  }
+
+  return demandeAchatRepository.update(idDemandeAchat, { numero_commande: result.data.numeroCommande })
 }
 
 const selectMarcheSchema = z

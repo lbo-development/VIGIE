@@ -140,7 +140,7 @@ export async function putDemandeAchatConsultation(req: Request, res: Response, n
 export async function postDemandeAchatTransmettreRc(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
-    const demandeAchat = await demandeAchatService.transmettreRc(req.matricule ?? null, id)
+    const demandeAchat = await demandeAchatService.transmettreRc(req.matricule ?? null, id, req.body)
     res.json(demandeAchat)
   } catch (err) {
     next(err)
@@ -267,10 +267,30 @@ export async function postDemandeAchatCompleterCb(req: Request, res: Response, n
   }
 }
 
+export async function postDemandeAchatDemanderModificationRc(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.demanderModificationRc(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
 export async function postDemandeAchatCommander(req: Request, res: Response, next: NextFunction) {
   try {
     const id = parseId(req.params.id)
     const demandeAchat = await demandeAchatService.commander(req.matricule ?? null, id, req.body)
+    res.json(demandeAchat)
+  } catch (err) {
+    next(err)
+  }
+}
+
+export async function putDemandeAchatNumeroCommande(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = parseId(req.params.id)
+    const demandeAchat = await demandeAchatService.modifierNumeroCommande(req.matricule ?? null, id, req.body)
     res.json(demandeAchat)
   } catch (err) {
     next(err)

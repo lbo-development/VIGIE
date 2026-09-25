@@ -25,7 +25,7 @@ export interface ValiderCommandeCbModalProps {
 
 const DECISION_BUTTONS: { decision: DecisionCbInput['decision']; label: string; className: string }[] = [
   { decision: 'VALIDER', label: 'Valider', className: 'gp-btn--primary' },
-  { decision: 'MODIFIER', label: 'Modifier', className: 'gp-btn--secondary' },
+  { decision: 'MODIFIER', label: 'Demande de modifications', className: 'gp-btn--secondary' },
   { decision: 'REJETER', label: 'Rejeter', className: 'gp-btn--danger' },
 ]
 

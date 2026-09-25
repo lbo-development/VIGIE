@@ -21,6 +21,7 @@ const DA1: DemandeAchatRow = {
   libelle_motif_choix: null,
   montant_retenu: null,
   montant_commande: null,
+  numero_commande: null,
   validee_sur_seuil_ds: false,
   date_creation: '2026-09-08',
   matricule_demandeur: '10001',
@@ -53,6 +54,7 @@ const listMock = vi.fn()
 const syntheseMock = vi.fn()
 const createMock = vi.fn()
 const transmettreRcMock = vi.fn()
+const modifierNumeroCommandeMock = vi.fn()
 const getHistoriqueMock = vi.fn()
 const updateMock = vi.fn()
 const selectMarcheMock = vi.fn()
@@ -138,6 +140,7 @@ vi.mock('../hooks/useDemandeAchat', () => ({
   useAccueilSynthese: (...args: unknown[]) => syntheseMock(...args),
   createDemandeAchat: (...args: unknown[]) => createMock(...args),
   transmettreRc: (...args: unknown[]) => transmettreRcMock(...args),
+  modifierNumeroCommande: (...args: unknown[]) => modifierNumeroCommandeMock(...args),
   getHistoriqueStatuts: (...args: unknown[]) => getHistoriqueMock(...args),
   updateDemandeAchat: (...args: unknown[]) => updateMock(...args),
   selectMarcheDemandeAchat: (...args: unknown[]) => selectMarcheMock(...args),
@@ -186,6 +189,7 @@ beforeEach(() => {
   syntheseMock.mockReset()
   createMock.mockReset()
   transmettreRcMock.mockReset()
+  modifierNumeroCommandeMock.mockReset()
   getHistoriqueMock.mockReset()
   updateMock.mockReset()
   selectMarcheMock.mockReset()
@@ -384,6 +388,27 @@ describe('Home — Voir les éléments de la demande (lecture seule)', () => {
     expect(within(dialog.querySelector('.gp-modal__ft') as HTMLElement).getByRole('button', { name: 'Fermer' })).toBeInTheDocument()
   })
 
+  // Décision du 25/09/2026 — numéro de commande PGI affiché à côté du numéro de FAD dans le titre.
+  it('affiche le numéro de commande à côté du numéro de FAD quand il est renseigné', async () => {
+    mockLists({ A_FINALISER: [{ ...DA1, numero_commande: 'BC-2026-042' }] })
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('2026-09-08-001 / n°CMD BC-2026-042')).toBeInTheDocument()
+  })
+
+  it('n\'affiche rien après le numéro de FAD tant qu\'aucune commande n\'a été passée', async () => {
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).getByText('2026-09-08-001')).toBeInTheDocument()
+    expect(within(dialog).queryByText(/n°CMD/)).not.toBeInTheDocument()
+  })
+
   it('"Montant & marché" est désactivé en lecture seule, "Gestion documentaire" reste accessible en consultation', async () => {
     const da: DemandeAchatRow = { ...DA1, procedure_achat: 'MARCHE', id_fournisseur_retenu: 42 }
     mockLists({ A_FINALISER: [da] })
@@ -400,6 +425,140 @@ describe('Home — Voir les éléments de la demande (lecture seule)', () => {
     // Consultation seule : pas d'icône d'ajout/remplacement du devis, Télécharger reste actif.
     expect(within(gestionDialog).queryByRole('button', { name: /Ajouter le devis|Remplacer le devis/ })).not.toBeInTheDocument()
     expect(within(gestionDialog).getByRole('button', { name: 'Télécharger le devis — ACME' })).toBeInTheDocument()
+  })
+})
+
+describe('Home — correction du numéro de commande par un administrateur (décision du 25/09/2026)', () => {
+  async function ouvrirFadCommandee() {
+    mockLists({ FAD_COMMANDEES: [FAD_COMMANDEE] })
+    render(<Home />)
+
+    fireEvent.click(screen.getByRole('tab', { name: /FAD commandées/ }))
+    fireEvent.click(within(screen.getByText('2026-08-01-001').closest('article')!).getByRole('button', { name: 'Voir les éléments de la demande' }))
+    return screen.findByRole('dialog')
+  }
+
+  it('aucune icône de modification pour un acteur sans rôle admin', async () => {
+    const dialog = await ouvrirFadCommandee()
+    expect(within(dialog).queryByRole('button', { name: 'Modifier le numéro de commande' })).not.toBeInTheDocument()
+  })
+
+  it('ADMIN_APP peut corriger le numéro de commande, sans restriction de service', async () => {
+    currentUserData = { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 100, roles: [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }] }
+    modifierNumeroCommandeMock.mockResolvedValue({ ...FAD_COMMANDEE, numero_commande: 'BC-CORRIGE' })
+    const dialog = await ouvrirFadCommandee()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Modifier le numéro de commande' }))
+    const sousDialog = await screen.findByRole('dialog', { name: 'Modifier le numéro de commande' })
+
+    fireEvent.change(within(sousDialog).getByLabelText('Numéro de commande'), { target: { value: 'BC-CORRIGE' } })
+    fireEvent.click(within(sousDialog).getByRole('button', { name: 'Enregistrer' }))
+
+    await waitFor(() => expect(modifierNumeroCommandeMock).toHaveBeenCalledWith(4, 'BC-CORRIGE'))
+    // Reflété immédiatement dans le titre, sans fermer la modale principale.
+    expect(await within(dialog).findByText('2026-08-01-001 / n°CMD BC-CORRIGE')).toBeInTheDocument()
+  })
+
+  it('ADMIN_SERVICE peut corriger une FAD de son propre service', async () => {
+    currentUserData = {
+      matricule: '10001',
+      nom: 'MARTIN',
+      prenom: 'Alice',
+      idService: 10,
+      idCellule: 100,
+      roles: [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: null, idService: 10, idCellule: null }],
+    }
+    const dialog = await ouvrirFadCommandee()
+    expect(within(dialog).getByRole('button', { name: 'Modifier le numéro de commande' })).toBeInTheDocument()
+  })
+
+  it('ADMIN_SERVICE d\'un autre service ne voit pas l\'icône', async () => {
+    currentUserData = {
+      matricule: '10001',
+      nom: 'MARTIN',
+      prenom: 'Alice',
+      idService: 10,
+      idCellule: 100,
+      roles: [{ typeRole: 'ADMIN_SERVICE', perimeterLabel: null, idService: 99, idCellule: null }],
+    }
+    const dialog = await ouvrirFadCommandee()
+    expect(within(dialog).queryByRole('button', { name: 'Modifier le numéro de commande' })).not.toBeInTheDocument()
+  })
+
+  it('refuse une correction vide', async () => {
+    currentUserData = { matricule: '10001', nom: 'MARTIN', prenom: 'Alice', idService: 10, idCellule: 100, roles: [{ typeRole: 'ADMIN_APP', perimeterLabel: null, idService: null, idCellule: null }] }
+    const dialog = await ouvrirFadCommandee()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Modifier le numéro de commande' }))
+    const sousDialog = await screen.findByRole('dialog', { name: 'Modifier le numéro de commande' })
+
+    fireEvent.change(within(sousDialog).getByLabelText('Numéro de commande'), { target: { value: '' } })
+    fireEvent.click(within(sousDialog).getByRole('button', { name: 'Enregistrer' }))
+
+    expect(await within(sousDialog).findByText('Le numéro de commande est obligatoire.')).toBeInTheDocument()
+    expect(modifierNumeroCommandeMock).not.toHaveBeenCalled()
+  })
+})
+
+describe('Home — reprise DA_A_COMPLETER_RC (réponse libre au motif du RC, décision du 25/09/2026)', () => {
+  it('pas d\'icône "Transmettre au RC" sur une DA à compléter — seule la modale d\'édition le permet', () => {
+    mockLists({ A_FINALISER: [DA1, DA2] })
+    render(<Home />)
+
+    const rowACompleter = within(screen.getByText('2026-09-08-002').closest('article')!)
+    expect(rowACompleter.queryByRole('button', { name: 'Transmettre au RC' })).not.toBeInTheDocument()
+    expect(rowACompleter.getByRole('button', { name: 'Modifier la demande' })).toBeInTheDocument()
+  })
+
+  it('affiche le motif du RC et permet une réponse libre facultative avant de retransmettre', async () => {
+    mockLists({ A_FINALISER: [DA1, DA2] })
+    getHistoriqueMock.mockResolvedValue([
+      {
+        idHisto: 1,
+        codeStatut: 'DA_A_COMPLETER_RC',
+        libelleStatut: 'À compléter',
+        dateHeure: '2026-09-09T10:00:00Z',
+        matriculeActeur: '20002',
+        acteurNomPrenom: 'Jean DUPONT',
+        suppleanceLabel: null,
+        commentaireStatut: 'Merci de préciser le fournisseur retenu.',
+      },
+    ])
+    transmettreRcMock.mockResolvedValue({ ...DA2, code_statut: 'DA_TRANSMISE_DEM_RC' })
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-002').closest('article')!).getByRole('button', { name: 'Modifier la demande' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(await within(dialog).findByText('Merci de préciser le fournisseur retenu.')).toBeInTheDocument()
+
+    fireEvent.change(within(dialog).getByPlaceholderText('Votre réponse…'), { target: { value: 'Voici le complément demandé.' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retransmettre au RC' }))
+
+    await waitFor(() => expect(transmettreRcMock).toHaveBeenCalledWith(2, 'Voici le complément demandé.'))
+  })
+
+  it('la réponse reste facultative — retransmet sans en avoir saisi une', async () => {
+    mockLists({ A_FINALISER: [DA1, DA2] })
+    transmettreRcMock.mockResolvedValue({ ...DA2, code_statut: 'DA_TRANSMISE_DEM_RC' })
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-002').closest('article')!).getByRole('button', { name: 'Modifier la demande' }))
+    const dialog = await screen.findByRole('dialog')
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retransmettre au RC' }))
+
+    await waitFor(() => expect(transmettreRcMock).toHaveBeenCalledWith(2, undefined))
+  })
+
+  it('aucun motif/réponse affiché pour la transmission initiale (DA_EN_PREPARATION)', async () => {
+    render(<Home />)
+
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Modifier la demande' }))
+    const dialog = await screen.findByRole('dialog')
+
+    expect(within(dialog).queryByPlaceholderText('Votre réponse…')).not.toBeInTheDocument()
+    expect(within(dialog).queryByRole('button', { name: 'Retransmettre au RC' })).not.toBeInTheDocument()
   })
 })
 

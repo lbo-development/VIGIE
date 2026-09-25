@@ -94,9 +94,13 @@ export async function editerEnPlaceRc(idCsf: number, input: CertificatServiceFai
   return api.put<CertificatServiceFait>(`/certificats-service-fait/${idCsf}/rc`, input)
 }
 
-/** Transmission au RC (R5) — soumission initiale ou resoumission après complément (CSF_A_COMPLETER_RC). */
-export async function transmettreRc(idCsf: number): Promise<CertificatServiceFait> {
-  return api.post<CertificatServiceFait>(`/certificats-service-fait/${idCsf}/transmettre-rc`, {})
+/**
+ * Transmission au RC (R5) — soumission initiale ou resoumission après complément (CSF_A_COMPLETER_RC).
+ * `commentaire` : réponse libre au motif du RC en reprise CSF_A_COMPLETER_RC (décision du
+ * 25/09/2026) — sans effet en CSF_EN_PREPARATION.
+ */
+export async function transmettreRc(idCsf: number, commentaire?: string): Promise<CertificatServiceFait> {
+  return api.post<CertificatServiceFait>(`/certificats-service-fait/${idCsf}/transmettre-rc`, { commentaire: commentaire || undefined })
 }
 
 /** RC transmet à la CB — depuis CSF_A_TRAITER. */
@@ -193,10 +197,14 @@ export interface SyntheseFacturationBucket {
 }
 
 export interface SyntheseFacturation {
-  /** CSF au statut CSF_VALIDE_BUDGET ou CSF_LIQUIDE uniquement. */
+  /** Tous les CSF qui existent, hors CSF_EN_PREPARATION (décision du 25/09/2026). */
   csf: SyntheseFacturationBucket
   /** FAD au statut FAD_COMMANDEE, dans le périmètre. */
   commandes: SyntheseFacturationBucket
+  /** CSF au statut CSF_VALIDE_BUDGET uniquement — validés par la CB, pas encore liquidés (décision du 25/09/2026). */
+  certifie: SyntheseFacturationBucket
+  /** CSF au statut CSF_LIQUIDE uniquement (décision du 25/09/2026). */
+  liquide: SyntheseFacturationBucket
   /** Commandes ci-dessus n'ayant strictement aucun CSF (tous statuts confondus). */
   commandesSansCsf: SyntheseFacturationBucket
 }

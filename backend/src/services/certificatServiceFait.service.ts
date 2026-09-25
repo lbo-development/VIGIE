@@ -198,14 +198,22 @@ export async function updateBrouillon(matricule: string | null, idCsf: number, i
   })
 }
 
-/** Transmission au RC (R5 : au moins un justificatif) — soumission initiale depuis CSF_EN_PREPARATION, ou resoumission depuis CSF_A_COMPLETER_RC après un complément demandé. */
-export async function transmettreRc(matricule: string | null, idCsf: number): Promise<CertificatServiceFait> {
+/**
+ * Transmission au RC (R5 : au moins un justificatif) — soumission initiale depuis CSF_EN_PREPARATION, ou
+ * resoumission depuis CSF_A_COMPLETER_RC après un complément demandé. `commentaire` : réponse libre au motif
+ * du RC en reprise CSF_A_COMPLETER_RC (décision du 25/09/2026, même principe que retransmettreBudget) —
+ * sans effet en CSF_EN_PREPARATION (rien à répondre).
+ */
+export async function transmettreRc(matricule: string | null, idCsf: number, input: unknown = {}): Promise<CertificatServiceFait> {
   if (!matricule) throw new AppError('Authentification requise', 401)
   const ctx = await loadContext(idCsf)
   if (!STATUTS_TRANSMISSIBLES_RC.includes(ctx.csf.code_statut_csf)) {
     throw new AppError('Ce certificat de service fait ne peut pas être transmis depuis son statut actuel.', 409)
   }
   const idSuppleance = await requireRedacteur(matricule, ctx)
+
+  const result = z.object({ commentaire: z.string().trim().nullish() }).safeParse(input)
+  if (!result.success) throw new AppError(result.error.issues[0]?.message ?? 'Requête invalide', 400)
 
   const pieces = await pieceJointeRepository.findAllByCsf(idCsf)
   if (pieces.length === 0) throw new AppError('Au moins un justificatif est requis pour transmettre le certificat de service fait.', 400)
@@ -215,7 +223,7 @@ export async function transmettreRc(matricule: string | null, idCsf: number): Pr
     code_statut_csf: 'CSF_A_TRAITER',
     matricule_acteur: matricule,
     id_suppleance: idSuppleance,
-    commentaire_statut: null,
+    commentaire_statut: result.data.commentaire ?? null,
   })
   return (await certificatServiceFaitRepository.findById(idCsf)) as CertificatServiceFait
 }
@@ -475,32 +483,39 @@ export interface SyntheseFacturationBucket {
 }
 
 export interface SyntheseFacturation {
-  /** CSF au statut CSF_VALIDE_BUDGET ou CSF_LIQUIDE uniquement — un CSF encore en cours de circuit ne compte pas comme « certifié ». */
+  /** Tous les CSF qui existent, hors CSF_EN_PREPARATION (décision du 25/09/2026 — un brouillon jamais transmis n'a pas d'existence pour ce suivi). */
   csf: SyntheseFacturationBucket
   /** FAD au statut FAD_COMMANDEE, dans le périmètre. */
   commandes: SyntheseFacturationBucket
+  /** CSF au statut CSF_VALIDE_BUDGET uniquement — validés par la CB, pas encore liquidés (décision du 25/09/2026, distinct de `liquide`). */
+  certifie: SyntheseFacturationBucket
+  /** CSF au statut CSF_LIQUIDE uniquement (décision du 25/09/2026). */
+  liquide: SyntheseFacturationBucket
   /** Parmi les commandes ci-dessus, celles qui n'ont strictement aucun CSF (tous statuts confondus). */
   commandesSansCsf: SyntheseFacturationBucket
 }
 
-const STATUTS_CSF_CERTIFIES = ['CSF_VALIDE_BUDGET', 'CSF_LIQUIDE']
+function sommeMontantCsf(pieces: CertificatServiceFait[]): number {
+  return pieces.reduce((somme, c) => somme + (c.montant_csf ?? 0), 0)
+}
 
 async function computeSyntheseFacturation(commandes: DemandeAchat[]): Promise<SyntheseFacturation> {
   const idsDemandeAchat = commandes.map((c) => c.id_demande_achat)
   const csfAll = await certificatServiceFaitRepository.findAllByDemandeAchatIn(idsDemandeAchat)
-  const csfCertifies = csfAll.filter((c) => STATUTS_CSF_CERTIFIES.includes(c.code_statut_csf))
+  const csfExistants = csfAll.filter((c) => c.code_statut_csf !== 'CSF_EN_PREPARATION')
+  const csfCertifies = csfAll.filter((c) => c.code_statut_csf === 'CSF_VALIDE_BUDGET')
+  const csfLiquides = csfAll.filter((c) => c.code_statut_csf === 'CSF_LIQUIDE')
   const idsAvecCsf = new Set(csfAll.map((c) => c.id_demande_achat))
   const commandesSansCsf = commandes.filter((c) => !idsAvecCsf.has(c.id_demande_achat))
 
   return {
-    csf: {
-      nombre: csfCertifies.length,
-      montant: csfCertifies.reduce((somme, c) => somme + (c.montant_csf ?? 0), 0),
-    },
+    csf: { nombre: csfExistants.length, montant: sommeMontantCsf(csfExistants) },
     commandes: {
       nombre: commandes.length,
       montant: commandes.reduce((somme, c) => somme + (c.montant_commande ?? 0), 0),
     },
+    certifie: { nombre: csfCertifies.length, montant: sommeMontantCsf(csfCertifies) },
+    liquide: { nombre: csfLiquides.length, montant: sommeMontantCsf(csfLiquides) },
     commandesSansCsf: {
       nombre: commandesSansCsf.length,
       montant: commandesSansCsf.reduce((somme, c) => somme + (c.montant_commande ?? 0), 0),
@@ -552,11 +567,29 @@ async function assertCanEditPieces(matricule: string, ctx: CsfContext): Promise<
   throw new AppError('Modification des justificatifs impossible depuis ce statut, ou droits insuffisants.', 403)
 }
 
-export async function listPieces(matricule: string | null, idCsf: number): Promise<PieceJointeCsf[]> {
+/** Vue frontend d'une pièce jointe CSF (camelCase) — voir demandeAchat.service.ts#PieceJointeView, même principe. */
+export interface PieceJointeCsfView {
+  idPiece: number
+  typePiece: string
+  nomFichierOriginal: string
+  tailleOctets: number
+}
+
+function toPieceJointeCsfView(row: PieceJointeCsf): PieceJointeCsfView {
+  return {
+    idPiece: row.id_piece,
+    typePiece: row.type_piece,
+    nomFichierOriginal: row.nom_fichier_original,
+    tailleOctets: row.taille_octets,
+  }
+}
+
+export async function listPieces(matricule: string | null, idCsf: number): Promise<PieceJointeCsfView[]> {
   if (!matricule) throw new AppError('Authentification requise', 401)
   const ctx = await loadContext(idCsf)
   await assertCanView(matricule, ctx)
-  return pieceJointeRepository.findAllByCsf(idCsf)
+  const rows = await pieceJointeRepository.findAllByCsf(idCsf)
+  return rows.map(toPieceJointeCsfView)
 }
 
 export interface UploadedFile {
@@ -574,7 +607,7 @@ function isPdfBuffer(buffer: Buffer): boolean {
 
 const addPieceSchema = z.object({ typePiece: z.enum(['PV_RECEPTION', 'BON_LIVRAISON', 'AUTRE']) })
 
-export async function addPiece(matricule: string | null, idCsf: number, input: unknown, file: UploadedFile | undefined): Promise<PieceJointeCsf> {
+export async function addPiece(matricule: string | null, idCsf: number, input: unknown, file: UploadedFile | undefined): Promise<PieceJointeCsfView> {
   if (!matricule) throw new AppError('Authentification requise', 401)
   if (!file) throw new AppError('Aucun fichier reçu.', 400)
   const ctx = await loadContext(idCsf)
@@ -588,7 +621,7 @@ export async function addPiece(matricule: string | null, idCsf: number, input: u
   const path = pieceJointeRepository.buildStoragePathCsf(idCsf)
   await pieceJointeRepository.uploadFile(path, file.buffer)
   try {
-    return await pieceJointeRepository.createForCsf({
+    const row = await pieceJointeRepository.createForCsf({
       id_csf: idCsf,
       type_piece: result.data.typePiece,
       origine: 'UTILISATEUR',
@@ -596,6 +629,7 @@ export async function addPiece(matricule: string | null, idCsf: number, input: u
       storage_path: path,
       taille_octets: file.size,
     })
+    return toPieceJointeCsfView(row)
   } catch (err) {
     await pieceJointeRepository.removeFile(path).catch(() => {})
     throw err
