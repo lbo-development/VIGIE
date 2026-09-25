@@ -103,27 +103,32 @@ export function CompleterCbModal({ demandeAchat, onClose, onSaved }: CompleterCb
           </button>
         </div>
         <div className="gp-modal__bd gp-scroll stack">
-          {motifDs && (
-            <p className="gp-errmsg" style={{ background: 'var(--gp-warning-bg)', color: 'var(--gp-warning-text)' }}>
-              <svg className="ti">
-                <use href="#i-alert-circle" />
-              </svg>
-              Motif du DS : {motifDs}
-            </p>
-          )}
-
-          <div className="gp-field">
-            <label className="gp-label" htmlFor="completercb-commentaire-reponse">
-              Votre réponse (facultatif)
-            </label>
-            <textarea
-              id="completercb-commentaire-reponse"
-              className="gp-textarea"
-              value={commentaireReponse}
-              onChange={(e) => setCommentaireReponse(e.target.value)}
-              maxLength={500}
-              rows={3}
-            />
+          {/* Échange motif/réponse présenté comme un fil (décision du 23/09/2026) — voir
+              TraiterFadRcModal.tsx pour le même traitement et la justification (pas de composant
+              "chat" dédié, absent du design system GPMM). */}
+          <div className="stack" style={{ gap: 8 }}>
+            {motifDs && (
+              <div style={{ background: 'var(--gp-warning-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                <p className="gp-label" style={{ color: 'var(--gp-warning-text)', margin: '0 0 4px' }}>
+                  DS
+                </p>
+                <p style={{ margin: 0, color: 'var(--gp-warning-text)' }}>{motifDs}</p>
+              </div>
+            )}
+            <div style={{ background: 'var(--gp-info-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+              <label className="gp-label" htmlFor="completercb-commentaire-reponse" style={{ color: 'var(--gp-info-text)' }}>
+                Vous (facultatif)
+              </label>
+              <textarea
+                id="completercb-commentaire-reponse"
+                className="gp-textarea"
+                value={commentaireReponse}
+                onChange={(e) => setCommentaireReponse(e.target.value)}
+                placeholder="Votre réponse…"
+                maxLength={500}
+                rows={3}
+              />
+            </div>
           </div>
 
           <div className="row">

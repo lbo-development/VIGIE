@@ -5,7 +5,7 @@ import { AppError } from '../middlewares/errorHandler.js'
 import type { LibelleReferentiel } from '../repositories/libelleReferentiel.repository.js'
 
 /** Domaines couverts par le référentiel — étendre ici lors de l'ajout d'une nouvelle liste. */
-export const DOMAINES = ['TYPE_PIECE_MARCHE', 'TYPE_PIECE_INVESTISSEMENT', 'TYPE_PIECE_FAD'] as const
+export const DOMAINES = ['TYPE_PIECE_MARCHE', 'TYPE_PIECE_INVESTISSEMENT', 'TYPE_PIECE_FAD', 'TYPE_PIECE_CSF'] as const
 export type Domaine = (typeof DOMAINES)[number]
 
 const domaineSchema = z.enum(DOMAINES)

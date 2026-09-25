@@ -60,6 +60,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 - **Résultat** : **FAD_TRANSMISE_RC_CDS** *(remplace FAD_TRANSMISE_CDS de la refonte du 06/09/2026 ; même code que la retransmission après complément — l'émetteur reste le RC dans les deux cas)*. C'est cette transmission — pas une étape séparée — qui fait basculer l'objet de DA à FAD : DA_VALIDEE_RC est le statut porté pendant toute la finalisation.
 - *(Auparavant fusionnée avec OP1.2 ; la décision du 14/09/2026 les a dé-fusionnées comme deux gestes distincts, définitivement confirmés séparés — écran et action — par la décision du 16/09/2026.)*
 - **Enregistrement intermédiaire (décision du 16/09/2026, nouveau)** : depuis le même écran « Traiter », un bouton « Enregistrer » sauvegarde la saisie en cours **sans transmettre ni changer de statut** (aucune ligne HISTORIQUE_STATUT créée) — permet de compléter la FAD en plusieurs fois. Contrairement à la transmission (règles d'émission ci-dessus), **aucun champ n'est obligatoire** pour cet enregistrement, à la seule exception du libellé du motif quand MOTIF_CHOIX vaut `Autre` (règle qui s'applique dès qu'il est saisi, même partiellement). Disponible sur les trois statuts où l'écran « Traiter » s'ouvre : DA_VALIDEE_RC, FAD_A_COMPLETER_CDS, et FAD_A_MODIFIER_CB (reprise CB, cf. OP1.4).
+- **Réponse libre à la reprise (décision du 23/09/2026, nouveau)** : sur une reprise faisant suite à une demande de complément du CDS (FAD_A_COMPLETER_CDS) ou de modification de la CB (FAD_A_MODIFIER_CB, cf. OP1.4), le motif d'origine est affiché en lecture seule dans l'écran « Traiter » et un champ de réponse libre, **facultatif**, est proposé juste avant de retransmettre. Le texte saisi est tracé comme une **nouvelle ligne** HISTORIQUE_STATUT portée par la transmission elle-même — jamais un ajout au commentaire d'origine (HISTORIQUE_STATUT est immuable, aucune ligne n'est jamais modifiée après création). Même mécanique reprise à OP1.5 (reprise CB après demande du DS).
 
 ## OP1.3 — Statuer sur la FAD (CDS)
 - **Événement** : FAD_TRANSMISE_RC_CDS (transmission initiale ou après complément — même code dans les deux cas).
@@ -87,7 +88,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 - **Règles d'émission** :
   - validé → FAD_VALIDEE_CB ; la CB est alors invitée à transmettre immédiatement (OP1.4b : au DS, ou exemption automatique de seuil) — si elle décline, la FAD reste en FAD_VALIDEE_CB dans sa file de travail jusqu'à déclenchement manuel *(nouveau, décision du 14/09/2026)* ;
   - rejeté (crédits insuffisants, marché inactif, plafond atteint) → FAD rejetée, **terminal** — la CB ne juge jamais l'opportunité de l'achat, uniquement la conformité budgétaire/comptable : elle ne dispose donc **pas** d'issue « annulé » ;
-  - modification demandée → FAD à modifier, reprise en place **par le RC**, qui retransmet **directement à la CB** via FAD_MODIFIEE_TRANSMISE_RC_CB (pas de nouveau passage par le CDS) — **pas de duplication**.
+  - modification demandée → FAD à modifier, reprise en place **par le RC**, qui retransmet **directement à la CB** via FAD_MODIFIEE_TRANSMISE_RC_CB (pas de nouveau passage par le CDS) — **pas de duplication**. *(Décision du 23/09/2026)* Cette reprise bénéficie de la même réponse libre facultative avant retransmission que la reprise après complément du CDS — voir OP1.2b.
 - **Résultats** : **FAD_VALIDEE_CB** | **FAD_REJETEE_CB** | **FAD_A_MODIFIER_CB**.
 
 ## OP1.4b — Router selon le seuil de validation DS (automatique)
@@ -107,7 +108,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
   - validé → FAD_VALIDEE_DS ; le DS est alors invité à donner immédiatement l'ordre de commande à la CB (OP1.5b) — s'il décline, la FAD reste en FAD_VALIDEE_DS dans sa file de travail jusqu'à déclenchement manuel *(nouveau, décision du 14/09/2026)* ;
   - rejeté (achat jugé non pertinent) → FAD rejetée, **terminal** ;
   - annulé (opportunité d'achat devenue caduque) → FAD annulée, **terminal** ;
-  - complément demandé *(nouveau, décision du 14/09/2026)* → FAD à compléter, reprise **par la CB** — seule boucle de reprise qui ne remonte pas jusqu'au RC : la CB apporte le complément sur la nature de l'achat ou les aspects budgétaires/comptables et retransmet **directement au DS**, en réutilisant le même statut que la transmission nominale (FAD_TRANSMISE_CB_DS, OP1.4b) — **pas de duplication**.
+  - complément demandé *(nouveau, décision du 14/09/2026)* → FAD à compléter, reprise **par la CB** — seule boucle de reprise qui ne remonte pas jusqu'au RC : la CB apporte le complément sur la nature de l'achat ou les aspects budgétaires/comptables et retransmet **directement au DS**, en réutilisant le même statut que la transmission nominale (FAD_TRANSMISE_CB_DS, OP1.4b) — **pas de duplication**. *(Décision du 23/09/2026)* Même réponse libre facultative avant retransmission que les reprises RC — voir OP1.2b.
 - **Résultats** : **FAD_VALIDEE_DS** | **FAD_REJETEE_DS** | **FAD_ANNULEE_DS** | **FAD_A_COMPLETER_CB**.
 
 ## OP1.5b — Donner l'ordre de commande à la CB (DS)
@@ -133,7 +134,7 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 - **Résultat** : **FAD_COMMANDEE**. *(Message sortant vers le PGI = émission effective de la commande, réalisée dans le PGI, hors application.)*
 
 ## OP1.7 — Clôturer / rouvrir la FAD (indicateur réversible)
-> **Point ouvert, non résolu par cette révision (14/09/2026).** `FAD_CLOTUREE` ne fait plus partie des 25 statuts du référentiel (`code_statut.xlsx`/`cycle-da-fad.html`) — retirée lors de la refonte du 14/09/2026, décision explicite prise pendant la conception des statuts DA/FAD : la clôture relève exclusivement du circuit CSF (`STATUT_CSF.CSF_LIQUIDE`, Processus 2), hors périmètre de ce chantier. L'opération ci-dessous, héritée de la refonte du 06/09/2026, n'a donc plus de statut à produire côté DA/FAD. Conservée à titre de mémoire de l'intention initiale — **ne pas s'appuyer dessus telle quelle** : le mécanisme de fin d'attente de CSF (indicateur porté par DEMANDE_ACHAT ? condition dérivée du dernier CSF ? autre ?) reste à reconcevoir avant toute implémentation Phase 2, de même que l'enchaînement inter-processus P1 → P2 ci-dessous, qui référence encore FAD_CLOTUREE.
+> **Point ouvert, non résolu par cette révision (14/09/2026).** `FAD_CLOTUREE` ne fait plus partie des 25 statuts du référentiel (`code_statut.xlsx`/`cycle-da-fad.html`) — retirée lors de la refonte du 14/09/2026, décision explicite prise pendant la conception des statuts DA/FAD : la clôture relève exclusivement du circuit CSF (`STATUT_CSF.CSF_LIQUIDE`, Processus 2), hors périmètre de ce chantier. L'opération ci-dessous, héritée de la refonte du 06/09/2026, n'a donc plus de statut à produire côté DA/FAD. Conservée à titre de mémoire de l'intention initiale — **ne pas s'appuyer dessus telle quelle** : le mécanisme de fin d'attente de CSF (indicateur porté par DEMANDE_ACHAT ? condition dérivée du dernier CSF ? autre ?) reste à reconcevoir, de même que l'enchaînement inter-processus P1 → P2 ci-dessous, qui référence encore FAD_CLOTUREE. **Précision du 24/09/2026** : le Processus 2 lui-même (circuit CSF, OP2.1-OP2.4) a depuis été implémenté (refonte du circuit sans rejet, voir Historique) — seul ce point OP1.7 (clôture/réouverture côté FAD) reste un point ouvert distinct, non traité par ce chantier.
 - **Événement** : décision de (dé)clôture (Demandeur ou CB).
 - **Synchronisation** : FAD au statut FAD_COMMANDEE.
 - **Actions** : pose/retrait de l'indicateur « aucun CSF supplémentaire attendu ».
@@ -143,28 +144,35 @@ Chaque **opération** est décrite par : événement(s) déclencheur(s) → sync
 # PROCESSUS 2 — SERVICE FAIT (CSF → liquidation/paiement)
 ═══════════════════════════════════════════
 
-## OP2.1 — Élaborer le certificat de service fait (rédacteur)
-- **Événement** : « Création d'un CSF » (externe, rédacteur = demandeur initial ou RC du demandeur) — **point d'entrée du processus 2**.
-- **Synchronisation (gardes)** : FAD au statut FAD_COMMANDEE (R1) ; au moins un justificatif joint (R5).
-- **Actions** : saisie montant constaté, date de service fait, description ; dépôt des justificatifs (PV réception, bon de livraison).
-- **Règles d'émission** : transmission au RC.
-- **Résultat** : **CSF_A_TRAITER**.
+> **Refonte du 24/09/2026 (circuit sans rejet ni annulation, demande client).** Les opérations ci-dessous remplacent la version D1-D9 du 23/08/2026, jamais implémentée. Principe directeur : le circuit CSF ne connaît que la transmission, la demande de complément (toujours non terminale, reprise en place puis retransmission) et la suppression physique (mécanisme d'abandon, hors référentiel de statuts) — aucun rejet, aucune annulation, à la différence du Processus 1. Voir MCD §5-§6, MLD §3.
 
-## OP2.2 — Statuer sur le CSF (RC)
-- **Événements** : CSF_A_TRAITER ; *ou* « CSF resoumis » (reprise après rejet).
+## OP2.1 — Élaborer et transmettre le certificat de service fait (rédacteur)
+- **Événements** : « Besoin de constater le service fait » (externe, rédacteur = demandeur initial ou RC du demandeur — R3) ; *ou* « CSF à compléter, reprise après demande du RC » (depuis CSF_A_COMPLETER_RC).
+- **Synchronisation (gardes)** : FAD au statut FAD_COMMANDEE (R1).
+- **Actions** — *(création progressive, même modèle que la DA — décision du 07/09/2026 côté FAD, motivée par le même constat : un dépôt de fichier Storage ne peut pas être transactionnel)* : dès le clic « Nouveau CSF » (ou l'ouverture de la reprise), un brouillon CERTIFICAT_SERVICE_FAIT est créé immédiatement (CSF_EN_PREPARATION) ; saisie du montant constaté, de la date de service fait, de la description, dépôt des justificatifs (PV réception, bon de livraison) ; transmission au RC. Le rédacteur peut à tout moment, tant que le CSF n'a pas quitté sa propre file, le supprimer physiquement (CSF_EN_PREPARATION ou CSF_A_COMPLETER_RC — R7) au lieu de le transmettre.
+- **Règles d'émission** : au moins un justificatif joint requis pour transmettre (R5).
+- **Résultat** : **CSF_A_TRAITER** (même code pour la transmission initiale et pour une resoumission après complément) ; *ou*, en cas de suppression, fin de cycle sans nouveau statut (l'enregistrement disparaît).
+
+## OP2.2 — Contrôler et statuer sur le CSF (RC)
+- **Événement** : CSF_A_TRAITER (transmission initiale ou resoumission après complément — même code dans les deux cas).
 - **Synchronisation** : —
-- **Actions** : contrôle du service fait ; décision.
-- **Règles d'émission** : validé → transmission à la CB ; rejeté → CSF rejeté (modification en place possible, puis resoumission ; suppression physique permise tant que rejeté — R4).
-- **Résultats** : **CSF_TRANSMIS_BUDGET** | **CSF_REJETE_RC**.
+- **Actions** : contrôle du justificatif et du montant constaté ; **édition en place** possible (remplacement du justificatif, modification du montant) directement depuis l'écran de contrôle, **sans changement de statut** (aucune ligne HISTORIQUE_STATUT_CSF, sur le modèle de l'enregistrement intermédiaire d'OP1.2b) ; puis décision.
+- **Règles d'émission** :
+  - transmis → CSF_TRANSMIS_BUDGET ;
+  - complément demandé → CSF à compléter, reprise en place **par le rédacteur** — **pas de duplication** ;
+  - supprimé → fin de cycle, aucune trace de statut supplémentaire (R7).
+- **Résultats** : **CSF_TRANSMIS_BUDGET** | **CSF_A_COMPLETER_RC** | *(suppression physique, hors référentiel de statuts)*.
+- *(Aucune issue « rejeté » : le RC ne dispose que de la transmission, de la demande de complément et de la suppression.)*
 
-## OP2.3 — Valider le CSF et déclencher le paiement (CB / Budget)
-- **Événement** : CSF_TRANSMIS_BUDGET.
+## OP2.3 — Contrôler les éléments budgétaires et statuer (CB)
+- **Événements** : CSF_TRANSMIS_BUDGET (transmission initiale ou retransmission après complément — même code dans les deux cas).
 - **Synchronisation** : calcul du cumul des CSF validés de la FAD.
-- **Actions** : contrôle budgétaire/comptable ; décision.
+- **Actions** : contrôle budgétaire/comptable ; décision — **jamais d'édition** du justificatif ni du montant (prérogative exclusive du RC, cf. OP2.2).
 - **Règles d'émission** :
   - validé → paiement déclenché dans le PGI (message sortant) ; **si** cumul des CSF validés > MONTANT_COMMANDE → **alerte** (non bloquant, R2) ;
-  - rejeté → CSF rejeté ; reprise ouverte **au rédacteur et au RC** (R4).
-- **Résultats** : **CSF_VALIDE_BUDGET** | **CSF_REJETE_BUDGET**.
+  - complément demandé → CSF à compléter, reprise en place **par le RC**, qui retransmet directement à la CB (CSF_A_COMPLETER_BUDGET, retransmission → repasse CSF_TRANSMIS_BUDGET) — **pas de duplication**.
+- **Résultats** : **CSF_VALIDE_BUDGET** | **CSF_A_COMPLETER_BUDGET**.
+- *(La CB ne dispose ni du rejet ni de l'annulation, à la différence du reste du circuit budgétaire du Processus 1 — elle ne juge que la conformité, jamais l'opportunité, et ne peut jamais mettre fin au cycle elle-même.)*
 
 ## OP2.4 — Constater la liquidation de la facture (retour PGI)
 - **Événement** : « Facture liquidée dans le PGI » (**externe**, constatée par la CB).
@@ -216,6 +224,17 @@ Aucune donnée manquante identifiée à ce stade.
 - Rejet/annulation devenus terminaux sans resoumission assistée (refonte du 06/09/2026) : à confirmer que c'est bien l'intention — un nouveau besoin repart d'une DA créée manuellement (OP1.1), sans lien conservé avec la DA/FAD rejetée ou annulée.
 
 # Historique
+- 24/09/2026 (démarrage de l'implémentation Phase 2 — refonte complète du circuit CSF, demande client) : Processus 2 entièrement réécrit (OP2.1-OP2.4), remplace la version D1-D9 du 23/08/2026, jamais implémentée. Principe directeur : **aucun rejet, aucune annulation** dans le circuit CSF — seulement transmission, demande de complément (toujours non terminale) et suppression physique. Changements : (1) OP2.1 adopte le modèle de création progressive de la DA (CSF_EN_PREPARATION dès le clic, même contrainte d'upload non transactionnel) et le rédacteur peut y supprimer physiquement son CSF ; (2) OP2.2 (RC) gagne une édition en place du justificatif/montant sans changement de statut (comme l'enregistrement intermédiaire d'OP1.2b), et ses trois issues sont transmettre / demander un complément (CSF_A_COMPLETER_RC, remplace CSF_REJETE_RC) / supprimer physiquement — plus d'issue « rejeté » ; (3) OP2.3 (CB) perd toute issue de rejet/annulation, ne dispose que de valider ou demander un complément (CSF_A_COMPLETER_BUDGET, remplace CSF_REJETE_BUDGET), et ne modifie jamais rien elle-même ; (4) OP2.4 inchangée. Répercuté dans le MCD (§3-§6, Note de lecture, Historique) et le MLD (§3, §4, §7).
+- 23/09/2026 (demande client — réponse libre après complément/modification) : les trois boucles
+  de reprise qui remontent à un acteur amont (OP1.2b après demande de complément du CDS,
+  OP1.4 après demande de modification de la CB, OP1.5 après demande de complément du DS)
+  gagnent un champ de réponse libre facultatif, saisi juste avant la retransmission, en plus
+  du motif d'origine désormais toujours affiché en lecture seule (jusqu'ici absent pour la
+  reprise OP1.2b, seule la reprise OP1.4 l'affichait). Le texte saisi est tracé comme une
+  **nouvelle ligne** HISTORIQUE_STATUT portée par la transmission — jamais un ajout au
+  commentaire d'origine, HISTORIQUE_STATUT restant immuable (aucune ligne existante n'est
+  jamais modifiée). Répercuté dans le MCD/MLD (HISTORIQUE_STATUT, COMMENTAIRE_STATUT) et le
+  MOT (écrans de reprise RC/CB).
 - 16/09/2026 (audit de cohérence CDC — conditions de transmission de la FAD formalisées et sécurisées, ajout de l'enregistrement intermédiaire) : deux ajouts à OP1.2b, jamais documentés dans aucune version antérieure de ce MCT. (1) **Règles d'émission explicitées** : la liste complète des conditions de transmissibilité (objet/description RC renseignés, site/secteur obligatoires — sous-site/sous-secteur optionnels —, CUG/type d'achat/type de FAD obligatoires, imputation comptable obligatoire avec numéro d'opération si investissement, **et** persistance des conditions déjà vérifiées à OP1.1) est désormais écrite noir sur blanc, alors qu'elle n'était qu'implicite jusqu'ici (« Localisation, imputation, TYPE_ACHAT, TYPE_FAD obligatoires » ne couvrait ni objet/description RC ni le rappel des conditions OP1.1) — chaque condition est désormais **revérifiée explicitement** côté application au moment de la transmission (`assertFadTransmissible`, backend/src/services/demandeAchat.service.ts), pas seulement garantie par construction via le verrou de modification de la DA. (2) **Enregistrement intermédiaire** (bouton « Enregistrer » dans l'écran « Traiter ») : sauvegarde la saisie en cours sans transmettre ni changer de statut, aucun champ obligatoire (sauf le libellé du motif si `Autre`) — nouvelle route `PUT /demandes-achat/:id/fad`, disponible sur DA_VALIDEE_RC/FAD_A_COMPLETER_CDS **et** FAD_A_MODIFIER_CB (reprise CB, OP1.4). Répercuté dans le MCD (Historique) et le MLD (§2.4).
 - 16/09/2026 (écran de suivi RC — renversement de la fusion décision+complétion, ajout de « Dévalider », même jour que l'entrée ci-dessous) : OP1.2 revient sur la fusion décrite juste en dessous, décidée puis annulée le jour même après retour utilisateur sur l'enchaînement de travail réel du RC. OP1.2 redevient purement décisionnelle : écran renommé « Valider les éléments de la commande » (visualisation seule — objet/description/montant, entreprises consultées + montant de leur devis en HORS_MARCHE, numéro + libellé du marché en MARCHE, gestion documentaire en consultation seule), Valider/Compléter/Rejeter/Annuler, aucun champ de complétion saisi à cette étape. Les champs de complétion OP1.2b (localisation, imputation, TYPE_ACHAT, TYPE_FAD, ainsi qu'OBJET_RC/DESCRIPTION_RC/MOTIF_CHOIX/LIBELLE_MOTIF_CHOIX) restent éditables uniquement dans l'écran « Traiter » dédié, une fois DA_VALIDEE_RC/FAD_A_COMPLETER_CDS — où la gestion documentaire redevient accessible **en modification**. Le bouton « Transmettre » (OP1.2b) n'est actionnable que sur ces deux statuts. **Nouveau : « Dévalider »** — depuis « Valider les éléments de la commande » rouverte sur une DA_VALIDEE_RC, le RC revient sur sa propre décision (réinsère DA_TRANSMISE_DEM_RC dans l'historique, aucun nouveau code statut, aucun commentaire obligatoire) ; ne s'applique jamais à un rejet ou une annulation, tous deux terminaux et irréversibles (décision du 06/09/2026 inchangée). Répercuté dans le MCD/MLD non modifiés sur ce point précis (TYPE_FAD et l'extension du périmètre RC sur MOTIF_CHOIX, actées par l'entrée ci-dessous, restent valables).
 - 16/09/2026 (écran de suivi RC — fusion de la saisie des champs de complétion avec la décision OP1.2, définition de TYPE_FAD ; **partiellement renversée le jour même, voir l'entrée au-dessus**) : OP1.2 et OP1.2b mises à jour — le RC peut désormais reformuler OBJET_RC/DESCRIPTION_RC/MOTIF_CHOIX/LIBELLE_MOTIF_CHOIX et renseigner les champs de complétion (localisation, imputation, TYPE_ACHAT, TYPE_FAD) dès OP1.2, avant même de statuer ; « Valider » les enregistre dans le même appel que la décision (ces champs deviennent alors obligatoires), tandis que rejeter/annuler/demander un complément les laissent facultatifs. La transmission au CDS (OP1.2b) reste un geste distinct et délibéré, décision du 14/09/2026 inchangée — seule la *saisie* peut désormais commencer plus tôt. TYPE_FAD (CONTRAT | OUVERTE | FERMEE), présent dans le MCD/MLD depuis l'origine mais jamais défini ni implémenté, reçoit sa définition métier : Fermée = action unique à prix forfaitaire ; Contrat = contrat annuel à montant connu, prestations récurrentes (ex. entretien climatisation) ; Ouverte = enveloppe pour travaux dont l'objet n'est pas connu à l'avance (ex. petites réparations de plomberie) — obligatoire au même titre que TYPE_ACHAT. MOTIF_CHOIX/LIBELLE_MOTIF_CHOIX, jusqu'ici posés une fois pour toutes par le Demandeur à OP1.1, restent modifiables par le RC à OP1.2/OP1.2b (pertinent surtout en HORS_MARCHE — en MARCHE le motif reste automatiquement `Prix`). Répercuté dans le MCD (§ Cœur métier) et le MLD (§2.4).

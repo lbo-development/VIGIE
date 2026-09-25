@@ -146,7 +146,8 @@ describe('CompleterCbModal', () => {
   it('affiche le motif du DS extrait du dernier FAD_A_COMPLETER_CB de l\'historique', async () => {
     render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
 
-    expect(await screen.findByText(/Motif du DS : Précisez le numéro d'opération\./)).toBeInTheDocument()
+    expect(await screen.findByText('Précisez le numéro d\'opération.')).toBeInTheDocument()
+    expect(screen.getByText('DS')).toBeInTheDocument()
   })
 
   it('demande l\'historique avec le rôle CB explicite', () => {
@@ -195,7 +196,7 @@ describe('CompleterCbModal', () => {
     completerCbMock.mockResolvedValue(DA)
     render(<CompleterCbModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
 
-    fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Numéro d\'opération ajouté.' } })
+    fireEvent.change(screen.getByLabelText('Vous (facultatif)'), { target: { value: 'Numéro d\'opération ajouté.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Retransmettre au DS' }))
 
     await waitFor(() =>

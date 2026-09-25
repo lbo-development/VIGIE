@@ -446,7 +446,7 @@ describe('Home — Historique des statuts', () => {
     expect(await screen.findByText('en suppléance de Alice MARTIN')).toBeInTheDocument()
   })
 
-  it('affiche une icône œil dans la colonne Commentaire quand il est renseigné, "—" sinon ; le clic ouvre le commentaire complet', async () => {
+  it('affiche le commentaire directement sous l\'entrée quand il est renseigné, aucun encart sinon (décision du 23/09/2026 — fil chronologique, plus d\'icône œil ni de 3e modale)', async () => {
     getHistoriqueMock.mockResolvedValue([
       {
         idHisto: 1,
@@ -474,13 +474,52 @@ describe('Home — Historique des statuts', () => {
     fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
     const dialog = await screen.findByRole('dialog', { name: /Historique des statuts/ })
 
-    expect(within(dialog).queryByText('Achat non pertinent pour le service.')).not.toBeInTheDocument()
-    expect(within(dialog).getAllByText('—')).toHaveLength(1)
+    expect(await within(dialog).findByText('Achat non pertinent pour le service.')).toBeInTheDocument()
+    // L'entrée DA_EN_PREPARATION n'a pas de commentaire — un seul badge de statut "Rejetée par
+    // N+1" attendu, pas de second encart de commentaire pour "DA en préparation".
+    expect(within(dialog).getByText('DA en préparation')).toBeInTheDocument()
+  })
 
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Voir le commentaire' }))
+  it('trie les lignes du plus récent au plus ancien (décision du 23/09/2026)', async () => {
+    getHistoriqueMock.mockResolvedValue([
+      {
+        idHisto: 1,
+        codeStatut: 'DA_EN_PREPARATION',
+        libelleStatut: 'DA en préparation',
+        dateHeure: '2026-09-08T09:00:00Z',
+        matriculeActeur: '10001',
+        acteurNomPrenom: 'Alice MARTIN',
+        suppleanceLabel: null,
+        commentaireStatut: null,
+      },
+      {
+        idHisto: 2,
+        codeStatut: 'DA_TRANSMISE_DEM_RC',
+        libelleStatut: 'Transmise au N+1',
+        dateHeure: '2026-09-10T09:00:00Z',
+        matriculeActeur: '10001',
+        acteurNomPrenom: 'Alice MARTIN',
+        suppleanceLabel: null,
+        commentaireStatut: null,
+      },
+      {
+        idHisto: 3,
+        codeStatut: 'DA_VALIDEE_RC',
+        libelleStatut: 'Validée par N+1',
+        dateHeure: '2026-09-09T09:00:00Z',
+        matriculeActeur: '20002',
+        acteurNomPrenom: 'Jean DUPONT',
+        suppleanceLabel: null,
+        commentaireStatut: null,
+      },
+    ])
+    render(<Home />)
 
-    const commentDialog = await screen.findByRole('dialog', { name: 'Commentaire' })
-    expect(within(commentDialog).getByText('Achat non pertinent pour le service.')).toBeInTheDocument()
+    fireEvent.click(within(screen.getByText('2026-09-08-001').closest('article')!).getByRole('button', { name: 'Historique des statuts' }))
+    const dialog = await screen.findByRole('dialog', { name: /Historique des statuts/ })
+
+    const badges = await within(dialog).findAllByText(/Transmise au N\+1|Validée par N\+1|DA en préparation/)
+    expect(badges.map((el) => el.textContent)).toEqual(['Transmise au N+1', 'Validée par N+1', 'DA en préparation'])
   })
 })
 

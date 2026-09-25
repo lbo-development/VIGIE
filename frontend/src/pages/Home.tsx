@@ -16,6 +16,9 @@ import { Combobox } from '../components/Combobox'
 import { MetricCard } from '../components/MetricCard'
 import { DemandeAchatModal, DeleteDemandeAchatModal, GestionDocumentaireModal } from '../components/demandeAchat/modals'
 import { HistoriqueStatutsModal } from '../components/demandeAchat/HistoriqueStatutsModal'
+import { CertificatsServiceFaitModal } from '../components/certificatServiceFait/modals'
+import { FacturationPanel } from '../components/certificatServiceFait/FacturationPanel'
+import { useSyntheseFacturation } from '../hooks/useCertificatServiceFait'
 import { DemandeAchatCard } from '../components/demandeAchat/DemandeAchatCard'
 import { STATUT_LABELS, ACCUEIL_SCOPE_STATUTS, CURRENCY_FORMAT } from '../components/demandeAchat/constants'
 import { ApiError } from '../services/api'
@@ -74,6 +77,7 @@ export function Home() {
   }, [activeTab])
 
   const { data: synthese, loading: syntheseLoading, error: syntheseError, refetch: refetchSynthese } = useAccueilSynthese()
+  const { data: syntheseFacturation, error: syntheseFacturationError } = useSyntheseFacturation()
 
   const { fournisseurs } = useFournisseurs(idService)
   const fournisseurOptions = fournisseurs.map((f) => ({ value: String(f.id_fournisseur), label: f.raison_sociale_service }))
@@ -133,6 +137,7 @@ export function Home() {
   const [gestionDocumentaireDa, setGestionDocumentaireDa] = useState<DemandeAchatRow | null>(null)
   const [historiqueDa, setHistoriqueDa] = useState<DemandeAchatRow | null>(null)
   const [confirmTransmettreDa, setConfirmTransmettreDa] = useState<DemandeAchatRow | null>(null)
+  const [csfDa, setCsfDa] = useState<DemandeAchatRow | null>(null)
 
   async function handleNouvelleDemande() {
     if (!matricule) return
@@ -165,7 +170,7 @@ export function Home() {
   }
 
   return (
-    <div className="stack">
+    <div className="stack tdb-page-fill">
       <div className="page-heading">
         <div>
           <h1>Bienvenue, {displayName}</h1>
@@ -191,8 +196,8 @@ export function Home() {
       {/* accueil-tiles-grid : réduit de 30% la colonne des tuiles par rapport au ratio par défaut de
           .demo-grid (gpmm.css, minmax(280px,.7fr)) — règle ajoutée dans styles/tableauDeBord.css,
           uniquement au-delà du même seuil que le repli mobile de .demo-grid (gpmm.css ne bouge pas). */}
-      <div className="demo-grid accueil-tiles-grid">
-      <div className="gp-panel">
+      <div className="demo-grid accueil-tiles-grid tdb-grid-fill">
+      <div className="gp-panel tdb-panel-fill">
         <div className="gp-tabs" role="tablist">
           {TABS.map((tab) => (
             <button
@@ -208,7 +213,7 @@ export function Home() {
           ))}
         </div>
 
-        <div className="stack" style={{ padding: '16px 0 0' }}>
+        <div className="stack tdb-body-fill" style={{ padding: '16px 0 0' }}>
           <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <div className="row" style={{ flexWrap: 'wrap', flex: 1 }}>
               <div className="gp-field" style={{ width: 260 }}>
@@ -279,7 +284,7 @@ export function Home() {
           )}
           {listError && <p className="gp-errmsg">{listError}</p>}
 
-          <div className="gp-scroll stack" style={{ maxHeight: 'calc(70vh - 70px)', gap: 10 }}>
+          <div className="gp-scroll stack tdb-list-fill" style={{ gap: 10 }}>
             {listLoading && <p className="gp-help">Chargement…</p>}
             {!listLoading && demandesAchat.length === 0 && (
               <p className="gp-help">{!matricule ? 'Chargement du profil…' : 'Aucune demande pour ce filtre.'}</p>
@@ -338,6 +343,15 @@ export function Home() {
                             </button>
                           </span>
                         </>
+                      )}
+                      {da.code_statut === 'FAD_COMMANDEE' && (
+                        <span className="gp-tip" data-tip="Certificats de service fait">
+                          <button aria-label="Certificats de service fait" onClick={() => setCsfDa(da)}>
+                            <svg className="ti">
+                              <use href="#i-circle-check" />
+                            </svg>
+                          </button>
+                        </span>
                       )}
                       <span className="gp-tip" data-tip="Voir les éléments de la demande">
                         <button
@@ -411,6 +425,8 @@ export function Home() {
             />
           </div>
         </div>
+
+        <FacturationPanel synthese={syntheseFacturation} error={syntheseFacturationError} />
       </div>
       </div>
 
@@ -504,6 +520,10 @@ export function Home() {
 
       {historiqueDa && (
         <HistoriqueStatutsModal idDemandeAchat={historiqueDa.id_demande_achat} numero={historiqueDa.numero} onClose={() => setHistoriqueDa(null)} />
+      )}
+
+      {csfDa && (
+        <CertificatsServiceFaitModal idDemandeAchat={csfDa.id_demande_achat} numeroFad={csfDa.numero} onClose={() => setCsfDa(null)} />
       )}
     </div>
   )

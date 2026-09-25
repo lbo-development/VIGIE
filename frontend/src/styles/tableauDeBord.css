@@ -85,3 +85,46 @@
 .accueil-da-card .gp-rowacts button {
   font-size: 20px;
 }
+
+/* Liste de FAD/CSF remplissant la hauteur de fenêtre disponible (décision du 24/09/2026,
+   remplace un plafond fixe `max-height:calc(70vh - 70px)` qui laissait un vide sous la liste
+   sur les grands écrans) — chaîne flex de la racine de page (.stack, déjà flex-column dans
+   gpmm.css) jusqu'à la liste scrollable elle-même, en passant par `.demo-grid` (grid, mais
+   valide comme item flex) et le `.gp-panel` de gauche. Partagée par pages/Home.tsx et tous les
+   écrans de suivi (SuiviRc/SuiviCds/SuiviCb/SuiviDs/SuiviCsfRc/SuiviCsfCb.tsx), qui utilisent
+   tous exactement la même structure à 2 colonnes (liste + tuiles de synthèse). N'y touche pas :
+   `.content-area` (gpmm.css) reste `overflow:auto`, filet de sécurité si le contenu déborde
+   malgré tout (ex. très petite fenêtre).
+   - .tdb-page-fill : racine de page, hérite la hauteur réelle de .content-area.
+   - .tdb-grid-fill : le `.demo-grid` à 2 colonnes, grandit pour occuper l'espace restant sous
+     le page-heading (et le bandeau de suppléance le cas échéant).
+   - .tdb-panel-fill : le `.gp-panel` de gauche (onglets + liste), grandit à la hauteur de sa
+     cellule de grille et redevient lui-même un conteneur flex-column.
+   - .tdb-body-fill : le `.stack` interne (filtres + liste), grandit pour occuper l'espace sous
+     les onglets.
+   - .tdb-list-fill : la liste elle-même — remplace `max-height:calc(70vh - 70px)`. */
+.tdb-page-fill {
+  height: 100%;
+  min-height: 0;
+}
+.tdb-grid-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.tdb-panel-fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.tdb-body-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tdb-list-fill {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}

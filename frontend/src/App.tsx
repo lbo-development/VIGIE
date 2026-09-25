@@ -10,6 +10,8 @@ import { SuiviRc } from './pages/SuiviRc'
 import { SuiviCds } from './pages/SuiviCds'
 import { SuiviCb } from './pages/SuiviCb'
 import { SuiviDs } from './pages/SuiviDs'
+import { SuiviCsfRc } from './pages/SuiviCsfRc'
+import { SuiviCsfCb } from './pages/SuiviCsfCb'
 import { GisementGeographique } from './pages/GisementGeographique'
 import { GisementTechnique } from './pages/GisementTechnique'
 import { Reglages } from './pages/Reglages'
@@ -59,6 +61,8 @@ function App() {
               <Route path="/suivi-cds" element={<SuiviCds />} />
               <Route path="/suivi-cb" element={<SuiviCb />} />
               <Route path="/suivi-ds" element={<SuiviDs />} />
+              <Route path="/suivi-csf-rc" element={<SuiviCsfRc />} />
+              <Route path="/suivi-csf-cb" element={<SuiviCsfCb />} />
               <Route path="/parametres/gisement-geographique" element={<GisementGeographique />} />
               <Route path="/parametres/gisement-technique" element={<GisementTechnique />} />
               <Route path="/parametres/reglages" element={<Reglages />} />

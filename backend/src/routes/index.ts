@@ -21,6 +21,7 @@ import investissementRoutes from './investissement.routes.js'
 import investissementImportRoutes from './investissementImport.routes.js'
 import investissementPieceRoutes from './investissementPiece.routes.js'
 import demandeAchatRoutes from './demandeAchat.routes.js'
+import certificatServiceFaitRoutes from './certificatServiceFait.routes.js'
 import acteurRoutes from './acteur.routes.js'
 import roleAttributionRoutes from './roleAttribution.routes.js'
 import suppleanceRoutes from './suppleance.routes.js'
@@ -53,6 +54,7 @@ router.use('/investissements', investissementRoutes)
 router.use('/investissements/import', investissementImportRoutes)
 router.use('/investissements/pieces', investissementPieceRoutes)
 router.use('/demandes-achat', demandeAchatRoutes)
+router.use('/certificats-service-fait', certificatServiceFaitRoutes)
 router.use('/acteurs', acteurRoutes)
 router.use('/role-attributions', roleAttributionRoutes)
 router.use('/suppleances', suppleanceRoutes)

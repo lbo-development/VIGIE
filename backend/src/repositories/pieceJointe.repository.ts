@@ -112,3 +112,65 @@ export async function removeFile(path: string): Promise<void> {
   const { error } = await supabase.storage.from(BUCKET).remove([path])
   if (error) throw error
 }
+
+/**
+ * Justificatifs CSF (Phase 2, décision du 24/09/2026) — même table, même
+ * bucket, rattachement exclusif via ID_CSF plutôt que ID_DEMANDE_ACHAT (voir
+ * migration 20260924100000, CHECK chk_pj_rattachement_exclusif). Pas de
+ * ID_FOURNISSEUR en contexte CSF (n'a de sens qu'en contexte DA). TYPE_PIECE
+ * contraint par le domaine dédié TYPE_PIECE_CSF (migration 20260924150000),
+ * PV_RECEPTION | BON_LIVRAISON | AUTRE — distinct de TYPE_PIECE_FAD.
+ */
+export interface PieceJointeCsf {
+  id_piece: number
+  id_csf: number
+  type_piece: string
+  origine: OriginePiece
+  nom_fichier_original: string
+  storage_path: string
+  taille_octets: number
+}
+
+const SELECT_COLUMNS_CSF = 'id_piece, id_csf, type_piece, origine, nom_fichier_original, storage_path, taille_octets'
+
+export async function findAllByCsf(idCsf: number): Promise<PieceJointeCsf[]> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('piece_jointe')
+    .select(SELECT_COLUMNS_CSF)
+    .eq('id_csf', idCsf)
+    .order('id_piece', { ascending: true })
+  if (error) throw error
+  return (data ?? []) as PieceJointeCsf[]
+}
+
+export interface PieceJointeCsfCreateInput {
+  id_csf: number
+  type_piece: string
+  origine: OriginePiece
+  nom_fichier_original: string
+  storage_path: string
+  taille_octets: number
+}
+
+export async function findByIdCsf(idPiece: number): Promise<PieceJointeCsf | null> {
+  const { data, error } = await supabase.schema('finances').from('piece_jointe').select(SELECT_COLUMNS_CSF).eq('id_piece', idPiece).maybeSingle()
+  if (error) throw error
+  return data as PieceJointeCsf | null
+}
+
+export async function createForCsf(input: PieceJointeCsfCreateInput): Promise<PieceJointeCsf> {
+  const { data, error } = await supabase
+    .schema('finances')
+    .from('piece_jointe')
+    .insert({ ...input, domaine_type_piece: 'TYPE_PIECE_CSF' })
+    .select(SELECT_COLUMNS_CSF)
+    .single()
+  if (error) throw error
+  return data as PieceJointeCsf
+}
+
+/** Chemin neutre côté serveur (jamais le nom fourni par l'utilisateur — SECURITY.md §10). */
+export function buildStoragePathCsf(idCsf: number): string {
+  return `csf/${idCsf}/${randomUUID()}.pdf`
+}

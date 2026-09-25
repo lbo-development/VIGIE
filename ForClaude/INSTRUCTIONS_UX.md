@@ -93,6 +93,20 @@ gabarit, comportement en React) — jamais improviser un composant visuellement 
 et jamais copier le balisage `data-*` du gabarit en supposant que `app.js` le fera
 fonctionner.
 
+### Écart assumé : fil chronologique de `HistoriqueStatutsModal.tsx`
+
+`gpmm-style-guide.html` ne propose aucun composant de type "fil"/timeline. L'affichage de
+l'historique des statuts d'une DA/FAD (décision du 23/09/2026, à la demande explicite de
+l'utilisateur, qui a validé un exemple avant implémentation) déroge donc sciemment à la règle
+ci-dessus : ligne verticale, point coloré par tonalité de statut, entrées sans commentaire
+compactes sur une ligne, commentaire affiché dans un encart teinté sous l'entrée quand il
+existe. Toutes les valeurs visuelles restent des variables `--gp-*` existantes (`--gp-info`/
+`--gp-success`/`--gp-warning`/`--gp-danger` et leurs `-bg`/`-text`, `--gp-border`,
+`--gp-radius`) — seule la structure (ligne + points au lieu d'un tableau) est nouvelle. Ne pas
+réutiliser cette structure ailleurs sans repasser par la même démarche (proposer un exemple,
+obtenir l'accord) ; si un vrai composant de fil chronologique devient un besoin récurrent, il
+mériterait d'être proposé au template partagé GPMM plutôt que dupliqué dans VIGIE seule.
+
 ### Panneaux flottants (`.gp-menu`, `.gp-dp__panel`…) dans un conteneur scrollable
 
 `.gp-menu` (Combobox) et `.gp-dp__panel` (DatePicker) sont en `position:absolute` dans

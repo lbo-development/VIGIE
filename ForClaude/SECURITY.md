@@ -333,12 +333,15 @@ accès** à n'importe quel rôle (sauf `service_role`, qui contourne la RLS par 
 le `GRANT` large au niveau table (`anon`/`authenticated` avaient `SELECT`/`INSERT`/`UPDATE`/
 `DELETE`/`TRUNCATE`/`REFERENCES`/`TRIGGER` sur absolument tout, vraisemblablement un `GRANT
 ALL ... TO anon, authenticated` exécuté globalement à un moment non documenté) ne s'applique
-donc jamais : la RLS bloque en amont. Les tables sans policy explicite
+donc jamais : la RLS bloque en amont. Les tables sans policy explicite **à cette date**
 (`acteur`, `certificat_service_fait`, `demande_achat`, `devis_consulte`, `historique_statut`,
 `historique_statut_csf`, `marche`, `operation_investissement`, `piece_jointe`,
 `role_attribution`, `statut`, `statut_csf`, `suppleance` — `fournisseur`/`contact` en faisaient
 partie jusqu'à l'exécution des migrations du 29/08/2026) sont donc **inaccessibles en pratique
-à `anon` et `authenticated`**, pas ouvertes.
+à `anon` et `authenticated`**, pas ouvertes. Depuis, `operation_investissement` (§2.8) et
+`suppleance` (§2.10) ont reçu des policies `SELECT` scopées ; `demande_achat`/
+`historique_statut`/`statut` aussi (§2.11), le 15/09/2026 — cette liste reste donc une photo
+du 30/08/2026, pas l'état courant.
 
 Deux correctifs réels appliqués malgré tout, en défense en profondeur (le GRANT large restait
 un filet de sécurité fragile — une policy trop permissive ajoutée par erreur, ou une RLS
@@ -367,6 +370,23 @@ risque pratique aujourd'hui — mais porte le même GRANT excessif (`anon` inclu
 `TRUNCATE`). Ne pas y toucher unilatéralement : contrairement à `finances.*`, cette table
 n'appartient pas qu'à VIGIE, un durcissement y nécessite une coordination avec qui gère
 `escales`.
+
+**Régression constatée et corrigée le 23/09/2026** : Security Advisor Supabase a signalé
+`public.profiles` en `rls_disabled_in_public` (RLS désactivée) — la policy `profiles_select_self`
+décrite ci-dessus existait toujours (les policies ne disparaissent pas quand la RLS est
+désactivée sur une table), seule la RLS elle-même avait été désactivée, par un mécanisme non
+identifié (accès direct au projet Supabase partagé par une autre équipe, ou restauration
+partielle). Corrigé par `supabase/migrations/20260923090000_reactive_rls_profiles.sql`
+(réactivation seule, aucune policy recréée). Cette régression a mené à découvrir un problème
+plus large : **aucune migration de ce dépôt n'a jamais été appliquée via `supabase db push`**
+(le schéma de suivi `supabase_migrations.schema_migrations` n'existe pas sur ce projet) — tout
+changement de schéma a été appliqué à la main dans l'éditeur SQL du dashboard, sans trace de ce
+qui a été réellement exécuté. C'est directement ce qui a permis à `demande_achat`/
+`historique_statut`/`statut` de rester sans policy en pratique malgré des migrations qui les
+ajoutaient dans ce dépôt depuis le 15/09/2026 (voir §2.11). Tant que ce point n'est pas résolu
+(migration CLI fonctionnelle, ou reconstitution de l'historique via `supabase migration
+repair`), toute nouvelle migration doit être vérifiée en base après application manuelle — la
+présence du fichier dans `supabase/migrations/` ne garantit rien sur l'état réel du projet.
 
 **Constat annexe, hors du périmètre de cet audit** : plusieurs policies déjà en place en base
 (`site_insert_admin`, `site_update_admin`, `sous_site_insert_admin`, `sous_site_update_admin`,
@@ -473,6 +493,83 @@ Points de sécurité à ne pas manquer :
 - **Liste des suppléants candidats** (écran de déclaration) : construite côté serveur à partir
   du périmètre du rôle (acteurs actifs du service / de la direction), jamais fournie par le
   client ; le trigger revérifie de toute façon à l'insertion.
+
+### 2.11 Demande d'achat / FAD (`finances.demande_achat`, `finances.historique_statut`, `finances.statut`)
+
+Ces trois tables faisaient partie de la liste sans policy du 30/08/2026 (§2.7) — RLS activée,
+accès refusé par défaut à `anon`/`authenticated`, réservé à `service_role` (tout le circuit
+DA/FAD passe par le backend Express). Deux migrations du 15/09/2026 leur ont ajouté des
+policies `SELECT` explicites, en défense en profondeur (aucun accès direct frontend/Supabase
+n'est utilisé aujourd'hui pour ces tables, même règle que §2.6/§2.9) :
+
+- **`finances.statut`** (`supabase/migrations/20260915100000_rls_statut_lecture_ouverte.sql`) :
+  lecture ouverte à tout utilisateur authentifié (`statut_select_authenticated`,
+  `public.current_user_matricule() is not null`) — référentiel transverse des 25 statuts,
+  aucune notion de périmètre, comme `libelle_referentiel` (§2.9). Aucune policy
+  `INSERT`/`UPDATE`/`DELETE` : ce référentiel est figé par migration
+  (`ForClaude/CDC/code_statut.pdf`), jamais modifié par l'application.
+- **`finances.demande_achat`/`finances.historique_statut`**
+  (`supabase/migrations/20260915110000_rls_demande_achat_historique_select.sql`) : lecture
+  scopée via `finances.can_view_demande_achat(id_demande_achat)` (`security definer`) —
+  demandeur propriétaire, ou rôle dont le périmètre couvre la DA/FAD (RC de la cellule du
+  demandeur, CDS/CB/ADMIN_SERVICE du service, DS de la direction, ADMIN_APP transverse), même
+  matrice de périmètre que `can_view_suppleance` (§2.10). Aucune policy
+  `INSERT`/`UPDATE`/`DELETE` pour `authenticated` : toute écriture métier (création,
+  transitions de statut OP1.1 à OP1.6) passe exclusivement par le backend Express — les règles
+  de garde (statut courant, périmètre exact, champs à écrire en plus du statut) sont trop
+  complexes pour être reproduites fidèlement en RLS.
+- **Correctif du 23/09/2026** (`supabase/migrations/20260923100000_fix_can_view_demande_achat_cast.sql`) :
+  `can_view_demande_achat` appelait `finances.current_user_has_role('ADMIN_SERVICE',
+  da.id_service)` (et de même pour `id_direction`/`id_cellule`) sans caster ces colonnes
+  `bigint` vers `integer`, le type attendu par `current_user_has_role` — Postgres ne caste
+  jamais implicitement `bigint` → `integer` (rétrécissement), la fonction échouait donc
+  systématiquement (`function … does not exist`). Découvert en tentant de rejouer
+  manuellement la migration du 15/09/2026 dans l'éditeur SQL (voir §2.7 addendum profiles :
+  aucune de ces deux migrations n'avait en réalité jamais été appliquée en base avant cette
+  date). Même correctif déjà appliqué ailleurs pour la même raison, voir
+  `20260920090000_suppleance_refonte_retrait_audit_perimetre.sql` (§2.10).
+
+### 2.12 Certificat de service fait / CSF (`finances.certificat_service_fait`, `finances.historique_statut_csf`, `finances.statut_csf`)
+
+Chantier du 24/09/2026 (démarrage de l'implémentation Phase 2 — voir
+`ForClaude/CDC/mcd-phases-1-2.md` §3-§6, `mct-phases-1-2.md` Processus 2). Ces
+3 tables préexistaient physiquement en base (créées hors de ce dépôt, comme
+`fournisseur`/`contact` en leur temps — voir §2.5), RLS activée sans aucune
+policy (même liste que `demande_achat`/`historique_statut` dans
+`20260830100000_harden_finances_grants.sql`, vérifié en lecture seule avant
+ce chantier : aucune policy existante, `certificat_service_fait` et
+`historique_statut_csf` vides). Quatre migrations (`20260924090000` à
+`20260924120000`) :
+
+- **`20260924090000`** : refonte `finances.statut_csf` — 7 valeurs, plus
+  aucun rejet ni annulation (voir MCD §3). DELETE + INSERT complet, sans
+  risque de violation de FK (tables filles vides à cette date).
+- **`20260924100000`** : `certificat_service_fait` gagne une clé technique
+  `id_csf` (même raisonnement que `demande_achat.id_demande_achat`,
+  `20260907130000`) — `numero_csf` n'est plus la PK. `historique_statut_csf`
+  et `piece_jointe` référencent désormais `id_csf`, plus `numero_csf`.
+  Corrige au passage `historique_statut_csf.id_histo_csf` (aucun `DEFAULT`
+  dans le schéma préexistant, jamais utilisable en l'état) en identity.
+  `historique_statut_csf.commentaire_motif` renommé `commentaire_statut`
+  (même mécanique que `historique_statut` côté FAD, réponse libre à une
+  reprise incluse).
+- **`20260924110000`** : trigger `trg_sync_statut_courant_csf` (même modèle
+  que `trg_sync_statut_courant` sur `demande_achat`, §2.11) + `REVOKE UPDATE
+  (code_statut_csf) ... FROM service_role` — le seul moyen de faire évoluer
+  le statut courant est un INSERT dans `historique_statut_csf`.
+- **`20260924120000`** : policies `SELECT` par défense en profondeur, même
+  principe que §2.11 — `finances.can_view_certificat_service_fait(id_csf)`
+  (`security definer`) autorise le rédacteur (`matricule_redacteur` ou
+  demandeur initial de la FAD), le RC de la cellule du demandeur, la CB du
+  service de la FAD, ou ADMIN_APP transverse. **Périmètre volontairement plus
+  étroit que `can_view_demande_achat`** : le MCD Phase 2 (§3) ne réutilise
+  explicitement que RC et CB comme rôles du circuit CSF, ni CDS, ni DS, ni
+  ADMIN_SERVICE — à revoir si ce périmètre s'avère trop restrictif à l'usage.
+  `finances.statut_csf` reçoit la même policy de lecture ouverte que
+  `finances.statut` (§2.11). Aucune policy `INSERT`/`UPDATE`/`DELETE` pour
+  `authenticated` : toute écriture métier (OP2.1 à OP2.4, y compris
+  l'édition en place du RC et les suppressions physiques R7) passe
+  exclusivement par le backend Express (`service_role`).
 
 ## 3. Validation et sanitization des données
 

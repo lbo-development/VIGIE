@@ -94,17 +94,27 @@ export function getAccueilSidebarItems(currentUser: MeResponse | null): NavItem[
   if (cbRole) items.push({ to: '/suivi-cb', label: `FAD (CB) — ${cbRole.perimeterLabel ?? ''}`, icon: 'iv-cb' })
   const dsRole = currentUser?.roles.find((r) => r.typeRole === 'DS')
   if (dsRole) items.push({ to: '/suivi-ds', label: `FAD (N+3) — ${dsRole.perimeterLabel ?? ''}`, icon: 'iv-ds' })
+  // Certificats de service fait (Phase 2, décision du 24/09/2026) : deux entrées dédiées,
+  // demandées explicitement par l'utilisateur (remplace une intégration initiale sous forme de
+  // section dans pages/SuiviRc.tsx/SuiviCb.tsx) — mêmes rôles que ci-dessus (RC/CB), pas de rôle
+  // CDS/DS dans le circuit CSF (MCD §3). Icône `i-circle-check` du sprite GPMM partagé (pas
+  // d'icône `iv-*` dédiée au concept CSF) plutôt que de réutiliser l'icône de rôle iv-rc/iv-cb,
+  // qui rendrait les deux entrées d'un même rôle indiscernables au premier coup d'œil.
+  if (rcRole) items.push({ to: '/suivi-csf-rc', label: `CSF — ${rcRole.perimeterLabel ?? ''}`, icon: 'i-circle-check' })
+  if (cbRole) items.push({ to: '/suivi-csf-cb', label: `CSF (CB) — ${cbRole.perimeterLabel ?? ''}`, icon: 'i-circle-check' })
   return items
 }
 
-/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC + suivi CDS + suivi CB + suivi DS — voir AppShell.tsx). */
+/** Vrai si la route courante appartient à la section "Accueil" (Accueil Demandeur + suivi RC + suivi CDS + suivi CB + suivi DS + suivi CSF RC/CB — voir AppShell.tsx). */
 export function isHomeSection(pathname: string): boolean {
   return (
     pathname === '/' ||
     pathname.startsWith('/suivi-rc') ||
     pathname.startsWith('/suivi-cds') ||
     pathname.startsWith('/suivi-cb') ||
-    pathname.startsWith('/suivi-ds')
+    pathname.startsWith('/suivi-ds') ||
+    pathname.startsWith('/suivi-csf-rc') ||
+    pathname.startsWith('/suivi-csf-cb')
   )
 }
 

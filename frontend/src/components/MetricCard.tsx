@@ -24,7 +24,8 @@ export function MetricCard({
   tone = 'info',
 }: {
   label: string
-  value: number
+  /** Nombre pour un compteur ; chaîne pour un taux déjà formaté (ex. "82%") — voir components/certificatServiceFait/FacturationPanel.tsx. */
+  value: number | string
   secondaryValue?: string
   tone?: MetricTone
 }) {

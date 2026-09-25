@@ -71,7 +71,7 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
 
   const [motifOrigine, setMotifOrigine] = useState<string | null>(null)
   const [commentaireReponse, setCommentaireReponse] = useState('')
-  const motifLabel = isReprisesCb ? 'Motif de la CB' : 'Motif du CDS'
+  const motifAuteur = isReprisesCb ? 'CB' : 'CDS'
 
   // Motif d'origine (décision du 23/09/2026 : généralisé à FAD_A_COMPLETER_CDS, qui n'affichait
   // rien jusqu'ici — seule la reprise CB était couverte) affiché en lecture seule, suivi du champ
@@ -232,28 +232,35 @@ export function TraiterFadRcModal({ demandeAchat, onClose, onSaved, onProgressSa
         </div>
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
           <div className="gp-modal__bd gp-scroll stack">
-            {isReprise && motifOrigine && (
-              <p className="gp-errmsg" style={{ background: 'var(--gp-warning-bg)', color: 'var(--gp-warning-text)' }}>
-                <svg className="ti">
-                  <use href="#i-alert-circle" />
-                </svg>
-                {motifLabel} : {motifOrigine}
-              </p>
-            )}
-
+            {/* Échange motif/réponse présenté comme un fil (décision du 23/09/2026) — deux blocs
+                empilés plutôt qu'une bannière isolée + un champ sans lien visuel avec elle.
+                Construit uniquement avec des primitives gp-* existantes (gp-label, gp-textarea,
+                --gp-warning-bg/--gp-info-bg déjà utilisés ailleurs) : pas de composant "chat"
+                dédié, absent du design system GPMM (voir ForClaude/INSTRUCTIONS_UX.md). */}
             {isReprise && (
-              <div className="gp-field">
-                <label className="gp-label" htmlFor="traiterfad-commentaire-reponse">
-                  Votre réponse (facultatif)
-                </label>
-                <textarea
-                  id="traiterfad-commentaire-reponse"
-                  className="gp-textarea"
-                  value={commentaireReponse}
-                  onChange={(e) => setCommentaireReponse(e.target.value)}
-                  maxLength={500}
-                  rows={3}
-                />
+              <div className="stack" style={{ gap: 8 }}>
+                {motifOrigine && (
+                  <div style={{ background: 'var(--gp-warning-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                    <p className="gp-label" style={{ color: 'var(--gp-warning-text)', margin: '0 0 4px' }}>
+                      {motifAuteur}
+                    </p>
+                    <p style={{ margin: 0, color: 'var(--gp-warning-text)' }}>{motifOrigine}</p>
+                  </div>
+                )}
+                <div style={{ background: 'var(--gp-info-bg)', borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>
+                  <label className="gp-label" htmlFor="traiterfad-commentaire-reponse" style={{ color: 'var(--gp-info-text)' }}>
+                    Vous (facultatif)
+                  </label>
+                  <textarea
+                    id="traiterfad-commentaire-reponse"
+                    className="gp-textarea"
+                    value={commentaireReponse}
+                    onChange={(e) => setCommentaireReponse(e.target.value)}
+                    placeholder="Votre réponse…"
+                    maxLength={500}
+                    rows={3}
+                  />
+                </div>
               </div>
             )}
 

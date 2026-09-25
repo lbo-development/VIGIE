@@ -1,19 +1,14 @@
 import { useEffect, useState } from 'react'
-import { getHistoriqueStatuts, type HistoriqueStatutView } from '../../hooks/useDemandeAchat'
-import { STATUT_BADGE_CLASS } from './constants'
+import { getHistoriqueStatutsCsf, type HistoriqueStatutCsfView } from '../../hooks/useCertificatServiceFait'
+import { STATUT_CSF_BADGE_CLASS } from './constants'
 
-interface HistoriqueStatutsModalProps {
-  idDemandeAchat: number
-  numero: string
+interface HistoriqueStatutsCsfModalProps {
+  idCsf: number
+  numeroCsf: string
   onClose: () => void
-  /** À fournir depuis pages/SuiviCds.tsx/pages/SuiviCb.tsx/pages/SuiviDs.tsx — voir useDemandeAchat.ts#getHistoriqueStatuts. */
-  role?: 'CDS' | 'CB' | 'DS'
 }
 
-/**
- * Tonalité du point/encart d'une entrée, dérivée de STATUT_BADGE_CLASS (même classification
- * que le badge affiché à côté — jamais une seconde source de vérité sur la couleur d'un statut).
- */
+/** Même tonalité que STATUT_BADGE_CLASS côté FAD — jamais une seconde source de vérité sur la couleur d'un statut. */
 const TONE_VARS: Record<string, { bg: string; text: string; solid: string }> = {
   'gp-badge--info': { bg: 'var(--gp-info-bg)', text: 'var(--gp-info-text)', solid: 'var(--gp-info)' },
   'gp-badge--success': { bg: 'var(--gp-success-bg)', text: 'var(--gp-success-text)', solid: 'var(--gp-success)' },
@@ -23,27 +18,21 @@ const TONE_VARS: Record<string, { bg: string; text: string; solid: string }> = {
 const DEFAULT_TONE = TONE_VARS['gp-badge--info']
 
 /**
- * Icône calendrier — fil chronologique des transitions de statut d'une DA/FAD (décision du
- * 23/09/2026, remplace l'ancien tableau). Plus récent en premier — affichage seulement, `rows`
- * reste dans l'ordre chronologique ascendant renvoyé par le backend, réutilisé tel quel par
- * TraiterFadRcModal/CompleterCbModal pour retrouver la dernière occurrence d'un statut via
- * [...rows].reverse().find(...). Aucune action possible (historique_statut est immuable en
- * base) — chaque transition affiche son commentaire directement quand il existe, dans un
- * encart teinté selon la tonalité du statut, plutôt que caché derrière une icône œil ouvrant
- * une 3e modale. Les entrées sans commentaire restent compactes (une seule ligne), pas de
- * gonflement pour les transitions routinières (la majorité). Écart assumé et validé
- * explicitement avec l'utilisateur par rapport au design system GPMM, qui ne propose aucun
- * composant "fil chronologique" — voir ForClaude/INSTRUCTIONS_UX.md.
+ * Fil chronologique des transitions de statut d'un CSF — même écart assumé
+ * et déjà validé côté FAD (HistoriqueStatutsModal.tsx, décision du
+ * 23/09/2026) : le design system GPMM ne propose aucun composant de type
+ * "fil"/timeline, voir ForClaude/INSTRUCTIONS_UX.md. Toutes les valeurs
+ * visuelles restent des variables --gp-* existantes.
  */
-export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose, role }: HistoriqueStatutsModalProps) {
+export function HistoriqueStatutsCsfModal({ idCsf, numeroCsf, onClose }: HistoriqueStatutsCsfModalProps) {
   const [loading, setLoading] = useState(true)
-  const [rows, setRows] = useState<HistoriqueStatutView[]>([])
+  const [rows, setRows] = useState<HistoriqueStatutCsfView[]>([])
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    getHistoriqueStatuts(idDemandeAchat, role)
+    getHistoriqueStatutsCsf(idCsf)
       .then((data) => {
         if (!cancelled) setRows(data)
       })
@@ -56,16 +45,16 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose, role }
     return () => {
       cancelled = true
     }
-  }, [idDemandeAchat, role])
+  }, [idCsf])
 
   const rowsTriees = [...rows].sort((a, b) => b.dateHeure.localeCompare(a.dateHeure))
 
   return (
     <div className="gp-overlay is-open">
-      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="historiqueStatutsModalTitle" style={{ maxWidth: 640 }}>
+      <div className="gp-modal" role="dialog" aria-modal="true" aria-labelledby="historiqueStatutsCsfModalTitle" style={{ maxWidth: 640 }}>
         <div className="gp-modal__hd">
-          <h3 className="gp-modal__title" id="historiqueStatutsModalTitle">
-            Historique des statuts — {numero}
+          <h3 className="gp-modal__title" id="historiqueStatutsCsfModalTitle">
+            Historique des statuts — {numeroCsf}
           </h3>
           <button className="gp-modal__close" aria-label="Fermer" onClick={onClose}>
             <svg className="ti">
@@ -83,15 +72,15 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose, role }
               {error}
             </p>
           )}
-          {!loading && !error && rows.length === 0 && <p>Aucun historique pour cette demande.</p>}
+          {!loading && !error && rows.length === 0 && <p>Aucun historique pour ce certificat.</p>}
           {!loading && !error && rows.length > 0 && (
             <div className="gp-scroll" style={{ maxHeight: 420, overflowY: 'auto' }}>
               <div style={{ position: 'relative', paddingLeft: 28 }}>
                 <div style={{ position: 'absolute', left: 7, top: 6, bottom: 6, width: 2, background: 'var(--gp-border)' }} />
                 {rowsTriees.map((row, index) => {
-                  const tone = TONE_VARS[STATUT_BADGE_CLASS[row.codeStatut] ?? ''] ?? DEFAULT_TONE
+                  const tone = TONE_VARS[STATUT_CSF_BADGE_CLASS[row.codeStatutCsf] ?? ''] ?? DEFAULT_TONE
                   return (
-                    <div key={row.idHisto} style={{ position: 'relative', paddingBottom: index === rowsTriees.length - 1 ? 0 : 14 }}>
+                    <div key={row.idHistoCsf} style={{ position: 'relative', paddingBottom: index === rowsTriees.length - 1 ? 0 : 14 }}>
                       <div
                         style={{
                           position: 'absolute',
@@ -108,16 +97,8 @@ export function HistoriqueStatutsModal({ idDemandeAchat, numero, onClose, role }
                         <span className="mono" style={{ fontSize: 12, color: 'var(--gp-text-muted)' }}>
                           {new Date(row.dateHeure).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}
                         </span>
-                        <span className={`gp-badge ${STATUT_BADGE_CLASS[row.codeStatut] ?? ''}`}>{row.libelleStatut}</span>
-                        <span style={{ fontSize: 13, color: 'var(--gp-text-secondary)' }}>
-                          {row.acteurNomPrenom ?? row.matriculeActeur}
-                          {row.suppleanceLabel && (
-                            <>
-                              <br />
-                              <span className="gp-help">{row.suppleanceLabel}</span>
-                            </>
-                          )}
-                        </span>
+                        <span className={`gp-badge ${STATUT_CSF_BADGE_CLASS[row.codeStatutCsf] ?? ''}`}>{row.libelleStatut}</span>
+                        <span style={{ fontSize: 13, color: 'var(--gp-text-secondary)' }}>{row.acteurNomPrenom ?? row.matriculeActeur}</span>
                       </div>
                       {row.commentaireStatut && (
                         <div style={{ marginTop: 8, background: tone.bg, borderRadius: 'var(--gp-radius)', padding: '10px 12px' }}>

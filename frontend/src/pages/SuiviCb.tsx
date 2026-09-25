@@ -158,7 +158,7 @@ export function SuiviCb() {
   }
 
   return (
-    <div className="stack">
+    <div className="stack tdb-page-fill">
       <div className="page-heading">
         <div>
           <h1>Suivi CB{cbRole?.perimeterLabel ? ` — ${cbRole.perimeterLabel}` : ''}</h1>
@@ -167,8 +167,8 @@ export function SuiviCb() {
       </div>
 
       {/* accueil-tiles-grid : même mise en page que pages/SuiviCds.tsx (styles/tableauDeBord.css). */}
-      <div className="demo-grid accueil-tiles-grid">
-      <div className="gp-panel">
+      <div className="demo-grid accueil-tiles-grid tdb-grid-fill">
+      <div className="gp-panel tdb-panel-fill">
         <div className="gp-tabs" role="tablist">
           {TABS.map((tab) => (
             <button
@@ -184,7 +184,7 @@ export function SuiviCb() {
           ))}
         </div>
 
-        <div className="stack" style={{ padding: '16px 0 0' }}>
+        <div className="stack tdb-body-fill" style={{ padding: '16px 0 0' }}>
           <div className="row" style={{ flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <div className="row" style={{ flexWrap: 'wrap', flex: 1 }}>
               <div className="gp-field" style={{ width: 260 }}>
@@ -250,7 +250,7 @@ export function SuiviCb() {
             </div>
           )}
 
-          <div className="gp-scroll stack" style={{ maxHeight: 'calc(70vh - 70px)', gap: 10 }}>
+          <div className="gp-scroll stack tdb-list-fill" style={{ gap: 10 }}>
             {listLoading && <p className="gp-help">Chargement…</p>}
             {!listLoading && demandesAchat.length === 0 && <p className="gp-help">Aucune demande pour ce filtre.</p>}
             {demandesAchat.map((da) => (

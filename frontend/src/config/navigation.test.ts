@@ -146,7 +146,10 @@ describe('getAccueilSidebarItems', () => {
   it('ajoute "FAD — <cellule>" pointant vers /suivi-rc avec un rôle RC (titulaire ou suppléant)', () => {
     const currentUser = meResponse([{ typeRole: 'RC', perimeterLabel: 'Cellule Achats Nord', idService: null, idCellule: 7 }])
 
-    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' }])
+    expect(getAccueilSidebarItems(currentUser)).toEqual([
+      { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
+      { to: '/suivi-csf-rc', label: 'CSF — Cellule Achats Nord', icon: 'i-circle-check' },
+    ])
   })
 
   it('ajoute "FAD (N+2) — <service>" pointant vers /suivi-cds avec un rôle CDS (titulaire ou suppléant)', () => {
@@ -164,13 +167,17 @@ describe('getAccueilSidebarItems', () => {
     expect(getAccueilSidebarItems(currentUser)).toEqual([
       { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
       { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
+      { to: '/suivi-csf-rc', label: 'CSF — Cellule Achats Nord', icon: 'i-circle-check' },
     ])
   })
 
   it('ajoute "FAD (CB) — <service>" pointant vers /suivi-cb avec un rôle CB (titulaire ou suppléant)', () => {
     const currentUser = meResponse([{ typeRole: 'CB', perimeterLabel: 'Service Maintenance', idService: 10, idCellule: null }])
 
-    expect(getAccueilSidebarItems(currentUser)).toEqual([{ to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' }])
+    expect(getAccueilSidebarItems(currentUser)).toEqual([
+      { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
+      { to: '/suivi-csf-cb', label: 'CSF (CB) — Service Maintenance', icon: 'i-circle-check' },
+    ])
   })
 
   it('cumul RC+CDS+CB : les trois entrées apparaissent, dans l\'ordre RC/CDS/CB', () => {
@@ -184,6 +191,8 @@ describe('getAccueilSidebarItems', () => {
       { to: '/suivi-rc', label: 'FAD — Cellule Achats Nord', icon: 'iv-rc' },
       { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
       { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
+      { to: '/suivi-csf-rc', label: 'CSF — Cellule Achats Nord', icon: 'i-circle-check' },
+      { to: '/suivi-csf-cb', label: 'CSF (CB) — Service Maintenance', icon: 'i-circle-check' },
     ])
   })
 
@@ -206,6 +215,8 @@ describe('getAccueilSidebarItems', () => {
       { to: '/suivi-cds', label: 'FAD (N+2) — Service Maintenance', icon: 'iv-cds' },
       { to: '/suivi-cb', label: 'FAD (CB) — Service Maintenance', icon: 'iv-cb' },
       { to: '/suivi-ds', label: 'FAD (N+3) — Direction Infrastructure', icon: 'iv-ds' },
+      { to: '/suivi-csf-rc', label: 'CSF — Cellule Achats Nord', icon: 'i-circle-check' },
+      { to: '/suivi-csf-cb', label: 'CSF (CB) — Service Maintenance', icon: 'i-circle-check' },
     ])
   })
 })
@@ -229,6 +240,11 @@ describe('isHomeSection', () => {
 
   it('reconnaît "/suivi-ds" et ses sous-pages', () => {
     expect(isHomeSection('/suivi-ds')).toBe(true)
+  })
+
+  it('reconnaît "/suivi-csf-rc" et "/suivi-csf-cb"', () => {
+    expect(isHomeSection('/suivi-csf-rc')).toBe(true)
+    expect(isHomeSection('/suivi-csf-cb')).toBe(true)
   })
 
   it('ignore une route hors de la section', () => {

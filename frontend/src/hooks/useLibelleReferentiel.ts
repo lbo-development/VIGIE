@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../services/api'
 
-export type DomaineReferentiel = 'TYPE_PIECE_MARCHE' | 'TYPE_PIECE_INVESTISSEMENT' | 'TYPE_PIECE_FAD'
+export type DomaineReferentiel = 'TYPE_PIECE_MARCHE' | 'TYPE_PIECE_INVESTISSEMENT' | 'TYPE_PIECE_FAD' | 'TYPE_PIECE_CSF'
 
 export interface LibelleReferentiel {
   domaine: string

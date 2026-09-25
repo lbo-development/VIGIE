@@ -331,7 +331,7 @@ describe('TraiterFadRcModal — DA_VALIDEE_RC/FAD_A_COMPLETER_CDS (complétion +
   it('DA_VALIDEE_RC (première transmission) : ni motif d\'origine, ni champ réponse — ce n\'est pas une reprise', () => {
     render(<TraiterFadRcModal demandeAchat={DA} onClose={vi.fn()} onSaved={vi.fn()} />)
     expect(getHistoriqueMock).not.toHaveBeenCalled()
-    expect(screen.queryByLabelText('Votre réponse (facultatif)')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Vous (facultatif)')).not.toBeInTheDocument()
   })
 
   // Décision du 23/09/2026 — écart corrigé : FAD_A_COMPLETER_CDS n'affichait jusqu'ici aucun motif
@@ -355,7 +355,8 @@ describe('TraiterFadRcModal — DA_VALIDEE_RC/FAD_A_COMPLETER_CDS (complétion +
       getHistoriqueMock.mockResolvedValue(ROWS)
       render(<TraiterFadRcModal demandeAchat={DA_A_COMPLETER} onClose={vi.fn()} onSaved={vi.fn()} />)
 
-      expect(await screen.findByText(/Motif du CDS : Numéro de marché manquant/)).toBeInTheDocument()
+      expect(await screen.findByText('Numéro de marché manquant')).toBeInTheDocument()
+      expect(screen.getByText('CDS')).toBeInTheDocument()
     })
 
     it('transmet la réponse saisie à transmettreFad', async () => {
@@ -363,7 +364,7 @@ describe('TraiterFadRcModal — DA_VALIDEE_RC/FAD_A_COMPLETER_CDS (complétion +
       render(<TraiterFadRcModal demandeAchat={DA_A_COMPLETER} onClose={vi.fn()} onSaved={vi.fn()} />)
 
       remplirChampsObligatoires()
-      fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Marché ajouté, voir pièce jointe.' } })
+      fireEvent.change(screen.getByLabelText('Vous (facultatif)'), { target: { value: 'Marché ajouté, voir pièce jointe.' } })
       fireEvent.click(screen.getByRole('button', { name: 'Transmettre au CDS' }))
 
       await waitFor(() =>
@@ -451,7 +452,7 @@ describe('TraiterFadRcModal — FAD_A_MODIFIER_CB (reprise, retransmission direc
     retransmettreCbMock.mockResolvedValue(DA_A_MODIFIER)
     render(<TraiterFadRcModal demandeAchat={DA_A_MODIFIER} onClose={vi.fn()} onSaved={vi.fn()} />)
 
-    fireEvent.change(screen.getByLabelText('Votre réponse (facultatif)'), { target: { value: 'Montant corrigé.' } })
+    fireEvent.change(screen.getByLabelText('Vous (facultatif)'), { target: { value: 'Montant corrigé.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Retransmettre à la CB' }))
 
     await waitFor(() => expect(retransmettreCbMock).toHaveBeenCalledWith(1, expect.objectContaining({ commentaireStatut: 'Montant corrigé.' })))
